@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 // --- ИКОНКИ (встроенные SVG для простоты) ---
 const ArrowRightIcon = ({ className = '' }) => (
-    <svg xmlns="http://www.w.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}>
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}>
         <path d="m9 18 6-6-6-6"/>
     </svg>
 );
@@ -115,13 +115,11 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 
 // --- Компонент: Детали новеллы ---
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedNovelIds, onPurchaseNovel }) => {
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedChapters, onPurchaseChapter }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    
-    const isNovelPurchased = purchasedNovelIds.includes(novel.id);
 
     useEffect(() => {
         setIsLoading(true);
@@ -150,21 +148,22 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedN
     }, [chapters, sortOrder]);
     
     const handleChapterClick = (chapter) => {
-        const isLocked = chapter.isPaid && !isNovelPurchased;
+        const isChapterPurchased = purchasedChapters[novel.id]?.includes(chapter.id);
+        const isLocked = chapter.isPaid && !isChapterPurchased;
         const tg = window.Telegram?.WebApp;
 
         if (isLocked) {
             if (tg && tg.showPopup) {
                 tg.showPopup({
                     title: 'Глава заблокирована',
-                    message: 'Для доступа к этой и всем последующим главам требуется оплата. Разблокировать новеллу?',
+                    message: `Для доступа к главе "${chapter.title}" требуется оплата. Разблокировать?`,
                     buttons: [
-                        { id: 'buy', type: 'default', text: 'Разблокировать' },
+                        { id: 'buy_chapter', type: 'default', text: 'Разблокировать главу' },
                         { type: 'cancel' },
                     ]
                 }, (buttonId) => {
-                    if (buttonId === 'buy') {
-                        onPurchaseNovel(novel.id);
+                    if (buttonId === 'buy_chapter') {
+                        onPurchaseChapter(novel.id, chapter.id);
                     }
                 });
             } else {
@@ -200,7 +199,8 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedN
                 {isLoading ? <p className={t.text}>Загрузка глав...</p> : (
                     <div className="flex flex-col gap-3">
                         {sortedChapters.map(chapter => {
-                            const showLock = chapter.isPaid && !isNovelPurchased;
+                            const isChapterPurchased = purchasedChapters[novel.id]?.includes(chapter.id);
+                            const showLock = chapter.isPaid && !isChapterPurchased;
                             return (
                                 <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-colors duration-200 hover:border-pink-400 border ${t.border} flex items-center justify-between ${showLock ? 'opacity-70' : ''}`}>
                                     <div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>
@@ -238,14 +238,12 @@ export default function App() {
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
   
-  // --- ИЗМЕНЕНИЕ №1: Загружаем "покупки" из localStorage при старте ---
-  const [purchasedNovelIds, setPurchasedNovelIds] = useState(() => {
+  const [purchasedChapters, setPurchasedChapters] = useState(() => {
     try {
-      const savedPurchases = localStorage.getItem('purchased_novels');
-      return savedPurchases ? JSON.parse(savedPurchases) : [];
+      const saved = localStorage.getItem('purchased_chapters');
+      return saved ? JSON.parse(saved) : {};
     } catch (error) {
-      console.error("Не удалось загрузить покупки:", error);
-      return [];
+      return {};
     }
   });
   
@@ -257,30 +255,28 @@ export default function App() {
         tg.expand();
     }
     fetch('data/novels.json')
-      .then(res => {
-          if (!res.ok) throw new Error('Network response was not ok');
-          return res.json()
-      })
+      .then(res => res.json())
       .then(data => setNovels(data.novels))
       .catch(err => console.error("Failed to load novels:", err));
   }, [tg]);
 
-  // --- ИЗМЕНЕНИЕ №2: Сохраняем "покупки" в localStorage при изменении ---
   useEffect(() => {
-    try {
-      localStorage.setItem('purchased_novels', JSON.stringify(purchasedNovelIds));
-    } catch (error) {
-      console.error("Не удалось сохранить покупки:", error);
-    }
-  }, [purchasedNovelIds]);
+    localStorage.setItem('purchased_chapters', JSON.stringify(purchasedChapters));
+  }, [purchasedChapters]);
 
-  const handlePurchaseNovel = (novelId) => {
-      setPurchasedNovelIds(prevIds => {
-          if (prevIds.includes(novelId)) return prevIds;
-          return [...prevIds, novelId];
+  const handlePurchaseChapter = (novelId, chapterId) => {
+      setPurchasedChapters(prev => {
+          const currentNovelPurchases = prev[novelId] || [];
+          if (currentNovelPurchases.includes(chapterId)) {
+              return prev;
+          }
+          return {
+              ...prev,
+              [novelId]: [...currentNovelPurchases, chapterId]
+          };
       });
       if (tg && tg.showAlert) {
-        tg.showAlert('Новелла успешно разблокирована!');
+        tg.showAlert('Глава успешно разблокирована!');
       }
   };
 
@@ -314,7 +310,7 @@ export default function App() {
 
   const renderPage = () => {
     switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedNovelIds={purchasedNovelIds} onPurchaseNovel={handlePurchaseNovel} />;
+      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedChapters={purchasedChapters} onPurchaseChapter={handlePurchaseChapter} />;
       case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={setTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }

@@ -141,14 +141,15 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedC
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const baseUrl = import.meta.env.BASE_URL;
 
     useEffect(() => {
         setIsLoading(true);
-        fetch(`data/chapters/${novel.id}.json`)
+        fetch(`${baseUrl}data/chapters/${novel.id}.json`)
             .then(res => res.json())
             .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
             .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
-    }, [novel.id]);
+    }, [novel.id, baseUrl]);
 
     const sortedChapters = useMemo(() => {
         const chaptersCopy = [...chapters];
@@ -162,12 +163,23 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedC
         const tg = window.Telegram?.WebApp;
 
         if (isLocked) {
-            if (tg) {
-                const textPayload = `pay_${novel.id}_${chapter.id}`;
-                tg.openTelegramLink(`https://t.me/${botUsername}?start=${textPayload}`);
-                tg.close();
+            if (tg && tg.showPopup) {
+                // --- НОВОЕ ИЗМЕНЕНИЕ ---
+                // Сначала показываем окно с подтверждением
+                tg.showPopup({
+                    title: 'Переход к оплате',
+                    message: `Вы будете перенаправлены в чат с ботом для получения инструкций по оплате главы "${chapter.title}".`,
+                    buttons: [{ id: 'continue', type: 'default', text: 'Продолжить' }, { type: 'cancel' }]
+                }, (buttonId) => {
+                    // Если пользователь нажал "Продолжить", переходим в бот
+                    if (buttonId === 'continue') {
+                        const textPayload = `pay_${novel.id}_${chapter.id}`;
+                        tg.openTelegramLink(`https://t.me/${botUsername}?start=${textPayload}`);
+                        tg.close();
+                    }
+                });
             } else {
-                alert('Не удалось перейти к боту для оплаты.');
+                alert('Не удалось перейти к боту для оплаты. Пожалуйста, убедитесь, что вы открыли приложение в Telegram.');
             }
         } else {
             onSelectChapter(chapter);
@@ -242,6 +254,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   const BOT_USERNAME = "tenebrisverbot";
+  const baseUrl = import.meta.env.BASE_URL;
 
   // Эффект для инициализации Firebase и аутентификации пользователя
   useEffect(() => {
@@ -267,7 +280,7 @@ export default function App() {
           setPurchasedChapters(docSnap.data().purchases || {});
         }
         
-        const response = await fetch('data/novels.json');
+        const response = await fetch(`${baseUrl}data/novels.json`);
         if (!response.ok) {
             throw new Error('Failed to fetch novels');
         }
@@ -282,9 +295,8 @@ export default function App() {
     };
 
     init();
-  }, []);
+  }, [baseUrl]);
 
-  // Функция покупки главы (остается без изменений)
   const handlePurchaseChapter = async (novelId, chapterId) => {
       if (!userId) return;
       const newPurchases = { ...purchasedChapters, [novelId]: [...(purchasedChapters[novelId] || []), chapterId] };
@@ -299,7 +311,6 @@ export default function App() {
       }
   };
   
-  // Остальная логика без изменений...
   useEffect(() => { document.documentElement.className = theme; }, [theme]);
   const handleBack = useCallback(() => {
       if (page === 'reader') setPage('details');

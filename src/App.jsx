@@ -24,6 +24,13 @@ const SearchIcon = ({ className = '' }) => (
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
     </svg>
 );
+const LockIcon = ({ className = '' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}>
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+);
+
 
 // --- Цветовые Схемы ---
 const themes = {
@@ -108,25 +115,28 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 
 // --- Компонент: Детали новеллы ---
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme }) => {
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedNovelIds, onPurchaseNovel }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    
+    const isNovelPurchased = purchasedNovelIds.includes(novel.id);
 
     useEffect(() => {
         setIsLoading(true);
-        fetch(`/data/chapters/${novel.id}.json`)
+        fetch(`data/chapters/${novel.id}.json`)
             .then(res => {
                 if (!res.ok) throw new Error('Network response was not ok');
                 return res.json();
             })
             .then(data => {
-                setChapters(data.chapters);
+                setChapters(data.chapters || []);
                 setIsLoading(false);
             })
             .catch(err => {
                 console.error("Failed to load chapters:", err);
+                setChapters([]);
                 setIsLoading(false);
             });
     }, [novel.id]);
@@ -138,6 +148,32 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme }) => {
         }
         return chaptersCopy;
     }, [chapters, sortOrder]);
+    
+    const handleChapterClick = (chapter) => {
+        const isLocked = chapter.isPaid && !isNovelPurchased;
+        const tg = window.Telegram?.WebApp;
+
+        if (isLocked) {
+            if (tg && tg.showPopup) {
+                tg.showPopup({
+                    title: 'Глава заблокирована',
+                    message: 'Для доступа к этой и всем последующим главам требуется оплата. Разблокировать новеллу?',
+                    buttons: [
+                        { id: 'buy', type: 'default', text: 'Разблокировать' },
+                        { type: 'cancel' },
+                    ]
+                }, (buttonId) => {
+                    if (buttonId === 'buy') {
+                        onPurchaseNovel(novel.id);
+                    }
+                });
+            } else {
+                alert('Эта глава платная. В приложении Telegram здесь будет окно покупки.');
+            }
+        } else {
+            onSelectChapter(chapter);
+        }
+    };
 
     return (
         <div className={t.text}>
@@ -163,12 +199,15 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme }) => {
                 </div>
                 {isLoading ? <p className={t.text}>Загрузка глав...</p> : (
                     <div className="flex flex-col gap-3">
-                        {sortedChapters.map(chapter => (
-                            <div key={chapter.id} onClick={() => onSelectChapter(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-colors duration-200 hover:border-pink-400 border ${t.border} flex items-center justify-between`}>
-                                <div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>
-                                <ArrowRightIcon className={t.text}/>
-                            </div>
-                        ))}
+                        {sortedChapters.map(chapter => {
+                            const showLock = chapter.isPaid && !isNovelPurchased;
+                            return (
+                                <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-colors duration-200 hover:border-pink-400 border ${t.border} flex items-center justify-between ${showLock ? 'opacity-70' : ''}`}>
+                                    <div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>
+                                    {showLock ? <LockIcon className={t.text} /> : <ArrowRightIcon className={t.text}/>}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -198,16 +237,33 @@ export default function App() {
   const [selectedNovel, setSelectedNovel] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
+  const [purchasedNovelIds, setPurchasedNovelIds] = useState([]);
+  
+  const tg = window.Telegram?.WebApp;
 
   useEffect(() => {
-    fetch('/data/novels.json')
+    if(tg) {
+        tg.ready();
+        tg.expand();
+    }
+    fetch('data/novels.json')
       .then(res => {
           if (!res.ok) throw new Error('Network response was not ok');
           return res.json()
       })
       .then(data => setNovels(data.novels))
       .catch(err => console.error("Failed to load novels:", err));
-  }, []);
+  }, [tg]);
+
+  const handlePurchaseNovel = (novelId) => {
+      setPurchasedNovelIds(prevIds => {
+          if (prevIds.includes(novelId)) return prevIds;
+          return [...prevIds, novelId];
+      });
+      if (tg && tg.showAlert) {
+        tg.showAlert('Новелла успешно разблокирована!');
+      }
+  };
 
   useEffect(() => { document.documentElement.className = theme; }, [theme]);
 
@@ -219,21 +275,18 @@ export default function App() {
   const handleHome = useCallback(() => { setPage('list'); setGenreFilter(null); }, []);
 
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
     if (!tg) return;
-    tg.ready();
-    tg.expand();
     tg.onEvent('backButtonClicked', handleBack);
-    if (page === 'list') tg.BackButton.hide(); else tg.BackButton.show();
+    if (page === 'list') tg.BackButton.hide();
+    else tg.BackButton.show();
     return () => tg.offEvent('backButtonClicked', handleBack);
-  }, [page, handleBack]);
+  }, [page, handleBack, tg]);
 
   useEffect(() => {
-      const tg = window.Telegram?.WebApp;
       if (!tg) return;
       tg.setHeaderColor(themes[theme].tgHeader);
       tg.setBackgroundColor(themes[theme].tgBg);
-  }, [theme]);
+  }, [theme, tg]);
 
   const handleSelectNovel = (novel) => { setSelectedNovel(novel); setPage('details'); };
   const handleSelectChapter = (chapter) => { setSelectedChapter(chapter); setPage('reader'); };
@@ -242,12 +295,12 @@ export default function App() {
 
   const renderPage = () => {
     switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} />;
+      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedNovelIds={purchasedNovelIds} onPurchaseNovel={handlePurchaseNovel} />;
       case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={setTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }
   };
-
+  
   const t = themes[theme];
   return (
     <main className={`${t.bg} min-h-screen`}>
@@ -256,4 +309,3 @@ export default function App() {
     </main>
   );
 }
-

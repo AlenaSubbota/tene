@@ -2,28 +2,35 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 // --- ИКОНКИ (встроенные SVG для простоты) ---
 const ArrowRightIcon = ({ className = '' }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}>
+    <svg xmlns="http://www.w.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}>
         <path d="m9 18 6-6-6-6"/>
     </svg>
 );
 const SunIcon = ({ className = '' }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
+    <svg xmlns="http://www.w.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>
 );
 const MoonIcon = ({ className = '' }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
+    <svg xmlns="http://www.w.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>
 );
 const HomeIcon = ({ className = '' }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+    <svg xmlns="http://www.w.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
 );
 const BackIcon = ({ className = '' }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>
+    <svg xmlns="http://www.w.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>
 );
 const SearchIcon = ({ className = '' }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 ${className}`}>
+    <svg xmlns="http://www.w.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 ${className}`}>
         <circle cx="11" cy="11" r="8"></circle>
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
     </svg>
 );
+const LockIcon = ({ className = '' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}>
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+);
+
 
 // --- Цветовые Схемы ---
 const themes = {
@@ -122,11 +129,12 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme }) => {
                 return res.json();
             })
             .then(data => {
-                setChapters(data.chapters);
+                setChapters(data.chapters || []); // Добавлена проверка на случай пустого файла
                 setIsLoading(false);
             })
             .catch(err => {
                 console.error("Failed to load chapters:", err);
+                setChapters([]); // В случае ошибки ставим пустой массив
                 setIsLoading(false);
             });
     }, [novel.id]);
@@ -138,6 +146,27 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme }) => {
         }
         return chaptersCopy;
     }, [chapters, sortOrder]);
+    
+    const handleChapterClick = (chapter) => {
+        if (chapter.isPaid) {
+            // Используем нативный попап Telegram для уведомления
+            window.Telegram?.WebApp.showPopup({
+                title: 'Глава заблокирована',
+                message: 'Для доступа к этой главе требуется оплата. Нажмите OK, чтобы перейти к оплате.',
+                buttons: [
+                    { id: 'buy', type: 'default', text: 'Оплатить' },
+                    { type: 'cancel' },
+                ]
+            }, (buttonId) => {
+                if (buttonId === 'buy') {
+                    // Здесь будет логика перехода к оплате
+                    window.Telegram?.WebApp.showAlert('Переход к окну оплаты...');
+                }
+            });
+        } else {
+            onSelectChapter(chapter);
+        }
+    };
 
     return (
         <div className={t.text}>
@@ -164,9 +193,9 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme }) => {
                 {isLoading ? <p className={t.text}>Загрузка глав...</p> : (
                     <div className="flex flex-col gap-3">
                         {sortedChapters.map(chapter => (
-                            <div key={chapter.id} onClick={() => onSelectChapter(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-colors duration-200 hover:border-pink-400 border ${t.border} flex items-center justify-between`}>
+                            <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-colors duration-200 hover:border-pink-400 border ${t.border} flex items-center justify-between ${chapter.isPaid ? 'opacity-70' : ''}`}>
                                 <div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>
-                                <ArrowRightIcon className={t.text}/>
+                                {chapter.isPaid ? <LockIcon className={t.text} /> : <ArrowRightIcon className={t.text}/>}
                             </div>
                         ))}
                     </div>
@@ -256,3 +285,4 @@ export default function App() {
     </main>
   );
 }
+

@@ -115,7 +115,7 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 
 // --- Компонент: Детали новеллы ---
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedNovelIds, onPurchaseNovel, tg }) => {
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedNovelIds, onPurchaseNovel }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
@@ -151,6 +151,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedN
     
     const handleChapterClick = (chapter) => {
         const isLocked = chapter.isPaid && !isNovelPurchased;
+        const tg = window.Telegram?.WebApp;
 
         if (isLocked) {
             if (tg && tg.showPopup) {
@@ -228,8 +229,8 @@ const ChapterReader = ({ chapter, novel, theme }) => {
   );
 };
 
-// --- Главный компонент приложения ---
-export default function App() {
+// --- Компонент-обертка для управления приложением ---
+const AppController = () => {
   const [theme, setTheme] = useState('light');
   const [page, setPage] = useState('list');
   const [novels, setNovels] = useState([]);
@@ -237,18 +238,14 @@ export default function App() {
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
   const [purchasedNovelIds, setPurchasedNovelIds] = useState([]);
-  const [tg, setTg] = useState(null);
+  
+  const tg = window.Telegram?.WebApp;
 
   useEffect(() => {
-    // Получаем объект Telegram Web App один раз при запуске
-    if (window.Telegram?.WebApp) {
-        const telegramApp = window.Telegram.WebApp;
-        telegramApp.ready();
-        telegramApp.expand();
-        setTg(telegramApp);
+    if(tg) {
+        tg.ready();
+        tg.expand();
     }
-
-    // Загружаем список новелл
     fetch('data/novels.json')
       .then(res => {
           if (!res.ok) throw new Error('Network response was not ok');
@@ -256,15 +253,12 @@ export default function App() {
       })
       .then(data => setNovels(data.novels))
       .catch(err => console.error("Failed to load novels:", err));
-  }, []);
+  }, [tg]);
 
   const handlePurchaseNovel = (novelId) => {
       setPurchasedNovelIds(prevIds => {
-          if (prevIds.includes(novelId)) {
-              return prevIds;
-          }
-          const newIds = [...prevIds, novelId];
-          return newIds;
+          if (prevIds.includes(novelId)) return prevIds;
+          return [...prevIds, novelId];
       });
       if (tg && tg.showAlert) {
         tg.showAlert('Новелла успешно разблокирована!');
@@ -282,14 +276,9 @@ export default function App() {
 
   useEffect(() => {
     if (!tg) return;
-
     tg.onEvent('backButtonClicked', handleBack);
-    if (page === 'list') {
-        tg.BackButton.hide();
-    } else {
-        tg.BackButton.show();
-    }
-    
+    if (page === 'list') tg.BackButton.hide();
+    else tg.BackButton.show();
     return () => tg.offEvent('backButtonClicked', handleBack);
   }, [page, handleBack, tg]);
 
@@ -306,12 +295,12 @@ export default function App() {
 
   const renderPage = () => {
     switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedNovelIds={purchasedNovelIds} onPurchaseNovel={handlePurchaseNovel} tg={tg} />;
+      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedNovelIds={purchasedNovelIds} onPurchaseNovel={handlePurchaseNovel} />;
       case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={setTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }
   };
-
+  
   const t = themes[theme];
   return (
     <main className={`${t.bg} min-h-screen`}>
@@ -319,4 +308,35 @@ export default function App() {
       {page !== 'list' && <FloatingNav onBack={handleBack} onHome={handleHome} />}
     </main>
   );
+}
+
+// --- Главный компонент, который проверяет готовность API ---
+export default function App() {
+    const [isTgReady, setIsTgReady] = useState(false);
+
+    useEffect(() => {
+        // Если API уже готово, сразу показываем приложение
+        if (window.Telegram?.WebApp?.initData) {
+            setIsTgReady(true);
+        } else {
+            // Если нет, ждем события 'TelegramWebAppReady'
+            // Это событие отправляет сам Telegram, когда все готово
+            const onTgReady = () => {
+                setIsTgReady(true);
+                document.removeEventListener('TelegramWebAppReady', onTgReady);
+            };
+            document.addEventListener('TelegramWebAppReady', onTgReady);
+            
+            // Защита на случай, если событие не сработает
+            setTimeout(() => {
+                if (!isTgReady) setIsTgReady(true);
+            }, 1500);
+        }
+    }, [isTgReady]);
+
+    if (!isTgReady) {
+        return <div style={{ color: '#888', textAlign: 'center', paddingTop: '40px' }}>Инициализация приложения...</div>;
+    }
+
+    return <AppController />;
 }

@@ -136,20 +136,19 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 
 // --- Компонент: Детали новеллы ---
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedChapters, botUsername }) => {
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedChapters, botUsername, userId }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const baseUrl = import.meta.env.BASE_URL;
 
     useEffect(() => {
         setIsLoading(true);
-        fetch(`${baseUrl}data/chapters/${novel.id}.json`)
+        fetch(`data/chapters/${novel.id}.json`)
             .then(res => res.json())
             .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
             .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
-    }, [novel.id, baseUrl]);
+    }, [novel.id]);
 
     const sortedChapters = useMemo(() => {
         const chaptersCopy = [...chapters];
@@ -157,24 +156,30 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedC
         return chaptersCopy;
     }, [chapters, sortOrder]);
     
-    const handleChapterClick = (chapter) => {
+    const handleChapterClick = async (chapter) => {
         const isChapterPurchased = purchasedChapters[novel.id]?.includes(chapter.id);
         const isLocked = chapter.isPaid && !isChapterPurchased;
         const tg = window.Telegram?.WebApp;
 
         if (isLocked) {
-            if (tg && tg.showPopup) {
-                // --- НОВОЕ ИЗМЕНЕНИЕ ---
-                // Сначала показываем окно с подтверждением
+            if (tg && userId) {
+                const userDocRef = doc(db, "users", userId);
+                await setDoc(userDocRef, { 
+                    pendingPayment: {
+                        novelId: novel.id,
+                        chapterId: chapter.id,
+                        novelTitle: novel.title,
+                        chapterTitle: chapter.title
+                    }
+                }, { merge: true });
+
                 tg.showPopup({
                     title: 'Переход к оплате',
                     message: `Вы будете перенаправлены в чат с ботом для получения инструкций по оплате главы "${chapter.title}".`,
                     buttons: [{ id: 'continue', type: 'default', text: 'Продолжить' }, { type: 'cancel' }]
                 }, (buttonId) => {
-                    // Если пользователь нажал "Продолжить", переходим в бот
                     if (buttonId === 'continue') {
-                        const textPayload = `pay_${novel.id}_${chapter.id}`;
-                        tg.openTelegramLink(`https://t.me/${botUsername}?start=${textPayload}`);
+                        tg.openTelegramLink(`https://t.me/${botUsername}`);
                         tg.close();
                     }
                 });
@@ -254,7 +259,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   const BOT_USERNAME = "tenebrisverbot";
-  const baseUrl = import.meta.env.BASE_URL;
 
   // Эффект для инициализации Firebase и аутентификации пользователя
   useEffect(() => {
@@ -280,7 +284,7 @@ export default function App() {
           setPurchasedChapters(docSnap.data().purchases || {});
         }
         
-        const response = await fetch(`${baseUrl}data/novels.json`);
+        const response = await fetch('data/novels.json');
         if (!response.ok) {
             throw new Error('Failed to fetch novels');
         }
@@ -295,8 +299,9 @@ export default function App() {
     };
 
     init();
-  }, [baseUrl]);
+  }, []);
 
+  // Функция покупки главы (остается без изменений)
   const handlePurchaseChapter = async (novelId, chapterId) => {
       if (!userId) return;
       const newPurchases = { ...purchasedChapters, [novelId]: [...(purchasedChapters[novelId] || []), chapterId] };
@@ -311,6 +316,7 @@ export default function App() {
       }
   };
   
+  // Остальная логика без изменений...
   useEffect(() => { document.documentElement.className = theme; }, [theme]);
   const handleBack = useCallback(() => {
       if (page === 'reader') setPage('details');
@@ -342,7 +348,7 @@ export default function App() {
 
   const renderPage = () => {
     switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedChapters={purchasedChapters} onPurchaseChapter={handlePurchaseChapter} botUsername={BOT_USERNAME} />;
+      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedChapters={purchasedChapters} onPurchaseChapter={handlePurchaseChapter} botUsername={BOT_USERNAME} userId={userId} />;
       case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={setTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }

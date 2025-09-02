@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 
 // --- ИКОНКИ (встроенные SVG для простоты) ---
 const ArrowRightIcon = ({ className = '' }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}>
+    <svg xmlns="http://www.w.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}>
         <path d="m9 18 6-6-6-6"/>
     </svg>
 );
@@ -237,7 +237,17 @@ export default function App() {
   const [selectedNovel, setSelectedNovel] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
-  const [purchasedNovelIds, setPurchasedNovelIds] = useState([]);
+  
+  // --- ИЗМЕНЕНИЕ №1: Загружаем "покупки" из localStorage при старте ---
+  const [purchasedNovelIds, setPurchasedNovelIds] = useState(() => {
+    try {
+      const savedPurchases = localStorage.getItem('purchased_novels');
+      return savedPurchases ? JSON.parse(savedPurchases) : [];
+    } catch (error) {
+      console.error("Не удалось загрузить покупки:", error);
+      return [];
+    }
+  });
   
   const tg = window.Telegram?.WebApp;
 
@@ -254,6 +264,15 @@ export default function App() {
       .then(data => setNovels(data.novels))
       .catch(err => console.error("Failed to load novels:", err));
   }, [tg]);
+
+  // --- ИЗМЕНЕНИЕ №2: Сохраняем "покупки" в localStorage при изменении ---
+  useEffect(() => {
+    try {
+      localStorage.setItem('purchased_novels', JSON.stringify(purchasedNovelIds));
+    } catch (error) {
+      console.error("Не удалось сохранить покупки:", error);
+    }
+  }, [purchasedNovelIds]);
 
   const handlePurchaseNovel = (novelId) => {
       setPurchasedNovelIds(prevIds => {
@@ -309,3 +328,4 @@ export default function App() {
     </main>
   );
 }
+

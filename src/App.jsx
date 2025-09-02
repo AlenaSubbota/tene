@@ -30,6 +30,9 @@ const LockIcon = ({ className = '' }) => (
         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
     </svg>
 );
+const CopyIcon = ({ className = '' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+);
 
 
 // --- Цветовые Схемы ---
@@ -37,6 +40,61 @@ const themes = {
   light: { bg: 'bg-stone-100', text: 'text-stone-800', componentBg: 'bg-white', componentText: 'text-stone-700', border: 'border-stone-200', searchBg: 'bg-white', searchPlaceholder: 'placeholder-stone-400', searchRing: 'focus:ring-pink-400', tgBg: '#F5F5F0', tgHeader: '#FFFFFF' },
   dark: { bg: 'bg-gray-900', text: 'text-gray-100', componentBg: 'bg-gray-800', componentText: 'text-gray-200', border: 'border-gray-700', searchBg: 'bg-gray-800', searchPlaceholder: 'placeholder-gray-500', searchRing: 'focus:ring-pink-500', tgBg: '#121212', tgHeader: '#171717' }
 };
+
+// --- Компонент: Модальное окно для ручной оплаты ---
+const ManualPaymentModal = ({ chapter, novel, onClose, onConfirm, theme }) => {
+    const t = themes[theme];
+    const paymentCode = useMemo(() => `TENE${novel.id}${chapter.id}${Math.floor(Math.random() * 100)}`, [novel, chapter]);
+    const cardNumber = "5555 4444 3333 2222"; // <--- ЗАМЕНИТЕ НА ВАШ НОМЕР КАРТЫ
+    const amount = 15; // Цена в рублях
+
+    const copyToClipboard = (text) => {
+        navigator.clipboard.writeText(text).then(() => {
+            window.Telegram?.WebApp.showAlert('Скопировано!');
+        });
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className={`w-full max-w-sm rounded-2xl p-6 shadow-lg ${t.componentBg} ${t.text}`}>
+                <h2 className="text-xl font-bold mb-2">Оплата главы</h2>
+                <p className={`text-sm mb-4 opacity-70`}>Для доступа к "{chapter.title}" выполните перевод:</p>
+                
+                <div className="space-y-4 text-sm">
+                    <div>
+                        <p className="font-bold">1. Сумма</p>
+                        <div className={`mt-1 flex justify-between items-center p-3 rounded-lg border ${t.border}`}>
+                            <span className="font-mono text-lg">{amount} ₽</span>
+                            <button onClick={() => copyToClipboard(String(amount))} className="p-2 rounded-md hover:bg-stone-100 dark:hover:bg-gray-700"><CopyIcon /></button>
+                        </div>
+                    </div>
+                    <div>
+                        <p className="font-bold">2. Номер карты (СБП)</p>
+                         <div className={`mt-1 flex justify-between items-center p-3 rounded-lg border ${t.border}`}>
+                            <span className="font-mono text-lg">{cardNumber}</span>
+                            <button onClick={() => copyToClipboard(cardNumber)} className="p-2 rounded-md hover:bg-stone-100 dark:hover:bg-gray-700"><CopyIcon /></button>
+                        </div>
+                    </div>
+                    <div>
+                        <p className="font-bold">3. Комментарий к переводу (ОБЯЗАТЕЛЬНО)</p>
+                         <div className={`mt-1 flex justify-between items-center p-3 rounded-lg border ${t.border}`}>
+                            <span className="font-mono text-lg text-pink-500">{paymentCode}</span>
+                            <button onClick={() => copyToClipboard(paymentCode)} className="p-2 rounded-md hover:bg-stone-100 dark:hover:bg-gray-700"><CopyIcon /></button>
+                        </div>
+                    </div>
+                </div>
+
+                <p className="text-xs opacity-60 mt-4">После перевода вернитесь сюда и нажмите "Я оплатил(а)".</p>
+
+                <div className="flex gap-3 mt-6">
+                    <button onClick={onClose} className={`w-full py-3 rounded-lg border ${t.border}`}>Отмена</button>
+                    <button onClick={onConfirm} className="w-full py-3 rounded-lg bg-pink-500 text-white font-semibold">Я оплатил(а)</button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 // --- Компонент: Плавающая навигация ---
 const FloatingNav = ({ onBack, onHome }) => {
@@ -79,23 +137,19 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
           {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
         </button>
       </div>
-
       {genreFilter && (
         <div className={`flex items-center justify-between p-3 mb-4 rounded-lg border ${t.border} ${t.componentBg}`}>
             <p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p>
             <button onClick={onClearGenreFilter} className="text-xs font-bold text-pink-500 hover:underline">Сбросить</button>
         </div>
       )}
-
       <div className="relative mb-6">
         <SearchIcon className={t.searchPlaceholder} />
         <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
           className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-2 pl-10 pr-4 ${t.text} ${t.searchPlaceholder} focus:outline-none focus:ring-2 ${t.searchRing} transition-shadow duration-300`}
         />
       </div>
-      
-      {filteredNovels.length > 0 ? (
-        <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4">
+      <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4">
           {filteredNovels.map(novel => (
             <div key={novel.id} onClick={() => onSelectNovel(novel)} className="cursor-pointer group relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-pink-500 to-purple-500 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition duration-500"></div>
@@ -107,9 +161,6 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
             </div>
           ))}
         </div>
-      ) : (
-        <p className="text-gray-500 text-center mt-8">Ничего не найдено.</p>
-      )}
     </div>
   );
 };
@@ -120,62 +171,49 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedC
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [paymentModalChapter, setPaymentModalChapter] = useState(null);
 
     useEffect(() => {
         setIsLoading(true);
         fetch(`data/chapters/${novel.id}.json`)
-            .then(res => {
-                if (!res.ok) throw new Error('Network response was not ok');
-                return res.json();
-            })
-            .then(data => {
-                setChapters(data.chapters || []);
-                setIsLoading(false);
-            })
-            .catch(err => {
-                console.error("Failed to load chapters:", err);
-                setChapters([]);
-                setIsLoading(false);
-            });
+            .then(res => res.json())
+            .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
+            .catch(err => { setChapters([]); setIsLoading(false); });
     }, [novel.id]);
 
     const sortedChapters = useMemo(() => {
         const chaptersCopy = [...chapters];
-        if (sortOrder === 'newest') {
-            return chaptersCopy.reverse();
-        }
+        if (sortOrder === 'newest') return chaptersCopy.reverse();
         return chaptersCopy;
     }, [chapters, sortOrder]);
     
     const handleChapterClick = (chapter) => {
         const isChapterPurchased = purchasedChapters[novel.id]?.includes(chapter.id);
         const isLocked = chapter.isPaid && !isChapterPurchased;
-        const tg = window.Telegram?.WebApp;
 
         if (isLocked) {
-            if (tg && tg.showPopup) {
-                tg.showPopup({
-                    title: 'Глава заблокирована',
-                    message: `Для доступа к главе "${chapter.title}" требуется оплата. Разблокировать?`,
-                    buttons: [
-                        { id: 'buy_chapter', type: 'default', text: 'Разблокировать главу' },
-                        { type: 'cancel' },
-                    ]
-                }, (buttonId) => {
-                    if (buttonId === 'buy_chapter') {
-                        onPurchaseChapter(novel.id, chapter.id);
-                    }
-                });
-            } else {
-                alert('Эта глава платная. В приложении Telegram здесь будет окно покупки.');
-            }
+            setPaymentModalChapter(chapter);
         } else {
             onSelectChapter(chapter);
         }
     };
 
+    const handleConfirmPayment = () => {
+        onPurchaseChapter(novel.id, paymentModalChapter.id);
+        setPaymentModalChapter(null);
+    };
+
     return (
         <div className={t.text}>
+            {paymentModalChapter && (
+                <ManualPaymentModal 
+                    novel={novel}
+                    chapter={paymentModalChapter}
+                    onClose={() => setPaymentModalChapter(null)}
+                    onConfirm={handleConfirmPayment}
+                    theme={theme}
+                />
+            )}
             <div className="relative h-64">
                 <img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/>
                 <div className={`absolute inset-0 bg-gradient-to-t ${theme === 'dark' ? 'from-gray-900 via-gray-900/80' : 'from-stone-100 via-stone-100/80'} to-transparent`}></div>
@@ -242,9 +280,7 @@ export default function App() {
     try {
       const saved = localStorage.getItem('purchased_chapters');
       return saved ? JSON.parse(saved) : {};
-    } catch (error) {
-      return {};
-    }
+    } catch (error) { return {}; }
   });
   
   const tg = window.Telegram?.WebApp;
@@ -267,13 +303,8 @@ export default function App() {
   const handlePurchaseChapter = (novelId, chapterId) => {
       setPurchasedChapters(prev => {
           const currentNovelPurchases = prev[novelId] || [];
-          if (currentNovelPurchases.includes(chapterId)) {
-              return prev;
-          }
-          return {
-              ...prev,
-              [novelId]: [...currentNovelPurchases, chapterId]
-          };
+          if (currentNovelPurchases.includes(chapterId)) return prev;
+          return { ...prev, [novelId]: [...currentNovelPurchases, chapterId] };
       });
       if (tg && tg.showAlert) {
         tg.showAlert('Глава успешно разблокирована!');

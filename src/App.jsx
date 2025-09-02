@@ -133,21 +133,18 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
           {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
         </button>
       </div>
-
       {genreFilter && (
         <div className={`flex items-center justify-between p-3 mb-4 rounded-lg border ${t.border} ${t.componentBg}`}>
             <p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p>
             <button onClick={onClearGenreFilter} className="text-xs font-bold text-pink-500 hover:underline">Сбросить</button>
         </div>
       )}
-
       <div className="relative mb-6">
         <SearchIcon className={t.searchPlaceholder} />
         <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
           className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-2 pl-10 pr-4 ${t.text} ${t.searchPlaceholder} focus:outline-none focus:ring-2 ${t.searchRing} transition-shadow duration-300`}
         />
       </div>
-      
       <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4">
           {filteredNovels.map(novel => (
             <div key={novel.id} onClick={() => onSelectNovel(novel)} className="cursor-pointer group relative">
@@ -171,17 +168,16 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
-    const baseUrl = import.meta.env.BASE_URL;
 
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
 
     useEffect(() => {
         setIsLoading(true);
-        fetch(`${baseUrl}data/chapters/${novel.id}.json`)
+        fetch(`data/chapters/${novel.id}.json`)
             .then(res => res.json())
             .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
             .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
-    }, [novel.id, baseUrl]);
+    }, [novel.id]);
 
     const sortedChapters = useMemo(() => {
         const chaptersCopy = [...chapters];
@@ -210,8 +206,16 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
                 }
             }, { merge: true });
 
-            tg.openTelegramLink(`https://t.me/${botUsername}`);
-            tg.close();
+            tg.showPopup({
+                title: 'Переход к оплате',
+                message: `Сейчас вы будете перенаправлены в чат с ботом. Пожалуйста, нажмите кнопку "START" внизу чата, чтобы получить инструкции по оплате.`,
+                buttons: [{ id: 'continue', type: 'default', text: 'Понятно, продолжить' }]
+            }, (buttonId) => {
+                if (buttonId === 'continue') {
+                    tg.openTelegramLink(`https://t.me/${botUsername}`);
+                    tg.close();
+                }
+            });
         }
     };
 
@@ -283,7 +287,6 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   const BOT_USERNAME = "tenebrisverbot";
-  const baseUrl = import.meta.env.BASE_URL;
 
   useEffect(() => {
     const init = async () => {
@@ -302,7 +305,7 @@ export default function App() {
         if (docSnap.exists()) {
           setSubscription(docSnap.data().subscription || null);
         }
-        const response = await fetch(`${baseUrl}data/novels.json`);
+        const response = await fetch('data/novels.json');
         if (!response.ok) throw new Error('Failed to fetch novels');
         const data = await response.json();
         setNovels(data.novels);
@@ -313,7 +316,7 @@ export default function App() {
       }
     };
     init();
-  }, [baseUrl]);
+  }, []);
   
   useEffect(() => { document.documentElement.className = theme; }, [theme]);
   const handleBack = useCallback(() => {

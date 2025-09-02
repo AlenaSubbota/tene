@@ -115,7 +115,7 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 
 // --- Компонент: Детали новеллы ---
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedNovelIds, onPurchaseNovel }) => {
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedNovelIds, onPurchaseNovel, tg }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
@@ -153,7 +153,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedN
         const isLocked = chapter.isPaid && !isNovelPurchased;
 
         if (isLocked) {
-            const tg = window.Telegram?.WebApp;
             if (tg && tg.showPopup) {
                 tg.showPopup({
                     title: 'Глава заблокирована',
@@ -192,8 +191,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedN
                 <p className={`text-sm mb-6 ${theme === 'dark' ? 'text-gray-300' : 'text-stone-600'}`}>{novel.description}</p>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Главы</h2>
-                    {/* --- НАША КОНТРОЛЬНАЯ ТОЧКА --- */}
-                    <p className="text-xs text-pink-500 font-mono">Куплено: {purchasedNovelIds.length}</p>
                     <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className={`text-sm p-2 rounded-lg border ${t.border} ${t.componentBg} ${t.text} focus:outline-none focus:ring-1 focus:ring-pink-400`}>
                         <option value="newest">Сначала новые</option>
                         <option value="oldest">Сначала старые</option>
@@ -240,23 +237,18 @@ export default function App() {
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
   const [purchasedNovelIds, setPurchasedNovelIds] = useState([]);
-
-  const handlePurchaseNovel = (novelId) => {
-      setPurchasedNovelIds(prevIds => {
-          if (prevIds.includes(novelId)) {
-              return prevIds;
-          }
-          const newIds = [...prevIds, novelId];
-          console.log("Purchased IDs:", newIds); // Для отладки
-          return newIds;
-      });
-      const tg = window.Telegram?.WebApp;
-      if (tg && tg.showAlert) {
-        tg.showAlert('Новелла успешно разблокирована!');
-      }
-  };
+  const [tg, setTg] = useState(null);
 
   useEffect(() => {
+    // Получаем объект Telegram Web App один раз при запуске
+    if (window.Telegram?.WebApp) {
+        const telegramApp = window.Telegram.WebApp;
+        telegramApp.ready();
+        telegramApp.expand();
+        setTg(telegramApp);
+    }
+
+    // Загружаем список новелл
     fetch('data/novels.json')
       .then(res => {
           if (!res.ok) throw new Error('Network response was not ok');
@@ -265,6 +257,19 @@ export default function App() {
       .then(data => setNovels(data.novels))
       .catch(err => console.error("Failed to load novels:", err));
   }, []);
+
+  const handlePurchaseNovel = (novelId) => {
+      setPurchasedNovelIds(prevIds => {
+          if (prevIds.includes(novelId)) {
+              return prevIds;
+          }
+          const newIds = [...prevIds, novelId];
+          return newIds;
+      });
+      if (tg && tg.showAlert) {
+        tg.showAlert('Новелла успешно разблокирована!');
+      }
+  };
 
   useEffect(() => { document.documentElement.className = theme; }, [theme]);
 
@@ -276,21 +281,23 @@ export default function App() {
   const handleHome = useCallback(() => { setPage('list'); setGenreFilter(null); }, []);
 
   useEffect(() => {
-    const tg = window.Telegram?.WebApp;
     if (!tg) return;
-    tg.ready();
-    tg.expand();
+
     tg.onEvent('backButtonClicked', handleBack);
-    if (page === 'list') tg.BackButton.hide(); else tg.BackButton.show();
+    if (page === 'list') {
+        tg.BackButton.hide();
+    } else {
+        tg.BackButton.show();
+    }
+    
     return () => tg.offEvent('backButtonClicked', handleBack);
-  }, [page, handleBack]);
+  }, [page, handleBack, tg]);
 
   useEffect(() => {
-      const tg = window.Telegram?.WebApp;
       if (!tg) return;
       tg.setHeaderColor(themes[theme].tgHeader);
       tg.setBackgroundColor(themes[theme].tgBg);
-  }, [theme]);
+  }, [theme, tg]);
 
   const handleSelectNovel = (novel) => { setSelectedNovel(novel); setPage('details'); };
   const handleSelectChapter = (chapter) => { setSelectedChapter(chapter); setPage('reader'); };
@@ -299,7 +306,7 @@ export default function App() {
 
   const renderPage = () => {
     switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedNovelIds={purchasedNovelIds} onPurchaseNovel={handlePurchaseNovel} />;
+      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedNovelIds={purchasedNovelIds} onPurchaseNovel={handlePurchaseNovel} tg={tg} />;
       case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={setTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }
@@ -313,4 +320,3 @@ export default function App() {
     </main>
   );
 }
-

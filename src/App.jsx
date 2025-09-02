@@ -88,7 +88,7 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
       .filter(novel => novel.title.toLowerCase().includes(searchQuery.toLowerCase()))
   , [novels, searchQuery, genreFilter]);
 
-  if (!novels.length) {
+  if (!novels.length && !searchQuery) {
       return <div className={`p-4 text-center ${t.text}`}>Загрузка библиотеки...</div>
   }
 
@@ -144,10 +144,10 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedC
 
     useEffect(() => {
         setIsLoading(true);
-        fetch(`/data/chapters/${novel.id}.json`)
+        fetch(`data/chapters/${novel.id}.json`)
             .then(res => res.json())
             .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
-            .catch(err => { setChapters([]); setIsLoading(false); });
+            .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
     }, [novel.id]);
 
     const sortedChapters = useMemo(() => {
@@ -267,7 +267,7 @@ export default function App() {
           setPurchasedChapters(docSnap.data().purchases || {});
         }
         
-        const response = await fetch('/data/novels.json'); // ИСПРАВЛЕННЫЙ ПУТЬ
+        const response = await fetch('data/novels.json');
         if (!response.ok) {
             throw new Error('Failed to fetch novels');
         }
@@ -331,7 +331,7 @@ export default function App() {
 
   const renderPage = () => {
     switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedChapters={purchasedChapters} onPurchaseChapter={handlePurchaseChapter} botUsername={tenebrisverbot} />;
+      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedChapters={purchasedChapters} onPurchaseChapter={handlePurchaseChapter} botUsername={BOT_USERNAME} />;
       case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={setTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }

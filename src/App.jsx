@@ -1,4 +1,26 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+// --- ИЗМЕНЕНИЕ: Добавляем импорты для Firebase ---
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getAuth, signInAnonymously } from "firebase/auth";
+
+
+// --- ВАШИ КЛЮЧИ ДОСТУПА FIREBASE ---
+// Мы вставляем тот самый объект, который вы скопировали
+const firebaseConfig = {
+  apiKey: "AIzaSyDfDGFXGFGkzmgYFAHI1q6AZiLy7esuPrw",
+  authDomain: "tenebris-verbum.firebaseapp.com",
+  projectId: "tenebris-verbum",
+  storageBucket: "tenebris-verbum.firebasestorage.app",
+  messagingSenderId: "637080257821",
+  appId: "1:637080257821:web:7f7440e0bcef2ce7178df4"
+};
+
+// --- Инициализация Firebase ---
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
 
 // --- ИКОНКИ (встроенные SVG для простоты) ---
 const ArrowRightIcon = ({ className = '' }) => (
@@ -30,9 +52,6 @@ const LockIcon = ({ className = '' }) => (
         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
     </svg>
 );
-const CopyIcon = ({ className = '' }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-);
 
 
 // --- Цветовые Схемы ---
@@ -40,61 +59,6 @@ const themes = {
   light: { bg: 'bg-stone-100', text: 'text-stone-800', componentBg: 'bg-white', componentText: 'text-stone-700', border: 'border-stone-200', searchBg: 'bg-white', searchPlaceholder: 'placeholder-stone-400', searchRing: 'focus:ring-pink-400', tgBg: '#F5F5F0', tgHeader: '#FFFFFF' },
   dark: { bg: 'bg-gray-900', text: 'text-gray-100', componentBg: 'bg-gray-800', componentText: 'text-gray-200', border: 'border-gray-700', searchBg: 'bg-gray-800', searchPlaceholder: 'placeholder-gray-500', searchRing: 'focus:ring-pink-500', tgBg: '#121212', tgHeader: '#171717' }
 };
-
-// --- Компонент: Модальное окно для ручной оплаты ---
-const ManualPaymentModal = ({ chapter, novel, onClose, onConfirm, theme }) => {
-    const t = themes[theme];
-    const paymentCode = useMemo(() => `TENE${novel.id}${chapter.id}${Math.floor(Math.random() * 100)}`, [novel, chapter]);
-    const cardNumber = "5555 4444 3333 2222"; // <--- ЗАМЕНИТЕ НА ВАШ НОМЕР КАРТЫ
-    const amount = 15; // Цена в рублях
-
-    const copyToClipboard = (text) => {
-        navigator.clipboard.writeText(text).then(() => {
-            window.Telegram?.WebApp.showAlert('Скопировано!');
-        });
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className={`w-full max-w-sm rounded-2xl p-6 shadow-lg ${t.componentBg} ${t.text}`}>
-                <h2 className="text-xl font-bold mb-2">Оплата главы</h2>
-                <p className={`text-sm mb-4 opacity-70`}>Для доступа к "{chapter.title}" выполните перевод:</p>
-                
-                <div className="space-y-4 text-sm">
-                    <div>
-                        <p className="font-bold">1. Сумма</p>
-                        <div className={`mt-1 flex justify-between items-center p-3 rounded-lg border ${t.border}`}>
-                            <span className="font-mono text-lg">{amount} ₽</span>
-                            <button onClick={() => copyToClipboard(String(amount))} className="p-2 rounded-md hover:bg-stone-100 dark:hover:bg-gray-700"><CopyIcon /></button>
-                        </div>
-                    </div>
-                    <div>
-                        <p className="font-bold">2. Номер карты (СБП)</p>
-                         <div className={`mt-1 flex justify-between items-center p-3 rounded-lg border ${t.border}`}>
-                            <span className="font-mono text-lg">{cardNumber}</span>
-                            <button onClick={() => copyToClipboard(cardNumber)} className="p-2 rounded-md hover:bg-stone-100 dark:hover:bg-gray-700"><CopyIcon /></button>
-                        </div>
-                    </div>
-                    <div>
-                        <p className="font-bold">3. Комментарий к переводу (ОБЯЗАТЕЛЬНО)</p>
-                         <div className={`mt-1 flex justify-between items-center p-3 rounded-lg border ${t.border}`}>
-                            <span className="font-mono text-lg text-pink-500">{paymentCode}</span>
-                            <button onClick={() => copyToClipboard(paymentCode)} className="p-2 rounded-md hover:bg-stone-100 dark:hover:bg-gray-700"><CopyIcon /></button>
-                        </div>
-                    </div>
-                </div>
-
-                <p className="text-xs opacity-60 mt-4">После перевода вернитесь сюда и нажмите "Я оплатил(а)".</p>
-
-                <div className="flex gap-3 mt-6">
-                    <button onClick={onClose} className={`w-full py-3 rounded-lg border ${t.border}`}>Отмена</button>
-                    <button onClick={onConfirm} className="w-full py-3 rounded-lg bg-pink-500 text-white font-semibold">Я оплатил(а)</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
 
 // --- Компонент: Плавающая навигация ---
 const FloatingNav = ({ onBack, onHome }) => {
@@ -137,19 +101,23 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
           {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
         </button>
       </div>
+
       {genreFilter && (
         <div className={`flex items-center justify-between p-3 mb-4 rounded-lg border ${t.border} ${t.componentBg}`}>
             <p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p>
             <button onClick={onClearGenreFilter} className="text-xs font-bold text-pink-500 hover:underline">Сбросить</button>
         </div>
       )}
+
       <div className="relative mb-6">
         <SearchIcon className={t.searchPlaceholder} />
         <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
           className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-2 pl-10 pr-4 ${t.text} ${t.searchPlaceholder} focus:outline-none focus:ring-2 ${t.searchRing} transition-shadow duration-300`}
         />
       </div>
-      <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4">
+      
+      {filteredNovels.length > 0 ? (
+        <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4">
           {filteredNovels.map(novel => (
             <div key={novel.id} onClick={() => onSelectNovel(novel)} className="cursor-pointer group relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-pink-500 to-purple-500 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition duration-500"></div>
@@ -161,17 +129,19 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
             </div>
           ))}
         </div>
+      ) : (
+        <p className="text-gray-500 text-center mt-8">Ничего не найдено.</p>
+      )}
     </div>
   );
 };
 
 // --- Компонент: Детали новеллы ---
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedChapters, onPurchaseChapter }) => {
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedChapters, onPurchaseChapter, botUsername }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [paymentModalChapter, setPaymentModalChapter] = useState(null);
 
     useEffect(() => {
         setIsLoading(true);
@@ -190,30 +160,23 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedC
     const handleChapterClick = (chapter) => {
         const isChapterPurchased = purchasedChapters[novel.id]?.includes(chapter.id);
         const isLocked = chapter.isPaid && !isChapterPurchased;
+        const tg = window.Telegram?.WebApp;
 
         if (isLocked) {
-            setPaymentModalChapter(chapter);
+            if (tg) {
+                const textPayload = `pay_${novel.id}_${chapter.id}`;
+                tg.openTelegramLink(`https://t.me/${botUsername}?start=${textPayload}`);
+                tg.close();
+            } else {
+                alert('Не удалось перейти к боту для оплаты.');
+            }
         } else {
             onSelectChapter(chapter);
         }
     };
 
-    const handleConfirmPayment = () => {
-        onPurchaseChapter(novel.id, paymentModalChapter.id);
-        setPaymentModalChapter(null);
-    };
-
     return (
         <div className={t.text}>
-            {paymentModalChapter && (
-                <ManualPaymentModal 
-                    novel={novel}
-                    chapter={paymentModalChapter}
-                    onClose={() => setPaymentModalChapter(null)}
-                    onConfirm={handleConfirmPayment}
-                    theme={theme}
-                />
-            )}
             <div className="relative h-64">
                 <img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/>
                 <div className={`absolute inset-0 bg-gradient-to-t ${theme === 'dark' ? 'from-gray-900 via-gray-900/80' : 'from-stone-100 via-stone-100/80'} to-transparent`}></div>
@@ -275,73 +238,102 @@ export default function App() {
   const [selectedNovel, setSelectedNovel] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
-  
-  const [purchasedChapters, setPurchasedChapters] = useState(() => {
-    try {
-      const saved = localStorage.getItem('purchased_chapters');
-      return saved ? JSON.parse(saved) : {};
-    } catch (error) { return {}; }
-  });
-  
-  const tg = window.Telegram?.WebApp;
+  const [purchasedChapters, setPurchasedChapters] = useState({});
+  const [userId, setUserId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
+  const BOT_USERNAME = "tenebrisverbot"; // <--- ЗАМЕНИТЕ НА ЮЗЕРНЕЙМ ВАШЕГО БОТА
+
+  // Эффект для инициализации Firebase и аутентификации пользователя
   useEffect(() => {
-    if(tg) {
+    const init = async () => {
+      const tg = window.Telegram?.WebApp;
+      if (tg) {
         tg.ready();
         tg.expand();
-    }
-    fetch('data/novels.json')
-      .then(res => res.json())
-      .then(data => setNovels(data.novels))
-      .catch(err => console.error("Failed to load novels:", err));
-  }, [tg]);
+        // Используем ID пользователя Telegram как его уникальный идентификатор
+        const telegramUserId = tg.initDataUnsafe?.user?.id?.toString() || "guest_user";
+        setUserId(telegramUserId);
 
-  useEffect(() => {
-    localStorage.setItem('purchased_chapters', JSON.stringify(purchasedChapters));
-  }, [purchasedChapters]);
+        // Анонимно входим в Firebase, чтобы иметь права на запись/чтение
+        await signInAnonymously(auth);
 
-  const handlePurchaseChapter = (novelId, chapterId) => {
-      setPurchasedChapters(prev => {
-          const currentNovelPurchases = prev[novelId] || [];
-          if (currentNovelPurchases.includes(chapterId)) return prev;
-          return { ...prev, [novelId]: [...currentNovelPurchases, chapterId] };
-      });
-      if (tg && tg.showAlert) {
-        tg.showAlert('Глава успешно разблокирована!');
+        // Загружаем покупки пользователя из Firestore
+        const userDocRef = doc(db, "users", telegramUserId);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          setPurchasedChapters(docSnap.data().purchases || {});
+        }
+      } else {
+        // Для тестирования в обычном браузере
+        setUserId("guest_user");
+      }
+      
+      // Загружаем список новелл
+      fetch('data/novels.json')
+        .then(res => res.json())
+        .then(data => setNovels(data.novels))
+        .catch(err => console.error("Failed to load novels:", err))
+        .finally(() => setIsLoading(false));
+    };
+
+    init();
+  }, []);
+
+  // Функция покупки главы, которая теперь сохраняет данные в Firestore
+  const handlePurchaseChapter = async (novelId, chapterId) => {
+      if (!userId) return; // Не делаем ничего, если ID пользователя еще не определен
+
+      const newPurchases = {
+          ...purchasedChapters,
+          [novelId]: [...(purchasedChapters[novelId] || []), chapterId]
+      };
+      
+      const userDocRef = doc(db, "users", userId);
+      try {
+        // Записываем обновленный список покупок в базу данных
+        await setDoc(userDocRef, { purchases: newPurchases }, { merge: true });
+        setPurchasedChapters(newPurchases);
+        window.Telegram?.WebApp.showAlert('Глава успешно разблокирована!');
+      } catch (error) {
+        console.error("Ошибка при сохранении покупки: ", error);
+        window.Telegram?.WebApp.showAlert('Не удалось сохранить покупку. Попробуйте снова.');
       }
   };
-
+  
+  // Остальная логика без изменений...
   useEffect(() => { document.documentElement.className = theme; }, [theme]);
-
   const handleBack = useCallback(() => {
       if (page === 'reader') setPage('details');
       else if (page === 'details') { setPage('list'); setGenreFilter(null); }
   }, [page]);
-
   const handleHome = useCallback(() => { setPage('list'); setGenreFilter(null); }, []);
-
   useEffect(() => {
+    const tg = window.Telegram?.WebApp;
     if (!tg) return;
     tg.onEvent('backButtonClicked', handleBack);
-    if (page === 'list') tg.BackButton.hide();
-    else tg.BackButton.show();
+    if (page === 'list') tg.BackButton.hide(); else tg.BackButton.show();
     return () => tg.offEvent('backButtonClicked', handleBack);
-  }, [page, handleBack, tg]);
-
+  }, [page, handleBack]);
   useEffect(() => {
-      if (!tg) return;
-      tg.setHeaderColor(themes[theme].tgHeader);
-      tg.setBackgroundColor(themes[theme].tgBg);
-  }, [theme, tg]);
+    const tg = window.Telegram?.WebApp;
+    if (!tg) return;
+    tg.setHeaderColor(themes[theme].tgHeader);
+    tg.setBackgroundColor(themes[theme].tgBg);
+  }, [theme]);
 
   const handleSelectNovel = (novel) => { setSelectedNovel(novel); setPage('details'); };
   const handleSelectChapter = (chapter) => { setSelectedChapter(chapter); setPage('reader'); };
   const handleGenreSelect = (genre) => { setGenreFilter(genre); setPage('list'); };
   const handleClearGenreFilter = () => { setGenreFilter(null); };
 
+  if (isLoading) {
+    return <div className="p-4 text-center">Инициализация приложения...</div>
+  }
+
   const renderPage = () => {
     switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedChapters={purchasedChapters} onPurchaseChapter={handlePurchaseChapter} />;
+      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedChapters={purchasedChapters} onPurchaseChapter={handlePurchaseChapter} botUsername={BOT_USERNAME} />;
       case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={setTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }
@@ -355,4 +347,3 @@ export default function App() {
     </main>
   );
 }
-

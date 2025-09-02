@@ -144,7 +144,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedC
 
     useEffect(() => {
         setIsLoading(true);
-        fetch(`data/chapters/${novel.id}.json`)
+        fetch(`/data/chapters/${novel.id}.json`)
             .then(res => res.json())
             .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
             .catch(err => { setChapters([]); setIsLoading(false); });
@@ -248,7 +248,7 @@ export default function App() {
     const init = async () => {
       try {
         const tg = window.Telegram?.WebApp;
-        let telegramUserId = "guest_user"; // ID по умолчанию для браузера
+        let telegramUserId = "guest_user";
 
         if (tg) {
           tg.ready();
@@ -267,8 +267,7 @@ export default function App() {
           setPurchasedChapters(docSnap.data().purchases || {});
         }
         
-        // Загружаем список новелл ПОСЛЕ всех асинхронных операций
-        const response = await fetch('data/novels.json');
+        const response = await fetch('/data/novels.json'); // ИСПРАВЛЕННЫЙ ПУТЬ
         if (!response.ok) {
             throw new Error('Failed to fetch novels');
         }
@@ -277,9 +276,7 @@ export default function App() {
 
       } catch (error) {
         console.error("Ошибка инициализации:", error);
-        // Можно показать пользователю сообщение об ошибке
       } finally {
-        // Эта строчка теперь ГАРАНТИРОВАННО выполнится
         setIsLoading(false);
       }
     };

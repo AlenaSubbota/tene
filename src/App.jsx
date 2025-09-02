@@ -115,11 +115,13 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 
 // --- Компонент: Детали новеллы ---
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme }) => {
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedNovelIds, onPurchaseNovel }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    
+    const isNovelPurchased = purchasedNovelIds.includes(novel.id);
 
     useEffect(() => {
         setIsLoading(true);
@@ -148,26 +150,24 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme }) => {
     }, [chapters, sortOrder]);
     
     const handleChapterClick = (chapter) => {
-        if (chapter.isPaid) {
+        const isLocked = chapter.isPaid && !isNovelPurchased;
+
+        if (isLocked) {
             const tg = window.Telegram?.WebApp;
-            // Явная проверка, что объект Telegram WebApp доступен
             if (tg && tg.showPopup) {
                 tg.showPopup({
                     title: 'Глава заблокирована',
-                    message: 'Для доступа к этой главе требуется оплата. Нажмите "Оплатить", чтобы перейти к оплате.',
+                    message: 'Для доступа к этой и всем последующим главам требуется оплата. Разблокировать новеллу?',
                     buttons: [
-                        { id: 'buy', type: 'default', text: 'Оплатить' },
+                        { id: 'buy', type: 'default', text: 'Разблокировать' },
                         { type: 'cancel' },
                     ]
                 }, (buttonId) => {
                     if (buttonId === 'buy') {
-                        tg.showAlert('Переход к окну оплаты...');
-                        // Здесь в будущем будет логика настоящей оплаты
+                        onPurchaseNovel(novel.id);
                     }
                 });
             } else {
-                // Это сообщение появится, если вы тестируете в обычном браузере
-                // или если API Telegram не загрузился по какой-то причине.
                 alert('Эта глава платная. В приложении Telegram здесь будет окно покупки.');
             }
         } else {
@@ -199,12 +199,15 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme }) => {
                 </div>
                 {isLoading ? <p className={t.text}>Загрузка глав...</p> : (
                     <div className="flex flex-col gap-3">
-                        {sortedChapters.map(chapter => (
-                            <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-colors duration-200 hover:border-pink-400 border ${t.border} flex items-center justify-between ${chapter.isPaid ? 'opacity-70' : ''}`}>
-                                <div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>
-                                {chapter.isPaid ? <LockIcon className={t.text} /> : <ArrowRightIcon className={t.text}/>}
-                            </div>
-                        ))}
+                        {sortedChapters.map(chapter => {
+                            const showLock = chapter.isPaid && !isNovelPurchased;
+                            return (
+                                <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-colors duration-200 hover:border-pink-400 border ${t.border} flex items-center justify-between ${showLock ? 'opacity-70' : ''}`}>
+                                    <div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>
+                                    {showLock ? <LockIcon className={t.text} /> : <ArrowRightIcon className={t.text}/>}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -234,6 +237,20 @@ export default function App() {
   const [selectedNovel, setSelectedNovel] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
+  const [purchasedNovelIds, setPurchasedNovelIds] = useState([]);
+
+  const handlePurchaseNovel = (novelId) => {
+      setPurchasedNovelIds(prevIds => {
+          if (prevIds.includes(novelId)) {
+              return prevIds;
+          }
+          return [...prevIds, novelId];
+      });
+      const tg = window.Telegram?.WebApp;
+      if (tg && tg.showAlert) {
+        tg.showAlert('Новелла успешно разблокирована!');
+      }
+  };
 
   useEffect(() => {
     fetch('data/novels.json')
@@ -278,7 +295,7 @@ export default function App() {
 
   const renderPage = () => {
     switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} />;
+      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedNovelIds={purchasedNovelIds} onPurchaseNovel={handlePurchaseNovel} />;
       case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={setTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }

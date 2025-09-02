@@ -192,6 +192,8 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedN
                 <p className={`text-sm mb-6 ${theme === 'dark' ? 'text-gray-300' : 'text-stone-600'}`}>{novel.description}</p>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-bold">Главы</h2>
+                    {/* --- НАША КОНТРОЛЬНАЯ ТОЧКА --- */}
+                    <p className="text-xs text-pink-500 font-mono">Куплено: {purchasedNovelIds.length}</p>
                     <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className={`text-sm p-2 rounded-lg border ${t.border} ${t.componentBg} ${t.text} focus:outline-none focus:ring-1 focus:ring-pink-400`}>
                         <option value="newest">Сначала новые</option>
                         <option value="oldest">Сначала старые</option>
@@ -244,7 +246,9 @@ export default function App() {
           if (prevIds.includes(novelId)) {
               return prevIds;
           }
-          return [...prevIds, novelId];
+          const newIds = [...prevIds, novelId];
+          console.log("Purchased IDs:", newIds); // Для отладки
+          return newIds;
       });
       const tg = window.Telegram?.WebApp;
       if (tg && tg.showAlert) {

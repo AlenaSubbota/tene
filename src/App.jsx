@@ -45,6 +45,12 @@ const SearchIcon = ({ className = '' }) => (
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
     </svg>
 );
+const LockIcon = ({ className = '' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}>
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+    </svg>
+);
 const CrownIcon = ({ className = '' }) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>
 );
@@ -54,6 +60,36 @@ const CrownIcon = ({ className = '' }) => (
 const themes = {
   light: { bg: 'bg-stone-100', text: 'text-stone-800', componentBg: 'bg-white', componentText: 'text-stone-700', border: 'border-stone-200', searchBg: 'bg-white', searchPlaceholder: 'placeholder-stone-400', searchRing: 'focus:ring-pink-400', tgBg: '#F5F5F0', tgHeader: '#FFFFFF' },
   dark: { bg: 'bg-gray-900', text: 'text-gray-100', componentBg: 'bg-gray-800', componentText: 'text-gray-200', border: 'border-gray-700', searchBg: 'bg-gray-800', searchPlaceholder: 'placeholder-gray-500', searchRing: 'focus:ring-pink-500', tgBg: '#121212', tgHeader: '#171717' }
+};
+
+// --- Компонент: Модальное окно подписки ---
+const SubscriptionModal = ({ onClose, onPurchase, theme }) => {
+    const t = themes[theme];
+    const subscriptionPlans = [
+        { duration: 1, name: '1 месяц', price: 199 },
+        { duration: 3, name: '3 месяца', price: 539, popular: true },
+        { duration: 12, name: '1 год', price: 1899 },
+    ];
+
+    return (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className={`w-full max-w-sm rounded-2xl p-6 shadow-lg ${t.componentBg} ${t.text}`}>
+                <CrownIcon className={`mx-auto mb-4 text-pink-400`} />
+                <h3 className="text-xl text-center font-bold">Получите доступ ко всем главам</h3>
+                <p className={`mt-2 mb-6 text-sm text-center opacity-70`}>Оформите подписку, чтобы читать все платные главы этой и других новелл без ограничений.</p>
+                <div className="space-y-3">
+                    {subscriptionPlans.map(plan => (
+                        <button key={plan.duration} onClick={() => onPurchase(plan)} className={`relative w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 ${t.border} ${t.componentBg} hover:border-pink-400`}>
+                            {plan.popular && <span className="absolute top-2 right-2 text-xs bg-pink-500 text-white px-2 py-0.5 rounded-full">Популярный</span>}
+                            <p className="font-bold">{plan.name}</p>
+                            <p className="text-sm">{plan.price} ₽</p>
+                        </button>
+                    ))}
+                </div>
+                 <button onClick={onClose} className={`w-full py-3 mt-4 rounded-lg border ${t.border}`}>Не сейчас</button>
+            </div>
+        </div>
+    );
 };
 
 // --- Компонент: Плавающая навигация ---
@@ -112,8 +148,7 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
         />
       </div>
       
-      {filteredNovels.length > 0 ? (
-        <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4">
+      <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4">
           {filteredNovels.map(novel => (
             <div key={novel.id} onClick={() => onSelectNovel(novel)} className="cursor-pointer group relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-pink-500 to-purple-500 rounded-lg blur-md opacity-0 group-hover:opacity-50 transition duration-500"></div>
@@ -125,9 +160,6 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
             </div>
           ))}
         </div>
-      ) : (
-        <p className="text-gray-500 text-center mt-8">Ничего не найдено.</p>
-      )}
     </div>
   );
 };
@@ -138,13 +170,8 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [isSubModalOpen, setIsSubModalOpen] = useState(false);
     const baseUrl = import.meta.env.BASE_URL;
-
-    const subscriptionPlans = [
-        { duration: 1, name: '1 месяц', price: 199 },
-        { duration: 3, name: '3 месяца', price: 539 },
-        { duration: 12, name: '1 год', price: 1899 },
-    ];
 
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
 
@@ -162,6 +189,14 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
         return chaptersCopy;
     }, [chapters, sortOrder]);
     
+    const handleChapterClick = (chapter) => {
+        if (!hasActiveSubscription && chapter.isPaid) {
+            setIsSubModalOpen(true);
+        } else {
+            onSelectChapter(chapter);
+        }
+    };
+    
     const handleSubscriptionPurchase = async (plan) => {
         const tg = window.Telegram?.WebApp;
         if (tg && userId) {
@@ -170,27 +205,20 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
                 pendingSubscription: {
                     duration: plan.duration,
                     price: plan.price,
-                    planName: plan.name
+                    planName: plan.name,
+                    date: new Date().toISOString()
                 }
             }, { merge: true });
 
-            tg.showPopup({
-                title: 'Переход к оплате',
-                message: `Вы будете перенаправлены в чат с ботом для оплаты подписки на ${plan.name}.`,
-                buttons: [{ id: 'continue', type: 'default', text: 'Продолжить' }]
-            }, (buttonId) => {
-                if (buttonId === 'continue') {
-                    tg.openTelegramLink(`https://t.me/${botUsername}`);
-                    tg.close();
-                }
-            });
-        } else {
-            alert('Не удалось перейти к боту для оплаты.');
+            tg.openTelegramLink(`https://t.me/${botUsername}`);
+            tg.close();
         }
     };
 
     return (
         <div className={t.text}>
+            {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onPurchase={handleSubscriptionPurchase} theme={theme} />}
+
             <div className="relative h-64">
                 <img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/>
                 <div className={`absolute inset-0 bg-gradient-to-t ${theme === 'dark' ? 'from-gray-900 via-gray-900/80' : 'from-stone-100 via-stone-100/80'} to-transparent`}></div>
@@ -204,37 +232,23 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
                     ))}
                 </div>
                 <p className={`text-sm mb-6 ${theme === 'dark' ? 'text-gray-300' : 'text-stone-600'}`}>{novel.description}</p>
-                
-                {hasActiveSubscription ? (
-                    <>
-                        <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-xl font-bold">Главы</h2>
-                            <p className="text-sm text-green-500">Подписка активна до {new Date(subscription.expires_at).toLocaleDateString()}</p>
-                        </div>
-                        {isLoading ? <p>Загрузка глав...</p> : (
-                             <div className="flex flex-col gap-3">
-                                {sortedChapters.map(chapter => (
-                                    <div key={chapter.id} onClick={() => onSelectChapter(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-colors duration-200 hover:border-pink-400 border ${t.border} flex items-center justify-between`}>
-                                        <div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>
-                                        <ArrowRightIcon className={t.text}/>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </>
-                ) : (
-                    <div className={`p-6 rounded-2xl border-2 border-dashed ${t.border} text-center`}>
-                        <CrownIcon className={`mx-auto mb-4 text-pink-400`} />
-                        <h3 className="text-lg font-bold">Получите доступ ко всем главам</h3>
-                        <p className={`mt-2 mb-6 text-sm opacity-70`}>Оформите подписку, чтобы читать все платные главы этой и других новелл без ограничений.</p>
-                        <div className="space-y-3">
-                            {subscriptionPlans.map(plan => (
-                                <button key={plan.duration} onClick={() => handleSubscriptionPurchase(plan)} className={`w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 ${t.border} ${t.componentBg} hover:border-pink-400`}>
-                                    <p className="font-bold">{plan.name}</p>
-                                    <p className="text-sm">{plan.price} ₽</p>
-                                </button>
-                            ))}
-                        </div>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">Главы</h2>
+                    {hasActiveSubscription && (
+                         <p className="text-sm text-green-500">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>
+                    )}
+                </div>
+                 {isLoading ? <p className={t.text}>Загрузка глав...</p> : (
+                    <div className="flex flex-col gap-3">
+                        {sortedChapters.map(chapter => {
+                            const showLock = !hasActiveSubscription && chapter.isPaid;
+                            return (
+                                <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-colors duration-200 hover:border-pink-400 border ${t.border} flex items-center justify-between ${showLock ? 'opacity-70' : ''}`}>
+                                    <div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>
+                                    {showLock ? <LockIcon className={t.text} /> : <ArrowRightIcon className={t.text}/>}
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -276,22 +290,18 @@ export default function App() {
       try {
         const tg = window.Telegram?.WebApp;
         let telegramUserId = "guest_user";
-
         if (tg) {
           tg.ready();
           tg.expand();
           telegramUserId = tg.initDataUnsafe?.user?.id?.toString() || "guest_user";
         }
-        
         setUserId(telegramUserId);
         await signInAnonymously(auth);
         const userDocRef = doc(db, "users", telegramUserId);
         const docSnap = await getDoc(userDocRef);
-
         if (docSnap.exists()) {
           setSubscription(docSnap.data().subscription || null);
         }
-        
         const response = await fetch(`${baseUrl}data/novels.json`);
         if (!response.ok) throw new Error('Failed to fetch novels');
         const data = await response.json();

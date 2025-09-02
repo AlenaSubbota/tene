@@ -45,11 +45,8 @@ const SearchIcon = ({ className = '' }) => (
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
     </svg>
 );
-const LockIcon = ({ className = '' }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}>
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-    </svg>
+const CrownIcon = ({ className = '' }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>
 );
 
 
@@ -136,19 +133,28 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 
 // --- Компонент: Детали новеллы ---
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedChapters, botUsername, userId }) => {
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscription, botUsername, userId }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+    const baseUrl = import.meta.env.BASE_URL;
+
+    const subscriptionPlans = [
+        { duration: 1, name: '1 месяц', price: 199 },
+        { duration: 3, name: '3 месяца', price: 539 },
+        { duration: 12, name: '1 год', price: 1899 },
+    ];
+
+    const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
 
     useEffect(() => {
         setIsLoading(true);
-        fetch(`data/chapters/${novel.id}.json`)
+        fetch(`${baseUrl}data/chapters/${novel.id}.json`)
             .then(res => res.json())
             .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
             .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
-    }, [novel.id]);
+    }, [novel.id, baseUrl]);
 
     const sortedChapters = useMemo(() => {
         const chaptersCopy = [...chapters];
@@ -156,38 +162,30 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedC
         return chaptersCopy;
     }, [chapters, sortOrder]);
     
-    const handleChapterClick = async (chapter) => {
-        const isChapterPurchased = purchasedChapters[novel.id]?.includes(chapter.id);
-        const isLocked = chapter.isPaid && !isChapterPurchased;
+    const handleSubscriptionPurchase = async (plan) => {
         const tg = window.Telegram?.WebApp;
+        if (tg && userId) {
+            const userDocRef = doc(db, "users", userId);
+            await setDoc(userDocRef, { 
+                pendingSubscription: {
+                    duration: plan.duration,
+                    price: plan.price,
+                    planName: plan.name
+                }
+            }, { merge: true });
 
-        if (isLocked) {
-            if (tg && userId) {
-                const userDocRef = doc(db, "users", userId);
-                await setDoc(userDocRef, { 
-                    pendingPayment: {
-                        novelId: novel.id,
-                        chapterId: chapter.id,
-                        novelTitle: novel.title,
-                        chapterTitle: chapter.title
-                    }
-                }, { merge: true });
-
-                tg.showPopup({
-                    title: 'Переход к оплате',
-                    message: `Вы будете перенаправлены в чат с ботом для получения инструкций по оплате главы "${chapter.title}".`,
-                    buttons: [{ id: 'continue', type: 'default', text: 'Продолжить' }, { type: 'cancel' }]
-                }, (buttonId) => {
-                    if (buttonId === 'continue') {
-                        tg.openTelegramLink(`https://t.me/${botUsername}`);
-                        tg.close();
-                    }
-                });
-            } else {
-                alert('Не удалось перейти к боту для оплаты. Пожалуйста, убедитесь, что вы открыли приложение в Telegram.');
-            }
+            tg.showPopup({
+                title: 'Переход к оплате',
+                message: `Вы будете перенаправлены в чат с ботом для оплаты подписки на ${plan.name}.`,
+                buttons: [{ id: 'continue', type: 'default', text: 'Продолжить' }]
+            }, (buttonId) => {
+                if (buttonId === 'continue') {
+                    tg.openTelegramLink(`https://t.me/${botUsername}`);
+                    tg.close();
+                }
+            });
         } else {
-            onSelectChapter(chapter);
+            alert('Не удалось перейти к боту для оплаты.');
         }
     };
 
@@ -206,25 +204,37 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedC
                     ))}
                 </div>
                 <p className={`text-sm mb-6 ${theme === 'dark' ? 'text-gray-300' : 'text-stone-600'}`}>{novel.description}</p>
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold">Главы</h2>
-                    <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className={`text-sm p-2 rounded-lg border ${t.border} ${t.componentBg} ${t.text} focus:outline-none focus:ring-1 focus:ring-pink-400`}>
-                        <option value="newest">Сначала новые</option>
-                        <option value="oldest">Сначала старые</option>
-                    </select>
-                </div>
-                {isLoading ? <p className={t.text}>Загрузка глав...</p> : (
-                    <div className="flex flex-col gap-3">
-                        {sortedChapters.map(chapter => {
-                            const isChapterPurchased = purchasedChapters[novel.id]?.includes(chapter.id);
-                            const showLock = chapter.isPaid && !isChapterPurchased;
-                            return (
-                                <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-colors duration-200 hover:border-pink-400 border ${t.border} flex items-center justify-between ${showLock ? 'opacity-70' : ''}`}>
-                                    <div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>
-                                    {showLock ? <LockIcon className={t.text} /> : <ArrowRightIcon className={t.text}/>}
-                                </div>
-                            );
-                        })}
+                
+                {hasActiveSubscription ? (
+                    <>
+                        <div className="flex justify-between items-center mb-4">
+                            <h2 className="text-xl font-bold">Главы</h2>
+                            <p className="text-sm text-green-500">Подписка активна до {new Date(subscription.expires_at).toLocaleDateString()}</p>
+                        </div>
+                        {isLoading ? <p>Загрузка глав...</p> : (
+                             <div className="flex flex-col gap-3">
+                                {sortedChapters.map(chapter => (
+                                    <div key={chapter.id} onClick={() => onSelectChapter(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-colors duration-200 hover:border-pink-400 border ${t.border} flex items-center justify-between`}>
+                                        <div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>
+                                        <ArrowRightIcon className={t.text}/>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <div className={`p-6 rounded-2xl border-2 border-dashed ${t.border} text-center`}>
+                        <CrownIcon className={`mx-auto mb-4 text-pink-400`} />
+                        <h3 className="text-lg font-bold">Получите доступ ко всем главам</h3>
+                        <p className={`mt-2 mb-6 text-sm opacity-70`}>Оформите подписку, чтобы читать все платные главы этой и других новелл без ограничений.</p>
+                        <div className="space-y-3">
+                            {subscriptionPlans.map(plan => (
+                                <button key={plan.duration} onClick={() => handleSubscriptionPurchase(plan)} className={`w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 ${t.border} ${t.componentBg} hover:border-pink-400`}>
+                                    <p className="font-bold">{plan.name}</p>
+                                    <p className="text-sm">{plan.price} ₽</p>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
@@ -254,13 +264,13 @@ export default function App() {
   const [selectedNovel, setSelectedNovel] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
-  const [purchasedChapters, setPurchasedChapters] = useState({});
+  const [subscription, setSubscription] = useState(null);
   const [userId, setUserId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const BOT_USERNAME = "tenebrisverbot";
+  const baseUrl = import.meta.env.BASE_URL;
 
-  // Эффект для инициализации Firebase и аутентификации пользователя
   useEffect(() => {
     const init = async () => {
       try {
@@ -274,49 +284,27 @@ export default function App() {
         }
         
         setUserId(telegramUserId);
-
         await signInAnonymously(auth);
-
         const userDocRef = doc(db, "users", telegramUserId);
         const docSnap = await getDoc(userDocRef);
 
         if (docSnap.exists()) {
-          setPurchasedChapters(docSnap.data().purchases || {});
+          setSubscription(docSnap.data().subscription || null);
         }
         
-        const response = await fetch('data/novels.json');
-        if (!response.ok) {
-            throw new Error('Failed to fetch novels');
-        }
+        const response = await fetch(`${baseUrl}data/novels.json`);
+        if (!response.ok) throw new Error('Failed to fetch novels');
         const data = await response.json();
         setNovels(data.novels);
-
       } catch (error) {
         console.error("Ошибка инициализации:", error);
       } finally {
         setIsLoading(false);
       }
     };
-
     init();
-  }, []);
-
-  // Функция покупки главы (остается без изменений)
-  const handlePurchaseChapter = async (novelId, chapterId) => {
-      if (!userId) return;
-      const newPurchases = { ...purchasedChapters, [novelId]: [...(purchasedChapters[novelId] || []), chapterId] };
-      const userDocRef = doc(db, "users", userId);
-      try {
-        await setDoc(userDocRef, { purchases: newPurchases }, { merge: true });
-        setPurchasedChapters(newPurchases);
-        window.Telegram?.WebApp.showAlert('Глава успешно разблокирована!');
-      } catch (error) {
-        console.error("Ошибка при сохранении покупки: ", error);
-        window.Telegram?.WebApp.showAlert('Не удалось сохранить покупку. Попробуйте снова.');
-      }
-  };
+  }, [baseUrl]);
   
-  // Остальная логика без изменений...
   useEffect(() => { document.documentElement.className = theme; }, [theme]);
   const handleBack = useCallback(() => {
       if (page === 'reader') setPage('details');
@@ -348,7 +336,7 @@ export default function App() {
 
   const renderPage = () => {
     switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedChapters={purchasedChapters} onPurchaseChapter={handlePurchaseChapter} botUsername={BOT_USERNAME} userId={userId} />;
+      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} />;
       case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={setTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }

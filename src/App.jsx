@@ -6,7 +6,6 @@ import { getAuth, signInAnonymously } from "firebase/auth";
 
 
 // --- ВАШИ КЛЮЧИ ДОСТУПА FIREBASE ---
-// Мы вставляем тот самый объект, который вы скопировали
 const firebaseConfig = {
   apiKey: "AIzaSyDfDGFXGFGkzmgYFAHI1q6AZiLy7esuPrw",
   authDomain: "tenebris-verbum.firebaseapp.com",
@@ -137,7 +136,7 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 
 // --- Компонент: Детали новеллы ---
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedChapters, onPurchaseChapter, botUsername }) => {
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, purchasedChapters, botUsername }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
@@ -242,56 +241,58 @@ export default function App() {
   const [userId, setUserId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const BOT_USERNAME = "tenebrisverbot"; // <--- ЗАМЕНИТЕ НА ЮЗЕРНЕЙМ ВАШЕГО БОТА
+  const BOT_USERNAME = "tenebrisverbot";
 
   // Эффект для инициализации Firebase и аутентификации пользователя
   useEffect(() => {
     const init = async () => {
-      const tg = window.Telegram?.WebApp;
-      if (tg) {
-        tg.ready();
-        tg.expand();
-        // Используем ID пользователя Telegram как его уникальный идентификатор
-        const telegramUserId = tg.initDataUnsafe?.user?.id?.toString() || "guest_user";
+      try {
+        const tg = window.Telegram?.WebApp;
+        let telegramUserId = "guest_user"; // ID по умолчанию для браузера
+
+        if (tg) {
+          tg.ready();
+          tg.expand();
+          telegramUserId = tg.initDataUnsafe?.user?.id?.toString() || "guest_user";
+        }
+        
         setUserId(telegramUserId);
 
-        // Анонимно входим в Firebase, чтобы иметь права на запись/чтение
         await signInAnonymously(auth);
 
-        // Загружаем покупки пользователя из Firestore
         const userDocRef = doc(db, "users", telegramUserId);
         const docSnap = await getDoc(userDocRef);
+
         if (docSnap.exists()) {
           setPurchasedChapters(docSnap.data().purchases || {});
         }
-      } else {
-        // Для тестирования в обычном браузере
-        setUserId("guest_user");
+        
+        // Загружаем список новелл ПОСЛЕ всех асинхронных операций
+        const response = await fetch('data/novels.json');
+        if (!response.ok) {
+            throw new Error('Failed to fetch novels');
+        }
+        const data = await response.json();
+        setNovels(data.novels);
+
+      } catch (error) {
+        console.error("Ошибка инициализации:", error);
+        // Можно показать пользователю сообщение об ошибке
+      } finally {
+        // Эта строчка теперь ГАРАНТИРОВАННО выполнится
+        setIsLoading(false);
       }
-      
-      // Загружаем список новелл
-      fetch('data/novels.json')
-        .then(res => res.json())
-        .then(data => setNovels(data.novels))
-        .catch(err => console.error("Failed to load novels:", err))
-        .finally(() => setIsLoading(false));
     };
 
     init();
   }, []);
 
-  // Функция покупки главы, которая теперь сохраняет данные в Firestore
+  // Функция покупки главы (остается без изменений)
   const handlePurchaseChapter = async (novelId, chapterId) => {
-      if (!userId) return; // Не делаем ничего, если ID пользователя еще не определен
-
-      const newPurchases = {
-          ...purchasedChapters,
-          [novelId]: [...(purchasedChapters[novelId] || []), chapterId]
-      };
-      
+      if (!userId) return;
+      const newPurchases = { ...purchasedChapters, [novelId]: [...(purchasedChapters[novelId] || []), chapterId] };
       const userDocRef = doc(db, "users", userId);
       try {
-        // Записываем обновленный список покупок в базу данных
         await setDoc(userDocRef, { purchases: newPurchases }, { merge: true });
         setPurchasedChapters(newPurchases);
         window.Telegram?.WebApp.showAlert('Глава успешно разблокирована!');
@@ -328,12 +329,12 @@ export default function App() {
   const handleClearGenreFilter = () => { setGenreFilter(null); };
 
   if (isLoading) {
-    return <div className="p-4 text-center">Инициализация приложения...</div>
+    return <div className="p-4 text-center text-gray-500">Инициализация приложения...</div>
   }
 
   const renderPage = () => {
     switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedChapters={purchasedChapters} onPurchaseChapter={handlePurchaseChapter} botUsername={BOT_USERNAME} />;
+      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} purchasedChapters={purchasedChapters} onPurchaseChapter={handlePurchaseChapter} botUsername={tenebrisverbot} />;
       case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={setTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }
@@ -347,3 +348,4 @@ export default function App() {
     </main>
   );
 }
+

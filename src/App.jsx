@@ -187,7 +187,6 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 
 // --- Компонент: Детали новеллы ---
-// ИСПРАВЛЕНО: Добавляем chaptersCache в пропсы для получения предзагруженных глав
 const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscription, botUsername, userId, chaptersCache }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
@@ -198,7 +197,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
 
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
 
-    // ИСПРАВЛЕНО: Логика теперь сначала проверяет кэш
     useEffect(() => {
         if (chaptersCache[novel.id]) {
             setChapters(chaptersCache[novel.id]);
@@ -230,11 +228,13 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
         setSelectedPlan(plan);
     };
 
+    // ИСПРАВЛЕНО: Убрана лишняя вложенная функция
     const handlePaymentMethodSelect = async (method) => {
         const tg = window.Telegram?.WebApp;
         if (tg && userId && selectedPlan) {
             const userDocRef = doc(db, "users", userId);
             try {
+                // Шаг 1: Записываем в базу данных
                 await setDoc(userDocRef, { 
                     pendingSubscription: {
                         ...selectedPlan,
@@ -243,29 +243,8 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
                     }
                 }, { merge: true });
                 
-                const handlePaymentMethodSelect = async (method) => {
-        const tg = window.Telegram?.WebApp;
-        if (tg && userId && selectedPlan) {
-            const userDocRef = doc(db, "users", userId);
-            try {
-                // Сначала записываем в базу данных
-                await setDoc(userDocRef, { 
-                    pendingSubscription: {
-                        ...selectedPlan,
-                        method: method,
-                        date: new Date().toISOString()
-                    }
-                }, { merge: true });
-                
-                // ИСПРАВЛЕНО: Открываем ссылку, которая сразу запускает команду /start
+                // Шаг 2: Сразу после успешной записи открываем ссылку на бота
                 tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
-
-            } catch (error) {
-                console.error("Ошибка записи в Firebase:", error);
-                tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
-            }
-        }
-    };
 
             } catch (error) {
                 console.error("Ошибка записи в Firebase:", error);

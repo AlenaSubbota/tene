@@ -62,8 +62,8 @@ const themes = {
   dark: { bg: 'bg-gray-900', text: 'text-gray-100', componentBg: 'bg-gray-800', componentText: 'text-gray-200', border: 'border-gray-700', searchBg: 'bg-gray-800', searchPlaceholder: 'placeholder-gray-500', searchRing: 'focus:ring-pink-500', tgBg: '#121212', tgHeader: '#171717' }
 };
 
-// --- Компонент: Модальное окно подписки ---
-const SubscriptionModal = ({ onClose, onPurchase, theme }) => {
+// --- Компонент: Модальное окно выбора тарифа ---
+const SubscriptionModal = ({ onClose, onSelectPlan, theme }) => {
     const t = themes[theme];
     const subscriptionPlans = [
         { duration: 1, name: '1 месяц', price: 199 },
@@ -76,10 +76,10 @@ const SubscriptionModal = ({ onClose, onPurchase, theme }) => {
             <div className={`w-full max-w-sm rounded-2xl p-6 shadow-lg ${t.componentBg} ${t.text}`}>
                 <CrownIcon className={`mx-auto mb-4 text-pink-400`} />
                 <h3 className="text-xl text-center font-bold">Получите доступ ко всем главам</h3>
-                <p className={`mt-2 mb-6 text-sm text-center opacity-70`}>Оформите подписку, чтобы читать все платные главы этой и других новелл без ограничений.</p>
+                <p className={`mt-2 mb-6 text-sm text-center opacity-70`}>Выберите подходящий тариф подписки:</p>
                 <div className="space-y-3">
                     {subscriptionPlans.map(plan => (
-                        <button key={plan.duration} onClick={() => onPurchase(plan)} className={`relative w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 ${t.border} ${t.componentBg} hover:border-pink-400`}>
+                        <button key={plan.duration} onClick={() => onSelectPlan(plan)} className={`relative w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 ${t.border} ${t.componentBg} hover:border-pink-400`}>
                             {plan.popular && <span className="absolute top-2 right-2 text-xs bg-pink-500 text-white px-2 py-0.5 rounded-full">Популярный</span>}
                             <p className="font-bold">{plan.name}</p>
                             <p className="text-sm">{plan.price} ₽</p>
@@ -91,6 +91,31 @@ const SubscriptionModal = ({ onClose, onPurchase, theme }) => {
         </div>
     );
 };
+
+// --- НОВЫЙ КОМПОНЕНТ: Модальное окно выбора способа оплаты ---
+const PaymentMethodModal = ({ onClose, onSelectMethod, theme, plan }) => {
+    const t = themes[theme];
+    return (
+         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className={`w-full max-w-sm rounded-2xl p-6 shadow-lg ${t.componentBg} ${t.text}`}>
+                <h3 className="text-xl text-center font-bold">Выберите способ оплаты</h3>
+                <p className={`mt-2 mb-6 text-sm text-center opacity-70`}>Тариф: {plan.name} ({plan.price} ₽)</p>
+                <div className="space-y-3">
+                    <button onClick={() => onSelectMethod('card')} className={`w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 ${t.border} ${t.componentBg} hover:border-pink-400`}>
+                        <p className="font-bold">💳 Банковской картой</p>
+                        <p className="text-sm opacity-70">Ручная проверка (до 24 часов)</p>
+                    </button>
+                    <button onClick={() => onSelectMethod('tribut')} className={`w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 ${t.border} ${t.componentBg} hover:border-pink-400`}>
+                        <p className="font-bold">❤️ Донат через tribut</p>
+                        <p className="text-sm opacity-70">Более быстрый способ</p>
+                    </button>
+                </div>
+                <button onClick={onClose} className={`w-full py-3 mt-4 rounded-lg border ${t.border}`}>Назад</button>
+            </div>
+        </div>
+    )
+};
+
 
 // --- Компонент: Плавающая навигация ---
 const FloatingNav = ({ onBack, onHome }) => {
@@ -116,10 +141,10 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
   const t = themes[theme];
 
   const filteredNovels = useMemo(() => 
-    novels
-      .filter(novel => !genreFilter || novel.genres.includes(genreFilter))
-      .filter(novel => novel.title.toLowerCase().includes(searchQuery.toLowerCase()))
-  , [novels, searchQuery, genreFilter]);
+    novels.filter(novel => 
+        (!genreFilter || novel.genres.includes(genreFilter)) && 
+        novel.title.toLowerCase().includes(searchQuery.toLowerCase())
+    ), [novels, searchQuery, genreFilter]);
 
   if (!novels.length && !searchQuery) {
       return <div className={`p-4 text-center ${t.text}`}>Загрузка библиотеки...</div>
@@ -168,6 +193,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
+    const [selectedPlan, setSelectedPlan] = useState(null);
 
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
 
@@ -193,35 +219,31 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
         }
     };
     
-    const handleSubscriptionPurchase = async (plan) => {
+    const handlePlanSelect = (plan) => {
+        setSelectedPlan(plan);
+    };
+
+    const handlePaymentMethodSelect = async (method) => {
         const tg = window.Telegram?.WebApp;
-        if (tg && userId) {
+        if (tg && userId && selectedPlan) {
             const userDocRef = doc(db, "users", userId);
             await setDoc(userDocRef, { 
                 pendingSubscription: {
-                    duration: plan.duration,
-                    price: plan.price,
-                    planName: plan.name,
+                    ...selectedPlan,
+                    method: method,
                     date: new Date().toISOString()
                 }
             }, { merge: true });
 
-            tg.showPopup({
-                title: 'Переход к оплате',
-                message: `Сейчас вы будете перенаправлены в чат с ботом. Пожалуйста, нажмите кнопку "START" внизу чата, чтобы получить инструкции по оплате.`,
-                buttons: [{ id: 'continue', type: 'default', text: 'Понятно, продолжить' }]
-            }, (buttonId) => {
-                if (buttonId === 'continue') {
-                    tg.openTelegramLink(`https://t.me/${botUsername}`);
-                    tg.close();
-                }
-            });
+            tg.openTelegramLink(`https://t.me/${botUsername}`);
+            tg.close();
         }
     };
 
     return (
         <div className={t.text}>
-            {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onPurchase={handleSubscriptionPurchase} theme={theme} />}
+            {isSubModalOpen && !selectedPlan && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} theme={theme} />}
+            {isSubModalOpen && selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} theme={theme} plan={selectedPlan} />}
 
             <div className="relative h-64">
                 <img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/>
@@ -287,6 +309,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   const BOT_USERNAME = "tenebrisverbot";
+  const baseUrl = "/"; // Для GitHub Pages нужен относительный путь
 
   useEffect(() => {
     const init = async () => {
@@ -305,7 +328,7 @@ export default function App() {
         if (docSnap.exists()) {
           setSubscription(docSnap.data().subscription || null);
         }
-        const response = await fetch('data/novels.json');
+        const response = await fetch(`${baseUrl}data/novels.json`);
         if (!response.ok) throw new Error('Failed to fetch novels');
         const data = await response.json();
         setNovels(data.novels);
@@ -316,7 +339,7 @@ export default function App() {
       }
     };
     init();
-  }, []);
+  }, [baseUrl]);
   
   useEffect(() => { document.documentElement.className = theme; }, [theme]);
   const handleBack = useCallback(() => {
@@ -363,4 +386,3 @@ export default function App() {
     </main>
   );
 }
-

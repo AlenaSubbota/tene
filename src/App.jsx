@@ -194,7 +194,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
     const [isLoading, setIsLoading] = useState(true);
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
-    const [isSaving, setIsSaving] = useState(false); // Состояние для индикации сохранения
 
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
 
@@ -226,10 +225,10 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
 
     const handlePaymentMethodSelect = async (method) => {
         const tg = window.Telegram?.WebApp;
-        if (tg && userId && selectedPlan && !isSaving) {
-            setIsSaving(true); // Блокируем кнопку
+        if (tg && userId && selectedPlan) {
             const userDocRef = doc(db, "users", userId);
             try {
+                // Сначала записываем в базу данных
                 await setDoc(userDocRef, { 
                     pendingSubscription: {
                         ...selectedPlan,
@@ -238,14 +237,12 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
                     }
                 }, { merge: true });
                 
-                // Переходим в бот только после успешной записи
+                // Только ПОСЛЕ успешной записи переходим в бот
                 tg.openTelegramLink(`https://t.me/${botUsername}`);
-                tg.close();
+
             } catch (error) {
                 console.error("Ошибка записи в Firebase:", error);
                 tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
-            } finally {
-                setIsSaving(false); // Разблокируем кнопку в любом случае
             }
         }
     };
@@ -395,3 +392,4 @@ export default function App() {
     </main>
   );
 }
+

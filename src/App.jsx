@@ -19,7 +19,6 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 
 // --- ИКОНКИ ---
-// ... (все твои иконки остаются здесь без изменений)
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
 const SunIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>);
 const MoonIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>);
@@ -36,10 +35,11 @@ const LoadingSpinner = ({ theme }) => {
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center ${t.bg}`}>
       <HeartIcon className="animate-pulse-heart text-pink-400" />
-      <p className={`mt-4 text-lg ${t.text} opacity-70`}>Инициализация...</p>
+      <p className={`mt-4 text-lg ${t.text} opacity-70`}>Загрузка новелл...</p>
     </div>
   );
 };
+
 
 // --- Цветовые Схемы ---
 const themes = {
@@ -47,9 +47,7 @@ const themes = {
   dark: { bg: 'bg-gray-900', text: 'text-gray-100', componentBg: 'bg-gray-800', componentText: 'text-gray-200', border: 'border-gray-700', searchBg: 'bg-gray-800', searchPlaceholder: 'placeholder-gray-500', searchRing: 'focus:ring-pink-500', tgBg: '#121212', tgHeader: '#171717' }
 };
 
-// --- КОМПОНЕНТЫ: SubscriptionModal, PaymentMethodModal, FloatingNav, NovelList, NovelDetails, ChapterReader ---
-// ... (все твои компоненты остаются здесь без изменений, я их не привожу, чтобы не загромождать ответ)
-// Просто скопируй этот код целиком, твои компоненты уже включены
+// --- КОМПОНЕНТЫ ---
 const SubscriptionModal = ({ onClose, onSelectPlan, theme }) => {
     const t = themes[theme];
     const subscriptionPlans = [{ duration: 1, name: '1 месяц', price: 199 },{ duration: 3, name: '3 месяца', price: 539, popular: true },{ duration: 12, name: '1 год', price: 1899 }];
@@ -72,14 +70,13 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscription, botUsername, userId, chaptersCache }) => {
     const t = themes[theme];
-    const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
     useEffect(() => { if (chaptersCache[novel.id]) { setChapters(chaptersCache[novel.id]); setIsLoading(false); } else { setIsLoading(true); fetch(`data/chapters/${novel.id}.json`).then(res => res.json()).then(data => { setChapters(data.chapters || []); setIsLoading(false); }).catch(err => { console.error(err); setChapters([]); setIsLoading(false); }); } }, [novel.id, chaptersCache]);
-    const sortedChapters = useMemo(() => { const chaptersCopy = [...chapters]; if (sortOrder === 'newest') return chaptersCopy.reverse(); return chaptersCopy; }, [chapters, sortOrder]);
+    const sortedChapters = useMemo(() => { const chaptersCopy = [...chapters]; return chaptersCopy.reverse() }, [chapters]);
     const handleChapterClick = (chapter) => { if (!hasActiveSubscription && chapter.isPaid) { setIsSubModalOpen(true); } else { onSelectChapter(chapter); } };
     const handlePlanSelect = (plan) => { setSelectedPlan(plan); };
     const handlePaymentMethodSelect = async (method) => { const tg = window.Telegram?.WebApp; if (tg && userId && selectedPlan) { const userDocRef = doc(db, "users", userId); try { await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true }); tg.openTelegramLink(`https://t.me/${botUsername}?start=true`); } catch (error) { console.error("Ошибка записи в Firebase:", error); tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова."); } } };
@@ -174,7 +171,6 @@ export default function App() {
   const handleGenreSelect = (genre) => { setGenreFilter(genre); setPage('list'); };
   const handleClearGenreFilter = () => { setGenreFilter(null); };
 
-  // ИСПРАВЛЕНО: Используем новый компонент LoadingSpinner
   if (isLoading) {
     return <LoadingSpinner theme={theme} />;
   }

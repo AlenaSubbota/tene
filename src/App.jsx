@@ -5,14 +5,14 @@ import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
 import { getAuth, signInAnonymously } from "firebase/auth";
 
 
-// --- ВАШИ КЛЮЧИ ДОСТУПА FIREBASE ---
+// --- ИСПРАВЛЕНО: Безопасная загрузка ключей из .env файла ---
 const firebaseConfig = {
-  apiKey: "AIzaSyDfDGFXGFGkzmgYFAHI1q6AZiLy7esuPrw",
-  authDomain: "tenebris-verbum.firebaseapp.com",
-  projectId: "tenebris-verbum",
-  storageBucket: "tenebris-verbum.firebasestorage.app",
-  messagingSenderId: "637080257821",
-  appId: "1:637080257821:web:7f7440e0bcef2ce7178df4"
+  apiKey: import.meta.env.VITE_API_KEY,
+  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_APP_ID
 };
 
 // --- Инициализация Firebase ---
@@ -187,7 +187,8 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 
 // --- Компонент: Детали новеллы ---
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscription, botUsername, userId }) => {
+// ИСПРАВЛЕНО: Добавляем chaptersCache в пропсы для получения предзагруженных глав
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscription, botUsername, userId, chaptersCache }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
     const [chapters, setChapters] = useState([]);
@@ -197,13 +198,19 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
 
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
 
+    // ИСПРАВЛЕНО: Логика теперь сначала проверяет кэш
     useEffect(() => {
-        setIsLoading(true);
-        fetch(`data/chapters/${novel.id}.json`)
-            .then(res => res.json())
-            .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
-            .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
-    }, [novel.id]);
+        if (chaptersCache[novel.id]) {
+            setChapters(chaptersCache[novel.id]);
+            setIsLoading(false);
+        } else {
+            setIsLoading(true);
+            fetch(`data/chapters/${novel.id}.json`)
+                .then(res => res.json())
+                .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
+                .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
+        }
+    }, [novel.id, chaptersCache]);
 
     const sortedChapters = useMemo(() => {
         const chaptersCopy = [...chapters];
@@ -228,7 +235,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
         if (tg && userId && selectedPlan) {
             const userDocRef = doc(db, "users", userId);
             try {
-                // Сначала записываем в базу данных
                 await setDoc(userDocRef, { 
                     pendingSubscription: {
                         ...selectedPlan,
@@ -237,7 +243,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
                     }
                 }, { merge: true });
                 
-                // Только ПОСЛЕ успешной записи переходим в бот
                 tg.openTelegramLink(`https://t.me/${botUsername}`);
 
             } catch (error) {
@@ -314,6 +319,8 @@ export default function App() {
   const [subscription, setSubscription] = useState(null);
   const [userId, setUserId] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  // ИСПРАВЛЕНО: Состояние для кэширования глав
+  const [chaptersCache, setChaptersCache] = useState({});
 
   const BOT_USERNAME = "tenebrisverbot";
   
@@ -347,6 +354,23 @@ export default function App() {
     init();
   }, []);
   
+  // ИСПРАВЛЕНО: Новый хук для предзагрузки глав в фоновом режиме
+  useEffect(() => {
+    if (novels.length > 0) {
+      novels.forEach(novel => {
+        fetch(`data/chapters/${novel.id}.json`)
+          .then(res => res.json())
+          .then(data => {
+            setChaptersCache(prevCache => ({
+              ...prevCache,
+              [novel.id]: data.chapters || []
+            }));
+          })
+          .catch(err => console.error(`Не удалось предзагрузить главы для ${novel.title}:`, err));
+      });
+    }
+  }, [novels]);
+
   useEffect(() => { document.documentElement.className = theme; }, [theme]);
   const handleBack = useCallback(() => {
       if (page === 'reader') setPage('details');
@@ -378,7 +402,8 @@ export default function App() {
 
   const renderPage = () => {
     switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} />;
+      // ИСПРАВЛЕНО: Передаем кэш в компонент деталей
+      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chaptersCache={chaptersCache} />;
       case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={setTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }
@@ -392,4 +417,3 @@ export default function App() {
     </main>
   );
 }
-

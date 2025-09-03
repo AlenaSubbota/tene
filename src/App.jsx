@@ -243,7 +243,29 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
                     }
                 }, { merge: true });
                 
-                tg.openTelegramLink(`https://t.me/${botUsername}`);
+                const handlePaymentMethodSelect = async (method) => {
+        const tg = window.Telegram?.WebApp;
+        if (tg && userId && selectedPlan) {
+            const userDocRef = doc(db, "users", userId);
+            try {
+                // Сначала записываем в базу данных
+                await setDoc(userDocRef, { 
+                    pendingSubscription: {
+                        ...selectedPlan,
+                        method: method,
+                        date: new Date().toISOString()
+                    }
+                }, { merge: true });
+                
+                // ИСПРАВЛЕНО: Открываем ссылку, которая сразу запускает команду /start
+                tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
+
+            } catch (error) {
+                console.error("Ошибка записи в Firebase:", error);
+                tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
+            }
+        }
+    };
 
             } catch (error) {
                 console.error("Ошибка записи в Firebase:", error);

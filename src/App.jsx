@@ -187,6 +187,8 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
 };
 
 // --- Компонент: Детали новеллы ---
+// ЗАМЕНИ ВЕСЬ ЭТОТ БЛОК ЦЕЛИКОМ
+
 const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscription, botUsername, userId, chaptersCache }) => {
     const t = themes[theme];
     const [sortOrder, setSortOrder] = useState('newest');
@@ -228,7 +230,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
         setSelectedPlan(plan);
     };
 
-    // ИСПРАВЛЕНО: Убрана лишняя вложенная функция
+    // ВОТ ИСПРАВЛЕННАЯ ВЕРСИЯ ФУНКЦИИ
     const handlePaymentMethodSelect = async (method) => {
         const tg = window.Telegram?.WebApp;
         if (tg && userId && selectedPlan) {
@@ -292,7 +294,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
                 )}
             </div>
         </div>
-    )
+    );
 };
 
 // --- Компонент: Читалка глав ---

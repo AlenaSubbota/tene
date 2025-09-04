@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { initializeApp } from "firebase/app";
 import {
     getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
@@ -20,7 +20,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const ADMIN_ID = "417641827"; // Your Admin ID
+const ADMIN_ID = "417641827";
 
 // --- ICONS ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
@@ -35,6 +35,8 @@ const UserIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www
 const LibraryIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M4 22h16"/><path d="M7 22V2h10v20"/><path d="M7 12h4"/></svg>);
 const ChevronLeftIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m15 18-6-6 6-6"/></svg>;
 const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>;
+const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
+
 
 // --- Components ---
 const LoadingSpinner = () => (
@@ -88,6 +90,8 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [sortOrder, setSortOrder] = useState('newest');
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+    const [showReadMore, setShowReadMore] = useState(false);
+    const descriptionRef = useRef(null);
 
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
     const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
@@ -104,6 +108,12 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
                 .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
         }
     }, [novel.id, chaptersCache]);
+    
+    useEffect(() => {
+        if (descriptionRef.current) {
+            setShowReadMore(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
+        }
+    }, [novel.description]);
 
     const sortedChapters = useMemo(() => {
         const chaptersCopy = [...chapters];
@@ -133,7 +143,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
       }
     };
 
-    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button>{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
+    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div className={`relative overflow-hidden transition-all duration-300 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p ref={descriptionRef} className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{showReadMore && <div className="text-right mt-1"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 my-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
         const showLock = !hasActiveSubscription && chapter.isPaid;
         const isLastRead = lastReadChapterId === chapter.id;
         return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 bg-component-bg rounded-xl cursor-pointer transition-all duration-200 hover:border-accent-hover hover:bg-accent/10 border border-border-color flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>
@@ -149,7 +159,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     </div></div>)
 };
 
-const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack }) => {
+const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack, onTextSizeChange }) => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState(null);
@@ -159,6 +169,7 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
   const [showChapterList, setShowChapterList] = useState(false);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
   const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
@@ -188,26 +199,16 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
     if (!newComment.trim() || !userId || userId === "guest_user") return;
-
     const commentsColRef = collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`);
-    await addDoc(commentsColRef, {
-      userId,
-      userName: userName || "Аноним",
-      text: newComment,
-      timestamp: serverTimestamp()
-    });
+    await addDoc(commentsColRef, { userId, userName: userName || "Аноним", text: newComment, timestamp: serverTimestamp() });
     setNewComment("");
   };
-    const handleEdit = (comment) => {
-    setEditingCommentId(comment.id);
-    setEditingText(comment.text);
-  };
+    const handleEdit = (comment) => { setEditingCommentId(comment.id); setEditingText(comment.text); };
     const handleUpdateComment = async (commentId) => {
     if (!editingText.trim()) return;
     const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
     await updateDoc(commentRef, { text: editingText });
-    setEditingCommentId(null);
-    setEditingText("");
+    setEditingCommentId(null); setEditingText("");
   };
     const handleDelete = async (commentId) => {
     const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
@@ -216,14 +217,11 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
 
   const handleLike = async () => {
     if (!userId || userId === "guest_user") return;
-
     const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
-
     await runTransaction(db, async (transaction) => {
       const likeDoc = await transaction.get(likeRef);
       const metaDoc = await transaction.get(chapterMetaRef);
       const currentLikes = metaDoc.data()?.likeCount || 0;
-
       if (likeDoc.exists()) {
         transaction.delete(likeRef);
         transaction.set(chapterMetaRef, { likeCount: Math.max(0, currentLikes - 1) }, { merge: true });
@@ -281,8 +279,10 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
       <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto pb-24">
         <h2 className="text-lg sm:text-xl mb-8 text-center opacity-80 font-sans">{chapter.title}</h2>
         <div className={`whitespace-pre-wrap leading-relaxed ${currentFontClass}`} style={{ fontSize: `${fontSize}px` }}>{chapter.content}</div>
+        
+        <div className="text-center my-8 text-accent opacity-50 text-xl font-bold">╚══ ≪ °❈° ≫ ══╝</div>
 
-        <div className="mt-12 border-t pt-8">
+        <div className="border-t border-border-color pt-8">
           <div className="flex items-center gap-4 mb-8">
             <button onClick={handleLike} className="flex items-center gap-2 text-accent-hover transition-transform hover:scale-110">
               <HeartIcon filled={userHasLiked} className={userHasLiked ? "text-accent" : ''} />
@@ -290,24 +290,19 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
             </button>
           </div>
 
-          <h3 className="text-2xl font-bold mb-4">Комментарии</h3>
+          <h3 className="text-xl font-bold mb-4">Комментарии</h3>
           <div className="space-y-4 mb-6">
             {comments.map(comment => (
               <div key={comment.id} className="p-3 rounded-lg bg-component-bg border border-border-color">
-                <p className="font-bold text-sm">{comment.userName}</p>
+                <p className="font-bold text-xs">{comment.userName}</p>
                 {editingCommentId === comment.id ? (
                   <div className="flex items-center gap-2 mt-1">
-                    <input
-                      type="text"
-                      value={editingText}
-                      onChange={(e) => setEditingText(e.target.value)}
-                      className="w-full bg-background border border-border-color rounded-lg py-1 px-2 text-text-main"
-                    />
+                    <input type="text" value={editingText} onChange={(e) => setEditingText(e.target.value)} className="w-full bg-background border border-border-color rounded-lg py-1 px-2 text-text-main text-sm" />
                     <button onClick={() => handleUpdateComment(comment.id)} className="p-1 rounded-full bg-green-500 text-white">✓</button>
                     <button onClick={() => setEditingCommentId(null)} className="p-1 rounded-full bg-gray-500 text-white">✕</button>
                   </div>
                 ) : (
-                  <p className="text-md mt-1">{comment.text}</p>
+                  <p className="text-sm mt-1">{comment.text}</p>
                 )}
                  {(userId === comment.userId || userId === ADMIN_ID) && (
                   <div className="flex items-center gap-2 mt-2">
@@ -317,27 +312,22 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
                 )}
               </div>
             ))}
-            {comments.length === 0 && <p className="opacity-70">Комментариев пока нет. Будьте первым!</p>}
+            {comments.length === 0 && <p className="opacity-70 text-sm">Комментариев пока нет. Будьте первым!</p>}
           </div>
 
           <form onSubmit={handleCommentSubmit} className="flex items-center gap-2">
-            <input
-              type="text"
-              value={newComment}
-              onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Написать комментарий..."
-              className="w-full bg-component-bg border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
-            />
-            <button type="submit" className="p-2 rounded-full bg-accent text-white">
-              <SendIcon />
-            </button>
+            <input type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Написать комментарий..." className="w-full bg-component-bg border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent" />
+            <button type="submit" className="p-2 rounded-full bg-accent text-white flex-shrink-0"><SendIcon /></button>
           </form>
         </div>
       </div>
-      {/* Chapter Navigation */}
+      
       <div className="fixed bottom-0 left-0 right-0 p-2 border-t border-border-color bg-component-bg flex justify-between items-center z-10">
         <button onClick={() => handleChapterClick(prevChapter)} disabled={!prevChapter} className="p-2 disabled:opacity-50"><BackIcon/></button>
-        <button onClick={() => setShowChapterList(true)} className="px-4 py-2 rounded-lg bg-background">Оглавление</button>
+        <div className="flex gap-2">
+            <button onClick={() => setShowChapterList(true)} className="px-4 py-2 rounded-lg bg-background">Оглавление</button>
+            <button onClick={() => setIsSettingsOpen(true)} className="p-2 rounded-lg bg-background"><SettingsIcon /></button>
+        </div>
         <button onClick={() => handleChapterClick(nextChapter)} disabled={!nextChapter} className="p-2 disabled:opacity-50"><ArrowRightIcon className="opacity-100"/></button>
       </div>
 
@@ -347,16 +337,24 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
             <h3 className="font-bold text-lg mb-4">Главы</h3>
             <div className="flex flex-col gap-2">
               {allChapters.map(chap => (
-                <button
-                  key={chap.id}
-                  onClick={() => handleChapterClick(chap)}
-                  className={`p-2 text-left rounded-md ${chap.id === chapter.id ? "bg-accent text-white" : "bg-background"}`}
-                >
-                  {chap.title}
-                </button>
+                <button key={chap.id} onClick={() => handleChapterClick(chap)} className={`p-2 text-left rounded-md ${chap.id === chapter.id ? "bg-accent text-white" : "bg-background"}`}>{chap.title}</button>
               ))}
             </div>
           </div>
+        </div>
+      )}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsSettingsOpen(false)}>
+            <div className={`absolute bottom-0 left-0 right-0 p-4 rounded-t-2xl bg-component-bg text-text-main`} onClick={e => e.stopPropagation()}>
+                <h3 className="font-bold text-lg mb-4">Настройки чтения</h3>
+                 <div className="flex items-center justify-between">
+                  <span>Размер текста</span>
+                  <div className="w-28 h-12 rounded-full bg-background flex items-center justify-around border border-border-color">
+                    <button onClick={() => onTextSizeChange(-1)} className="text-2xl font-bold">-</button>
+                    <button onClick={() => onTextSizeChange(1)} className="text-2xl font-bold">+</button>
+                  </div>
+                </div>
+            </div>
         </div>
       )}
       {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
@@ -498,7 +496,7 @@ const NewsModal = ({ newsItem, onClose }) => (
 
 // --- Главный компонент приложения ---
 export default function App() {
-  const [fontSize, setFontSize] = useState(18);
+  const [fontSize, setFontSize] = useState(16);
   const [fontClass, setFontClass] = useState('font-sans');
   const [page, setPage] = useState('list');
   const [activeTab, setActiveTab] = useState('library');
@@ -529,6 +527,13 @@ export default function App() {
         }
     }
   }, [userId]);
+
+  const handleTextSizeChange = useCallback((amount) => {
+    setFontSize(prevSize => {
+        const newSize = Math.max(12, Math.min(32, prevSize + amount));
+        return newSize;
+    });
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -672,7 +677,7 @@ export default function App() {
       return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chaptersCache={chaptersCache} lastReadData={lastReadData} onBack={handleBack}/>;
     }
     if (page === 'reader') {
-      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} userId={userId} userName={userName} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chaptersCache[selectedNovel.id] || []} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} />;
+      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onTextSizeChange={handleTextSizeChange} userId={userId} userName={userName} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chaptersCache[selectedNovel.id] || []} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} />;
     }
 
     switch (activeTab) {
@@ -682,6 +687,7 @@ export default function App() {
             <Header title="Библиотека" />
             <NewsSlider onReadMore={setSelectedNews} />
             <NovelList novels={novels.filter(n => (!genreFilter || n.genres.includes(genreFilter)))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+             {genreFilter && <div className="p-4 text-center"><button onClick={handleClearGenreFilter} className="text-accent font-semibold text-sm">Сбросить фильтр</button></div>}
           </>
         )
       case 'search':
@@ -706,6 +712,7 @@ export default function App() {
         {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
         {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
         {selectedNews && <NewsModal newsItem={selectedNews} onClose={() => setSelectedNews(null)} />}
+
     </main>
   );
 }

@@ -13,7 +13,7 @@
       @keyframes fadeIn-down {
         from {
           opacity: 0;
-          transform: translateY(20px);
+          transform: translateY(-20px); /* Изменено на движение сверху вниз */
         }
         to {
           opacity: 1;
@@ -21,9 +21,7 @@
         }
       }
       .animate-fade-in-down {
-        /* Изначально элемент невидимый, чтобы анимация сработала */
         opacity: 0;
-        /* Применяем анимацию */
         animation: fadeIn-down 0.5s ease-out forwards;
       }
     </style>

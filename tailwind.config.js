@@ -7,11 +7,12 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        'sans': ['Montserrat', 'sans-serif'], // Заголовки, интерфейс
-        'serif': ['Merriweather', 'serif'], // Запасной, если захотим вернуть
-        'body': ['Arial', 'sans-serif', 'system-ui'], // Основной текст
+        'sans': ['Montserrat', 'sans-serif'], // Для заголовков и интерфейса
+        'body': ['Arial', 'sans-serif', 'system-ui'], // Для основного текста
       },
-      // ДОБАВЛЯЕМ СЕКЦИЮ ДЛЯ АНИМАЦИИ
+      dropShadow: {
+        'pink': '0 1px 2px rgba(236, 72, 153, 0.7)', // Новая розовая тень
+      },
       keyframes: {
         'pulse-heart': {
           '0%, 100%': {

@@ -63,7 +63,6 @@ const themes = {
   }
 };
 
-
 // --- КОМПОНЕНТЫ ---
 const SubscriptionModal = ({ onClose, onSelectPlan, theme }) => {
     const t = themes[theme];
@@ -78,9 +77,9 @@ const PaymentMethodModal = ({ onClose, onSelectMethod, theme, plan }) => {
 const Header = ({ title, onBack, theme }) => {
   const t = themes[theme];
   return (
-    <div className={`sticky top-0 ${t.componentBg} z-10 py-3 px-4 flex items-center border-b ${t.border}`}>
+    <div className={`sticky top-0 ${t.componentBg} z-20 py-3 px-4 flex items-center border-b ${t.border} shadow-sm`}>
       {onBack && (
-        <button onClick={onBack} className="mr-4">
+        <button onClick={onBack} className={`mr-4 p-2 -ml-2 rounded-full hover:${t.bg}`}>
           <BackIcon />
         </button>
       )}
@@ -89,12 +88,25 @@ const Header = ({ title, onBack, theme }) => {
   )
 }
 
-const NovelList = ({ novels, onSelectNovel, theme, genreFilter, onClearGenreFilter, bookmarks, onToggleBookmark }) => {
+const NovelList = ({ novels, onSelectNovel, theme, bookmarks, onToggleBookmark }) => {
   const t = themes[theme];
-  return (<div className={`p-4 ${t.text}`}>
-    {genreFilter && (<div className={`flex items-center justify-between p-3 mb-4 rounded-lg border ${t.border} ${t.componentBg}`}><p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p><button onClick={onClearGenreFilter} className={`text-xs font-bold text-${t.accent} hover:underline`}>Сбросить</button></div>)}
-    <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4">{novels.map((novel, index) => (<div key={novel.id} onClick={() => onSelectNovel(novel)} className="cursor-pointer group animate-fade-in-down" style={{ animationDelay: `${index * 50}ms` }}><div className="relative filter drop-shadow-md group-hover:drop-shadow-pink transition-all duration-300"><button onClick={(e) => { e.stopPropagation(); onToggleBookmark(novel.id); }} className={`absolute top-2 right-2 z-10 p-1 rounded-full bg-black/30 backdrop-blur-sm text-white transition-colors ${bookmarks.includes(novel.id) ? 'text-pink-400' : ''}`}><BookmarkIcon filled={bookmarks.includes(novel.id)} width="20" height="20" /></button><img src={novel.coverUrl} alt={novel.title} className={`w-full aspect-[2/3] object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 ${t.border} border`} /><h2 className={`mt-2 font-semibold text-xs truncate ${t.text}`}>{novel.title}</h2></div></div>))}</div>
-  </div>);
+  return (
+    <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 p-4">
+      {novels.length > 0 ? novels.map((novel, index) => (
+        <div key={novel.id} onClick={() => onSelectNovel(novel)} className="cursor-pointer group animate-fade-in-down" style={{ animationDelay: `${index * 50}ms` }}>
+          <div className="relative filter drop-shadow-md group-hover:drop-shadow-pink transition-all duration-300">
+            <button onClick={(e) => { e.stopPropagation(); onToggleBookmark(novel.id); }} className={`absolute top-2 right-2 z-10 p-1 rounded-full bg-black/30 backdrop-blur-sm text-white transition-colors ${bookmarks.includes(novel.id) ? 'text-pink-400' : ''}`}>
+              <BookmarkIcon filled={bookmarks.includes(novel.id)} width="20" height="20" />
+            </button>
+            <img src={novel.coverUrl} alt={novel.title} className={`w-full aspect-[2/3] object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 ${t.border} border`} />
+            <h2 className={`mt-2 font-semibold text-xs truncate ${t.text}`}>{novel.title}</h2>
+          </div>
+        </div>
+      )) : (
+        <p className={`col-span-3 text-center ${t.text} opacity-70`}>Ничего не найдено.</p>
+      )}
+    </div>
+  );
 };
 
 const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscription, botUsername, userId, chaptersCache, lastReadData, onBack }) => {
@@ -267,7 +279,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
 
     const handlePlanSelect = (plan) => {
         setSelectedPlan(plan);
-        setIsSubModalOpen(false); // Close subscription modal to open payment method modal
+        setIsSubModalOpen(false);
     };
 
     const handlePaymentMethodSelect = async (method) => {
@@ -297,7 +309,6 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
     <div className={`min-h-screen transition-colors duration-300 ${t.bg}`}>
       <Header title={novel.title} onBack={onBack} theme={theme} />
       <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto pb-24">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center font-sans text-pink-400">{novel.title}</h1>
         <h2 className={`text-lg sm:text-xl mb-8 text-center opacity-80 font-sans ${t.text}`}>{chapter.title}</h2>
         <div className={`whitespace-pre-wrap leading-relaxed ${t.text} ${currentFontClass}`} style={{ fontSize: `${fontSize}px` }}>{chapter.content}</div>
 
@@ -390,6 +401,7 @@ export default function App() {
   const [fontSize, setFontSize] = useState(18);
   const [fontClass, setFontClass] = useState('font-sans'); // 'font-sans' теперь JetBrains Mono
   const [page, setPage] = useState('list');
+  const [activeTab, setActiveTab] = useState('library');
   const [novels, setNovels] = useState([]);
   const [selectedNovel, setSelectedNovel] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
@@ -401,8 +413,7 @@ export default function App() {
   const [chaptersCache, setChaptersCache] = useState({});
   const [lastReadData, setLastReadData] = useState(null);
   const [bookmarks, setBookmarks] = useState([]);
-  const [isBookmarksOpen, setIsBookmarksOpen] = useState(false);
-
+  
   const BOT_USERNAME = "tenebrisverbot";
 
   const updateUserDoc = useCallback(async (dataToUpdate) => {
@@ -493,7 +504,7 @@ export default function App() {
     const tg = window.Telegram?.WebApp;
     if (!tg) return;
     tg.onEvent('backButtonClicked', handleBack);
-    if (page === 'list') { 
+    if (page === 'list') {
         tg.BackButton.hide();
     } else {
         tg.BackButton.show();
@@ -525,8 +536,8 @@ export default function App() {
     }
   }, [userId, selectedNovel, lastReadData, updateUserDoc]);
 
-  const handleSelectNovel = (novel) => { setSelectedNovel(novel); setPage('details'); };
-  const handleGenreSelect = (genre) => { setGenreFilter(genre); setPage('list'); };
+  const handleSelectNovel = (novel) => { setSelectedNovel(novel); setPage('list'); };
+  const handleGenreSelect = (genre) => { setGenreFilter(genre); setPage('list'); setActiveTab('library'); };
   const handleClearGenreFilter = () => { setGenreFilter(null); };
 
   const handleToggleBookmark = useCallback(async (novelId) => {
@@ -544,21 +555,45 @@ export default function App() {
   if (isLoading) {
     return <LoadingSpinner theme={theme} />;
   }
-
-  const renderPage = () => {
-    switch (page) {
-      case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chaptersCache={chaptersCache} lastReadData={lastReadData} onBack={handleBack}/>;
-      case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} fontSize={fontSize} userId={userId} userName={userName} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chaptersCache[selectedNovel.id] || []} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} />;
-      case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
-    }
-  };
-
+  
   const t = themes[theme];
   const isUserAdmin = userId === ADMIN_ID;
 
+  const renderContent = () => {
+    if (page === 'details') {
+      return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chaptersCache={chaptersCache} lastReadData={lastReadData} onBack={handleBack}/>;
+    }
+    if (page === 'reader') {
+      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} fontSize={fontSize} userId={userId} userName={userName} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chaptersCache[selectedNovel.id] || []} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} />;
+    }
+
+    switch (activeTab) {
+      case 'library':
+        return (
+          <>
+            <Header title="Библиотека" theme={theme} />
+            <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />
+          </>
+        )
+      case 'search':
+        return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} theme={theme} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+      case 'bookmarks':
+        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} theme={theme} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+      case 'profile':
+        return <ProfilePage theme={theme} subscription={subscription} onThemeChange={() => handleSetTheme(theme === 'dark' ? 'light' : 'dark')} />
+      default:
+        return <Header title="Библиотека" theme={theme} />
+    }
+  };
+
   return (
     <main className={`${t.bg} min-h-screen font-sans ${!isUserAdmin ? 'no-select' : ''}`}>
-      {renderPage()}
+        <div className="pb-20">
+            {renderContent()}
+        </div>
+        {page === 'list' && (
+            <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} />
+        )}
     </main>
   );
 }

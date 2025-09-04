@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from "firebase/app";
-import { 
+import {
     getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
-    collection, onSnapshot, query, orderBy, addDoc, 
+    collection, onSnapshot, query, orderBy, addDoc,
     serverTimestamp, runTransaction
 } from "firebase/firestore";
 import { getAuth, signInAnonymously } from "firebase/auth";
@@ -50,16 +50,16 @@ const LoadingSpinner = ({ theme }) => {
 
 // --- Цветовые Схемы ---
 const themes = {
-  light: { 
-    bg: 'bg-stone-100', text: 'text-stone-800', componentBg: 'bg-white', componentText: 'text-stone-700', 
-    border: 'border-stone-200', searchBg: 'bg-white', searchPlaceholder: 'placeholder-stone-400', 
-    searchRing: 'focus:ring-pink-400', tgBg: '#f8f7f5', tgHeader: '#FFFFFF', accent: 'pink-500', 
+  light: {
+    bg: 'bg-stone-100', text: 'text-stone-800', componentBg: 'bg-white', componentText: 'text-stone-700',
+    border: 'border-stone-200', searchBg: 'bg-white', searchPlaceholder: 'placeholder-stone-400',
+    searchRing: 'focus:ring-pink-400', tgBg: '#f8f7f5', tgHeader: '#FFFFFF', accent: 'pink-500',
     accentHover: 'pink-400', commentBg: 'bg-stone-50', commentText: 'text-stone-800'
   },
-  dark: { 
-    bg: 'bg-gray-900', text: 'text-gray-100', componentBg: 'bg-gray-800', componentText: 'text-gray-200', 
-    border: 'border-gray-700', searchBg: 'bg-gray-800', searchPlaceholder: 'placeholder-gray-500', 
-    searchRing: 'focus:ring-pink-500', tgBg: '#111827', tgHeader: '#1f2937', accent: 'pink-500', 
+  dark: {
+    bg: 'bg-gray-900', text: 'text-gray-100', componentBg: 'bg-gray-800', componentText: 'text-gray-200',
+    border: 'border-gray-700', searchBg: 'bg-gray-800', searchPlaceholder: 'placeholder-gray-500',
+    searchRing: 'focus:ring-pink-500', tgBg: '#111827', tgHeader: '#1f2937', accent: 'pink-500',
     accentHover: 'pink-400', commentBg: 'bg-gray-700', commentText: 'text-gray-100'
   }
 };
@@ -82,18 +82,18 @@ const TopMenu = ({ onBack, onHome, isReader = false, onTextSizeChange, onThemeCh
 
   return (
     <>
-      <button 
-        onClick={() => setIsOpen(true)} 
+      <button
+        onClick={() => setIsOpen(true)}
         className={`fixed top-4 right-4 z-20 w-12 h-12 rounded-full ${t.componentBg} ${t.border} border text-lg shadow-lg flex items-center justify-center ${t.text}`}
       >
         <MenuIcon/>
       </button>
       {isOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/30 backdrop-blur-sm z-30"
           onClick={() => setIsOpen(false)}
         >
-          <div 
+          <div
             className={`fixed top-0 left-0 right-0 p-4 ${t.componentBg} shadow-lg rounded-b-2xl animate-fade-in-down ${t.text}`}
             onClick={e => e.stopPropagation()}
           >
@@ -149,20 +149,20 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
 
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
     const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
-    
-    useEffect(() => { 
-        if (chaptersCache[novel.id]) { 
-            setChapters(chaptersCache[novel.id]); 
-            setIsLoading(false); 
-        } else { 
-            setIsLoading(true); 
+
+    useEffect(() => {
+        if (chaptersCache[novel.id]) {
+            setChapters(chaptersCache[novel.id]);
+            setIsLoading(false);
+        } else {
+            setIsLoading(true);
             fetch(`./data/chapters/${novel.id}.json`)
                 .then(res => res.json())
                 .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
                 .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
-        } 
+        }
     }, [novel.id, chaptersCache]);
-    
+
     const sortedChapters = useMemo(() => {
         const chaptersCopy = [...chapters];
         if (sortOrder === 'newest') return chaptersCopy.reverse();
@@ -172,35 +172,38 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
     const handleChapterClick = (chapter) => { if (!hasActiveSubscription && chapter.isPaid) setIsSubModalOpen(true); else onSelectChapter(chapter); };
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
     const handlePlanSelect = (plan) => setSelectedPlan(plan);
-    const handlePaymentMethodSelect = async (method) => { 
-      const tg = window.Telegram?.WebApp; 
+    const handlePaymentMethodSelect = async (method) => {
+      const tg = window.Telegram?.WebApp;
       if (tg && userId && selectedPlan) {
         tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
           if (confirmed) {
-            const userDocRef = doc(db, "users", userId); 
-            try { 
-              await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true }); 
-              tg.openTelegramLink(`https://t.me/${botUsername}?start=true`); 
-            } catch (error) { 
-              console.error("Ошибка записи в Firebase:", error); 
-              tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова."); 
+            const userDocRef = doc(db, "users", userId);
+            try {
+              await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
+              tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
+            } catch (error) {
+              console.error("Ошибка записи в Firebase:", error);
+              tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
             }
           }
         });
-      } 
+      }
     };
-    
-    return (<div className={t.text}><div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className={`absolute inset-0 bg-gradient-to-t ${theme === 'dark' ? 'from-gray-900 via-gray-900/80' : 'from-stone-100 via-stone-100/80'} to-transparent`}></div><div className="absolute bottom-4 left-4"><h1 className={`text-3xl font-bold font-sans text-white drop-shadow-pink`}>{novel.title}</h1><p className="text-sm font-sans text-white">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 ${theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-stone-200 text-stone-700 hover:bg-stone-300'}`}>{genre}</button>))}</div><div className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className={`text-sm mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-stone-600'} font-body`}>{novel.description}</p></div><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className={`text-sm font-semibold text-${t.accent} mb-4`}>{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button>{lastReadChapterId && <button onClick={handleContinueReading} className={`w-full py-3 mb-4 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold shadow-lg shadow-pink-500/30 transition-all hover:scale-105 hover:shadow-xl`}>Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className={`text-sm font-semibold text-${t.accent}`}>{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p className={t.text}>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => { 
-        const showLock = !hasActiveSubscription && chapter.isPaid; 
+
+    return (<div className={t.text}><div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className={`absolute inset-0 bg-gradient-to-t ${theme === 'dark' ? 'from-gray-900 via-gray-900/80' : 'from-stone-100 via-stone-100/80'} to-transparent`}></div><div className="absolute bottom-4 left-4"><h1 className={`text-3xl font-bold font-sans text-white drop-shadow-pink`}>{novel.title}</h1><p className="text-sm font-sans text-white">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 ${theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-stone-200 text-stone-700 hover:bg-stone-300'}`}>{genre}</button>))}</div><div className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className={`text-sm mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-stone-600'} font-body`}>{novel.description}</p></div><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className={`text-sm font-semibold text-${t.accent} mb-4`}>{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button>{lastReadChapterId && <button onClick={handleContinueReading} className={`w-full py-3 mb-4 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold shadow-lg shadow-pink-500/30 transition-all hover:scale-105 hover:shadow-xl`}>Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className={`text-sm font-semibold text-${t.accent}`}>{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p className={t.text}>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
+        const showLock = !hasActiveSubscription && chapter.isPaid;
         const isLastRead = lastReadChapterId === chapter.id;
-        return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-all duration-200 hover:border-pink-400 hover:bg-pink-500/10 border ${t.border} flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}> 
+        return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-all duration-200 hover:border-pink-400 hover:bg-pink-500/10 border ${t.border} flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>
             <div className="flex items-center gap-3">
                 {isLastRead && <span className={`w-2 h-2 rounded-full bg-pink-400`}></span>}
                 <p className={`font-semibold ${t.componentText}`}>{chapter.title}</p>
             </div>
             {showLock ? <LockIcon className={t.text} /> : <ArrowRightIcon className={t.text}/>}
-        </div>); 
-    })}</div>)}</div></div>)
+        </div>);
+    })}</div>)}
+    {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} theme={theme} />}
+    {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} theme={theme} plan={selectedPlan} />}
+    </div></div>)
 };
 
 const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, currentFontClass, onSelectChapter, allChapters }) => {
@@ -268,7 +271,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
 
   const handleLike = async () => {
     if (!userId || userId === "guest_user") return;
-    
+
     const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
 
     await runTransaction(db, async (transaction) => {
@@ -298,7 +301,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
         <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center font-sans text-pink-400">{novel.title}</h1>
         <h2 className={`text-lg sm:text-xl mb-8 text-center opacity-80 font-sans ${t.text}`}>{chapter.title}</h2>
         <div className={`whitespace-pre-wrap leading-relaxed ${t.text} ${currentFontClass}`} style={{ fontSize: `${fontSize}px` }}>{chapter.content}</div>
-        
+
         <div className="mt-12 border-t pt-8">
           <div className="flex items-center gap-4 mb-8">
             <button onClick={handleLike} className={`flex items-center gap-2 text-${t.accentHover} transition-transform hover:scale-110`}>
@@ -310,7 +313,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
           <h3 className={`text-2xl font-bold mb-4 ${t.text}`}>Комментарии</h3>
           <div className="space-y-4 mb-6">
             {comments.map(comment => (
-              <div key={comment.id} className={`p-3 rounded-lg ${t.commentBg}`}> 
+              <div key={comment.id} className={`p-3 rounded-lg ${t.commentBg}`}>
                 <p className={`font-bold text-sm ${t.commentText}`}>{comment.userName}</p>
                 {editingCommentId === comment.id ? (
                   <div className="flex items-center gap-2 mt-1">
@@ -338,7 +341,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
           </div>
 
           <form onSubmit={handleCommentSubmit} className="flex items-center gap-2">
-            <input 
+            <input
               type="text"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
@@ -364,8 +367,8 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
             <h3 className="font-bold text-lg mb-4">Главы</h3>
             <div className="flex flex-col gap-2">
               {allChapters.map(chap => (
-                <button 
-                  key={chap.id} 
+                <button
+                  key={chap.id}
                   onClick={() => { onSelectChapter(chap); setShowChapterList(false); }}
                   className={`p-2 text-left rounded-md ${chap.id === chapter.id ? `bg-${t.accent} text-white` : t.bg}`}
                 >
@@ -400,7 +403,7 @@ export default function App() {
   const [isBookmarksOpen, setIsBookmarksOpen] = useState(false);
 
   const BOT_USERNAME = "tenebrisverbot";
-  
+
   const updateUserDoc = useCallback(async (dataToUpdate) => {
     if (userId && userId !== "guest_user") {
         const userDocRef = doc(db, "users", userId);
@@ -416,7 +419,7 @@ export default function App() {
     setTheme(newTheme);
     updateUserDoc({ settings: { theme: newTheme, fontSize, fontClass } });
   }, [fontSize, fontClass, updateUserDoc]);
-  
+
   const handleTextSizeChange = useCallback((amount) => {
     setFontSize(prevSize => {
         const newSize = Math.max(12, Math.min(32, prevSize + amount));
@@ -470,7 +473,7 @@ export default function App() {
     };
     init();
   }, []);
-  
+
   useEffect(() => {
     if (novels.length > 0) {
       novels.forEach(novel => {
@@ -515,13 +518,13 @@ export default function App() {
         await updateUserDoc({ lastRead: newLastReadData });
     }
   }, [userId, selectedNovel, lastReadData, updateUserDoc]);
-  
+
   const handleSelectNovel = (novel) => { setSelectedNovel(novel); setPage('details'); };
   const handleGenreSelect = (genre) => { setGenreFilter(genre); setPage('list'); };
   const handleClearGenreFilter = () => { setGenreFilter(null); };
 
   const handleToggleBookmark = useCallback(async (novelId) => {
-    const newBookmarks = bookmarks.includes(novelId) 
+    const newBookmarks = bookmarks.includes(novelId)
       ? bookmarks.filter(id => id !== novelId)
       : [...bookmarks, novelId];
     setBookmarks(newBookmarks);
@@ -543,7 +546,7 @@ export default function App() {
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={handleSetTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} onShowBookmarks={() => setIsBookmarksOpen(true)} />;
     }
   };
-  
+
   const t = themes[theme];
   const isUserAdmin = userId === ADMIN_ID;
 
@@ -566,7 +569,7 @@ export default function App() {
         </div>
       )}
       <TopMenu
-        onBack={page !== 'list' ? handleBack : null} 
+        onBack={page !== 'list' ? handleBack : null}
         onHome={page !== 'list' ? handleHome : null}
         isReader={page === 'reader'}
         onTextSizeChange={handleTextSizeChange}

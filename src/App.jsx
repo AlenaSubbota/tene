@@ -181,6 +181,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
             try {
               await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
               tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
+              tg.close();
             } catch (error) {
               console.error("Ошибка записи в Firebase:", error);
               tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
@@ -295,6 +296,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
   };
 
     const handleChapterClick = (chapter) => {
+        if (!chapter) return;
         if (!hasActiveSubscription && chapter.isPaid) {
             setIsSubModalOpen(true);
         } else {
@@ -302,12 +304,12 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
             setShowChapterList(false);
         }
     };
-    
+
     const handlePlanSelect = (plan) => {
         setSelectedPlan(plan);
         setIsSubModalOpen(false); // Close subscription modal to open payment method modal
     };
-    
+
     const handlePaymentMethodSelect = async (method) => {
       const tg = window.Telegram?.WebApp;
       if (tg && userId && selectedPlan) {
@@ -317,6 +319,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
             try {
               await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
               tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
+              tg.close();
             } catch (error) {
               console.error("Ошибка записи в Firebase:", error);
               tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
@@ -391,9 +394,9 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
       </div>
       {/* Навигация по главам */}
       <div className={`fixed bottom-0 left-0 right-0 p-2 border-t ${t.border} ${t.componentBg} flex justify-between items-center z-10`}>
-        <button onClick={() => onSelectChapter(prevChapter)} disabled={!prevChapter} className="p-2 disabled:opacity-50"><BackIcon/></button>
+        <button onClick={() => handleChapterClick(prevChapter)} disabled={!prevChapter} className="p-2 disabled:opacity-50"><BackIcon/></button>
         <button onClick={() => setShowChapterList(true)} className={`px-4 py-2 rounded-lg ${t.bg}`}>Оглавление</button>
-        <button onClick={() => onSelectChapter(nextChapter)} disabled={!nextChapter} className="p-2 disabled:opacity-50"><ArrowRightIcon className="opacity-100"/></button>
+        <button onClick={() => handleChapterClick(nextChapter)} disabled={!nextChapter} className="p-2 disabled:opacity-50"><ArrowRightIcon className="opacity-100"/></button>
       </div>
 
       {showChapterList && (

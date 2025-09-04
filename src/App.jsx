@@ -398,6 +398,105 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
   );
 };
 
+const SearchPage = ({ novels, onSelectNovel, theme, bookmarks, onToggleBookmark }) => {
+    const t = themes[theme];
+    const [searchQuery, setSearchQuery] = useState('');
+    const filteredNovels = useMemo(() => {
+        if (!searchQuery) return novels; // Показываем все новеллы, если поиск пуст
+        return novels.filter(novel => novel.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    }, [novels, searchQuery]);
+
+    return (
+        <div>
+            <Header title="Поиск" theme={theme} />
+            <div className="p-4">
+                <div className="relative mb-6">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                        <SearchIcon className={`${t.text} opacity-50`} />
+                    </div>
+                    <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-2 pl-10 pr-4 ${t.text} ${t.searchPlaceholder} focus:outline-none focus:ring-2 ${t.searchRing} transition-shadow duration-300`} />
+                </div>
+                <NovelList novels={filteredNovels} onSelectNovel={onSelectNovel} theme={theme} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
+            </div>
+        </div>
+    );
+}
+
+const BookmarksPage = ({ novels, onSelectNovel, theme, bookmarks, onToggleBookmark }) => {
+    return (
+        <div>
+            <Header title="Закладки" theme={theme} />
+            <NovelList novels={novels} onSelectNovel={onSelectNovel} theme={theme} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
+        </div>
+    )
+}
+
+const ProfilePage = ({ theme, subscription, onThemeChange, onGetSubscriptionClick }) => {
+    const t = themes[theme];
+    const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
+
+    return (
+        <div>
+            <Header title="Профиль" theme={theme} />
+            <div className="p-4 space-y-4">
+                 <div className={`p-4 rounded-lg ${t.componentBg} border ${t.border}`}>
+                    <h3 className="font-bold mb-2">Подписка</h3>
+                    {hasActiveSubscription ? (
+                        <div>
+                            <p className="text-green-500">Активна</p>
+                            <p className={`text-sm ${t.text} opacity-70`}>
+                                Заканчивается: {new Date(subscription.expires_at).toLocaleDateString()}
+                            </p>
+                        </div>
+                    ) : (
+                        <div>
+                            <p className="text-red-500">Неактивна</p>
+                             <p className={`text-sm ${t.text} opacity-70 mb-3`}>
+                                Оформите подписку, чтобы получить доступ ко всем платным главам.
+                            </p>
+                            <button onClick={onGetSubscriptionClick} className={`w-full py-2 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold shadow-lg shadow-pink-500/30 transition-all hover:scale-105`}>
+                                Оформить подписку
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <div className={`p-4 rounded-lg ${t.componentBg} border ${t.border}`}>
+                     <h3 className="font-bold mb-2">Настройки</h3>
+                     <div className="flex items-center justify-between">
+                        <span>Тема</span>
+                        <button onClick={onThemeChange} className={`w-12 h-12 rounded-full ${t.bg} flex items-center justify-center border ${t.border}`}>
+                            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+const BottomNav = ({ activeTab, setActiveTab, theme }) => {
+    const t = themes[theme];
+    const navItems = [
+        { id: 'library', label: 'Библиотека', icon: HomeIcon },
+        { id: 'search', label: 'Поиск', icon: SearchIcon },
+        { id: 'bookmarks', label: 'Закладки', icon: BookmarkIcon },
+        { id: 'profile', label: 'Профиль', icon: UserIcon },
+    ];
+    return (
+        <div className={`fixed bottom-0 left-0 right-0 border-t ${t.border} ${t.componentBg} z-30 shadow-[0_-2px_5px_rgba(0,0,0,0.05)]`}>
+            <div className="flex justify-around items-center h-16">
+                {navItems.map(item => (
+                    <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center justify-center w-full h-full transition-colors duration-200 ${activeTab === item.id ? `text-${t.accent}` : `${t.text} opacity-60`}`}>
+                        <item.icon filled={activeTab === item.id} />
+                        <span className="text-xs mt-1">{item.label}</span>
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
+}
+
 // --- Главный компонент приложения ---
 export default function App() {
   const [theme, setTheme] = useState('light');
@@ -416,7 +515,9 @@ export default function App() {
   const [chaptersCache, setChaptersCache] = useState({});
   const [lastReadData, setLastReadData] = useState(null);
   const [bookmarks, setBookmarks] = useState([]);
-
+  const [isSubModalOpen, setIsSubModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  
   const BOT_USERNAME = "tenebrisverbot";
 
   const updateUserDoc = useCallback(async (dataToUpdate) => {
@@ -463,18 +564,20 @@ export default function App() {
         await signInAnonymously(auth);
         if (telegramUserId !== "guest_user") {
             const userDocRef = doc(db, "users", telegramUserId);
-            const docSnap = await getDoc(userDocRef);
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              setSubscription(data.subscription || null);
-              setLastReadData(data.lastRead || null);
-              setBookmarks(data.bookmarks || []);
-              if (data.settings) {
-                setTheme(data.settings.theme || 'light');
-                setFontSize(data.settings.fontSize || 18);
-                setFontClass(data.settings.fontClass || 'font-sans');
-              }
-            }
+            const unsub = onSnapshot(userDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    setSubscription(data.subscription || null);
+                    setLastReadData(data.lastRead || null);
+                    setBookmarks(data.bookmarks || []);
+                    if (data.settings) {
+                        setTheme(data.settings.theme || 'light');
+                        setFontSize(data.settings.fontSize || 18);
+                        setFontClass(data.settings.fontClass || 'font-sans');
+                    }
+                }
+            });
+            // You might want to return `unsub` in a real app to clean up the listener
         }
         const response = await fetch(`./data/novels.json`);
         if (!response.ok) throw new Error('Failed to fetch novels');
@@ -555,6 +658,34 @@ export default function App() {
     return novels.filter(novel => bookmarks.includes(novel.id));
   }, [novels, bookmarks]);
 
+  const handleGetSubscription = () => {
+    setIsSubModalOpen(true);
+  }
+
+  const handlePlanSelect = (plan) => {
+      setSelectedPlan(plan);
+      setIsSubModalOpen(false);
+  };
+  
+  const handlePaymentMethodSelect = async (method) => {
+    const tg = window.Telegram?.WebApp;
+    if (tg && userId && selectedPlan) {
+      tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
+        if (confirmed) {
+          const userDocRef = doc(db, "users", userId);
+          try {
+            await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
+            tg.openTelegramLink(`https://t.me/${BOT_USERNAME}?start=true`);
+            tg.close();
+          } catch (error) {
+            console.error("Ошибка записи в Firebase:", error);
+            tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
+          }
+        }
+      });
+    }
+  };
+
   if (isLoading) {
     return <LoadingSpinner theme={theme} />;
   }
@@ -575,7 +706,7 @@ export default function App() {
         return (
           <>
             <Header title="Библиотека" theme={theme} />
-            <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />
+            <NovelList novels={novels.filter(n => (!genreFilter || n.genres.includes(genreFilter)))} onSelectNovel={handleSelectNovel} theme={theme} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
           </>
         )
       case 'search':
@@ -583,7 +714,7 @@ export default function App() {
       case 'bookmarks':
         return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} theme={theme} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'profile':
-        return <ProfilePage theme={theme} subscription={subscription} onThemeChange={() => handleSetTheme(theme === 'dark' ? 'light' : 'dark')} />
+        return <ProfilePage theme={theme} subscription={subscription} onThemeChange={() => handleSetTheme(theme === 'dark' ? 'light' : 'dark')} onGetSubscriptionClick={handleGetSubscription} />
       default:
         return <Header title="Библиотека" theme={theme} />
     }
@@ -597,6 +728,10 @@ export default function App() {
         {page === 'list' && (
             <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} />
         )}
+        {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} theme={theme} />}
+        {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} theme={theme} plan={selectedPlan} />}
+
     </main>
   );
 }
+

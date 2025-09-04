@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from "firebase/app";
 import { 
-    getFirestore, doc, getDoc, setDoc, updateDoc, 
+    getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
     collection, onSnapshot, query, orderBy, addDoc, 
     serverTimestamp, runTransaction
 } from "firebase/firestore";
@@ -138,6 +138,8 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName }) =>
   const t = themes[theme];
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingText, setEditingText] = useState("");
   const [likeCount, setLikeCount] = useState(0);
   const [userHasLiked, setUserHasLiked] = useState(false);
 
@@ -177,6 +179,21 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName }) =>
       timestamp: serverTimestamp()
     });
     setNewComment("");
+  };
+    const handleEdit = (comment) => {
+    setEditingCommentId(comment.id);
+    setEditingText(comment.text);
+  };
+    const handleUpdateComment = async (commentId) => {
+    if (!editingText.trim()) return;
+    const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
+    await updateDoc(commentRef, { text: editingText });
+    setEditingCommentId(null);
+    setEditingText("");
+  };
+    const handleDelete = async (commentId) => {
+    const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
+    await deleteDoc(commentRef);
   };
 
   const handleLike = async () => {
@@ -221,7 +238,26 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName }) =>
             {comments.map(comment => (
               <div key={comment.id} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-stone-50'}`}>
                 <p className="font-bold text-sm">{comment.userName}</p>
-                <p className="text-md mt-1">{comment.text}</p>
+                {editingCommentId === comment.id ? (
+                  <div className="flex items-center gap-2 mt-1">
+                    <input
+                      type="text"
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-1 px-2 ${t.text}`}
+                    />
+                    <button onClick={() => handleUpdateComment(comment.id)} className={`p-1 rounded-full bg-green-500 text-white`}>✓</button>
+                    <button onClick={() => setEditingCommentId(null)} className={`p-1 rounded-full bg-gray-500 text-white`}>✕</button>
+                  </div>
+                ) : (
+                  <p className="text-md mt-1">{comment.text}</p>
+                )}
+                 {(userId === comment.userId || userId === "5493263435") && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <button onClick={() => handleEdit(comment)} className="text-xs text-gray-500">Редактировать</button>
+                    <button onClick={() => handleDelete(comment.id)} className="text-xs text-red-500">Удалить</button>
+                  </div>
+                )}
               </div>
             ))}
             {comments.length === 0 && <p className="opacity-70">Комментариев пока нет. Будьте первым!</p>}

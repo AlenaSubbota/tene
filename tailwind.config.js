@@ -6,6 +6,10 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        'sans': ['Montserrat', 'sans-serif'],
+        'serif': ['Merriweather', 'serif'],
+      },
       // ДОБАВЛЯЕМ СЕКЦИЮ ДЛЯ АНИМАЦИИ
       keyframes: {
         'pulse-heart': {

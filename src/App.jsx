@@ -206,7 +206,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
     </div></div>)
 };
 
-const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, currentFontClass, onSelectChapter, allChapters }) => {
+const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername }) => {
   const t = themes[theme];
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
@@ -215,7 +215,10 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
   const [likeCount, setLikeCount] = useState(0);
   const [userHasLiked, setUserHasLiked] = useState(false);
   const [showChapterList, setShowChapterList] = useState(false);
+  const [isSubModalOpen, setIsSubModalOpen] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState(null);
 
+  const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
   const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
 
   useEffect(() => {
@@ -290,6 +293,38 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
       }
     });
   };
+
+    const handleChapterClick = (chapter) => {
+        if (!hasActiveSubscription && chapter.isPaid) {
+            setIsSubModalOpen(true);
+        } else {
+            onSelectChapter(chapter);
+            setShowChapterList(false);
+        }
+    };
+    
+    const handlePlanSelect = (plan) => {
+        setSelectedPlan(plan);
+        setIsSubModalOpen(false); // Close subscription modal to open payment method modal
+    };
+    
+    const handlePaymentMethodSelect = async (method) => {
+      const tg = window.Telegram?.WebApp;
+      if (tg && userId && selectedPlan) {
+        tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
+          if (confirmed) {
+            const userDocRef = doc(db, "users", userId);
+            try {
+              await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
+              tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
+            } catch (error) {
+              console.error("Ошибка записи в Firebase:", error);
+              tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
+            }
+          }
+        });
+      }
+    };
 
   const currentChapterIndex = allChapters.findIndex(c => c.id === chapter.id);
   const prevChapter = allChapters[currentChapterIndex - 1];
@@ -369,7 +404,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
               {allChapters.map(chap => (
                 <button
                   key={chap.id}
-                  onClick={() => { onSelectChapter(chap); setShowChapterList(false); }}
+                  onClick={() => handleChapterClick(chap)}
                   className={`p-2 text-left rounded-md ${chap.id === chapter.id ? `bg-${t.accent} text-white` : t.bg}`}
                 >
                   {chap.title}
@@ -379,6 +414,8 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
           </div>
         </div>
       )}
+      {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} theme={theme} />}
+      {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} theme={theme} plan={selectedPlan} />}
     </div>
   );
 };
@@ -542,7 +579,7 @@ export default function App() {
   const renderPage = () => {
     switch (page) {
       case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chaptersCache={chaptersCache} lastReadData={lastReadData} />;
-      case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} fontSize={fontSize} userId={userId} userName={userName} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chaptersCache[selectedNovel.id] || []} />;
+      case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} fontSize={fontSize} userId={userId} userName={userName} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chaptersCache[selectedNovel.id] || []} subscription={subscription} botUsername={BOT_USERNAME} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={handleSetTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} onShowBookmarks={() => setIsBookmarksOpen(true)} />;
     }
   };

@@ -6,11 +6,19 @@ export default {
   ],
   theme: {
     extend: {
+      colors: {
+        'background': '#F5F1ED',
+        'text-main': '#2C3A47',
+        'component-bg': '#FFFFFF',
+        'accent': '#9A7B66',
+        'accent-hover': '#8A6B56',
+        'border-color': '#EAE5E0',
+      },
       fontFamily: {
         'sans': ['JetBrains Mono', 'monospace'],
       },
       dropShadow: {
-        'pink': '0 1px 2px rgba(236, 72, 153, 0.7)',
+        'accent': '0 1px 2px rgba(154, 123, 102, 0.7)',
       },
       keyframes: {
         'pulse-heart': {

@@ -7,11 +7,11 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        'sans': ['Montserrat', 'sans-serif'], // Для заголовков и интерфейса
+        'sans': ['JetBrains Mono', 'monospace'], // Для заголовков и интерфейса
         'body': ['Arial', 'sans-serif', 'system-ui'], // Для основного текста
       },
       dropShadow: {
-        'pink': '0 1px 2px rgba(236, 72, 153, 0.7)', // Новая розовая тень
+        'pink': '0 1px 2px rgba(236, 72, 153, 0.7)',
       },
       keyframes: {
         'pulse-heart': {

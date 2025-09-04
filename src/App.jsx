@@ -80,11 +80,6 @@ const TopMenu = ({ onBack, onHome, isReader = false, onTextSizeChange, onThemeCh
   const [isOpen, setIsOpen] = useState(false);
   const t = themes[theme];
 
-  const fonts = [
-    { name: 'JetBrains Mono', class: 'font-sans' },
-    { name: 'Arial', class: 'font-body' },
-  ];
-
   return (
     <>
       <button 
@@ -120,18 +115,6 @@ const TopMenu = ({ onBack, onHome, isReader = false, onTextSizeChange, onThemeCh
                   <button onClick={onThemeChange} className={`w-12 h-12 rounded-full ${t.bg} flex items-center justify-center`}>
                     {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
                   </button>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Шрифт</span>
-                  <select 
-                    onChange={(e) => onFontChange(e.target.value)} 
-                    value={currentFont}
-                    className={`w-36 h-10 rounded-full ${t.bg} border ${t.border} ${t.text} px-2 py-1 focus:outline-none focus:ring-2 ${t.searchRing}`}
-                  >
-                    {fonts.map(font => (
-                      <option key={font.name} value={font.class}>{font.name}</option>
-                    ))}
-                  </select>
                 </div>
               </div>
             )}
@@ -189,7 +172,23 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
     const handleChapterClick = (chapter) => { if (!hasActiveSubscription && chapter.isPaid) setIsSubModalOpen(true); else onSelectChapter(chapter); };
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
     const handlePlanSelect = (plan) => setSelectedPlan(plan);
-    const handlePaymentMethodSelect = async (method) => { const tg = window.Telegram?.WebApp; if (tg && userId && selectedPlan) { const userDocRef = doc(db, "users", userId); try { await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true }); tg.openTelegramLink(`https://t.me/${botUsername}?start=true`); } catch (error) { console.error("Ошибка записи в Firebase:", error); tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова."); } } };
+    const handlePaymentMethodSelect = async (method) => { 
+      const tg = window.Telegram?.WebApp; 
+      if (tg && userId && selectedPlan) {
+        tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
+          if (confirmed) {
+            const userDocRef = doc(db, "users", userId); 
+            try { 
+              await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true }); 
+              tg.openTelegramLink(`https://t.me/${botUsername}?start=true`); 
+            } catch (error) { 
+              console.error("Ошибка записи в Firebase:", error); 
+              tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова."); 
+            }
+          }
+        });
+      } 
+    };
     
     return (<div className={t.text}><div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className={`absolute inset-0 bg-gradient-to-t ${theme === 'dark' ? 'from-gray-900 via-gray-900/80' : 'from-stone-100 via-stone-100/80'} to-transparent`}></div><div className="absolute bottom-4 left-4"><h1 className={`text-3xl font-bold font-sans text-white drop-shadow-pink`}>{novel.title}</h1><p className="text-sm font-sans text-white">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 ${theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-stone-200 text-stone-700 hover:bg-stone-300'}`}>{genre}</button>))}</div><div className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className={`text-sm mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-stone-600'} font-body`}>{novel.description}</p></div><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className={`text-sm font-semibold text-${t.accent} mb-4`}>{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button>{lastReadChapterId && <button onClick={handleContinueReading} className={`w-full py-3 mb-4 rounded-lg bg-gradient-to-r from-pink-500 to-purple-500 text-white font-bold shadow-lg shadow-pink-500/30 transition-all hover:scale-105 hover:shadow-xl`}>Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className={`text-sm font-semibold text-${t.accent}`}>{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p className={t.text}>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => { 
         const showLock = !hasActiveSubscription && chapter.isPaid; 
@@ -385,7 +384,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, curr
 export default function App() {
   const [theme, setTheme] = useState('light');
   const [fontSize, setFontSize] = useState(18);
-  const [fontClass, setFontClass] = useState('font-sans');
+  const [fontClass, setFontClass] = useState('font-sans'); // 'font-sans' теперь JetBrains Mono
   const [page, setPage] = useState('list');
   const [novels, setNovels] = useState([]);
   const [selectedNovel, setSelectedNovel] = useState(null);

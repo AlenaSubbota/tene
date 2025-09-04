@@ -7,8 +7,7 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        'sans': ['JetBrains Mono', 'monospace'], // Для заголовков и интерфейса
-        'body': ['Arial', 'sans-serif', 'system-ui'], // Для основного текста
+        'sans': ['JetBrains Mono', 'monospace'],
       },
       dropShadow: {
         'pink': '0 1px 2px rgba(236, 72, 153, 0.7)',

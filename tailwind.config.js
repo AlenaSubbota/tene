@@ -7,8 +7,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        'sans': ['Montserrat', 'sans-serif'],
-        'serif': ['Merriweather', 'serif'],
+        'sans': ['Montserrat', 'sans-serif'], // Заголовки, интерфейс
+        'serif': ['Merriweather', 'serif'], // Запасной, если захотим вернуть
+        'body': ['Arial', 'sans-serif', 'system-ui'], // Основной текст
       },
       // ДОБАВЛЯЕМ СЕКЦИЮ ДЛЯ АНИМАЦИИ
       keyframes: {

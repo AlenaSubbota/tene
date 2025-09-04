@@ -44,11 +44,22 @@ const LoadingSpinner = ({ theme }) => {
   );
 };
 
-// --- Цветовые Схемы с розовым акцентом ---
+// --- Цветовые Схемы ---
 const themes = {
-  light: { bg: 'bg-stone-100', text: 'text-stone-800', componentBg: 'bg-white', componentText: 'text-stone-700', border: 'border-stone-200', searchBg: 'bg-white', searchPlaceholder: 'placeholder-stone-400', searchRing: 'focus:ring-pink-400', tgBg: '#f8f7f5', tgHeader: '#FFFFFF', accent: 'pink-500', accentHover: 'pink-400' },
-  dark: { bg: 'bg-gray-900', text: 'text-gray-100', componentBg: 'bg-gray-800', componentText: 'text-gray-200', border: 'border-gray-700', searchBg: 'bg-gray-800', searchPlaceholder: 'placeholder-gray-500', searchRing: 'focus:ring-pink-500', tgBg: '#111827', tgHeader: '#1f2937', accent: 'pink-500', accentHover: 'pink-400' }
+  light: { 
+    bg: 'bg-stone-100', text: 'text-stone-800', componentBg: 'bg-white', componentText: 'text-stone-700', 
+    border: 'border-stone-200', searchBg: 'bg-white', searchPlaceholder: 'placeholder-stone-400', 
+    searchRing: 'focus:ring-pink-400', tgBg: '#f8f7f5', tgHeader: '#FFFFFF', accent: 'pink-500', 
+    accentHover: 'pink-400', commentBg: 'bg-stone-50', commentText: 'text-stone-800'
+  },
+  dark: { 
+    bg: 'bg-gray-900', text: 'text-gray-100', componentBg: 'bg-gray-800', componentText: 'text-gray-200', 
+    border: 'border-gray-700', searchBg: 'bg-gray-800', searchPlaceholder: 'placeholder-gray-500', 
+    searchRing: 'focus:ring-pink-500', tgBg: '#111827', tgHeader: '#1f2937', accent: 'pink-500', 
+    accentHover: 'pink-400', commentBg: 'bg-gray-800', commentText: 'text-gray-100'
+  }
 };
+
 
 // --- КОМПОНЕНТЫ ---
 const SubscriptionModal = ({ onClose, onSelectPlan, theme }) => {
@@ -61,15 +72,20 @@ const PaymentMethodModal = ({ onClose, onSelectMethod, theme, plan }) => {
     return (<div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className={`w-full max-w-sm rounded-2xl p-6 shadow-lg ${t.componentBg} ${t.text}`}><h3 className="text-xl text-center font-bold">Выберите способ оплаты</h3><p className={`mt-2 mb-6 text-sm text-center opacity-70`}>Тариф: {plan.name} ({plan.price} ₽)</p><div className="space-y-3"><button onClick={() => onSelectMethod('card')} className={`w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 ${t.border} ${t.componentBg} hover:border-${t.accentHover}`}><p className="font-bold">💳 Банковской картой</p><p className="text-sm opacity-70">Ручная проверка (до 24 часов)</p></button><button onClick={() => onSelectMethod('tribut')} className={`w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 ${t.border} ${t.componentBg} hover:border-${t.accentHover}`}><p className="font-bold">❤️ Донат через tribut</p><p className="text-sm opacity-70">Более быстрый способ</p></button></div><button onClick={onClose} className={`w-full py-3 mt-4 rounded-lg border ${t.border}`}>Назад</button></div></div>)
 };
 
-const TopMenu = ({ onBack, onHome, isReader = false, onTextSizeChange, onThemeChange, theme }) => {
+const TopMenu = ({ onBack, onHome, isReader = false, onTextSizeChange, onThemeChange, theme, onFontChange, currentFont }) => {
   const [isOpen, setIsOpen] = useState(false);
   const t = themes[theme];
+
+  const fonts = [
+    { name: 'Montserrat', class: 'font-sans' },
+    { name: 'Arial', class: 'font-body' },
+  ];
 
   return (
     <>
       <button 
         onClick={() => setIsOpen(true)} 
-        className={`fixed top-4 right-4 z-20 w-12 h-12 rounded-full ${t.componentBg} ${t.border} border text-lg shadow-lg flex items-center justify-center`}
+        className={`fixed top-4 right-4 z-20 w-12 h-12 rounded-full ${t.componentBg} ${t.border} border text-lg shadow-lg flex items-center justify-center ${t.text}`}
       >
         ☰
       </button>
@@ -79,7 +95,7 @@ const TopMenu = ({ onBack, onHome, isReader = false, onTextSizeChange, onThemeCh
           onClick={() => setIsOpen(false)}
         >
           <div 
-            className={`fixed top-0 left-0 right-0 p-4 ${t.componentBg} shadow-lg rounded-b-2xl animate-fade-in-down`}
+            className={`fixed top-0 left-0 right-0 p-4 ${t.componentBg} shadow-lg rounded-b-2xl animate-fade-in-down ${t.text}`}
             onClick={e => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-4">
@@ -101,6 +117,19 @@ const TopMenu = ({ onBack, onHome, isReader = false, onTextSizeChange, onThemeCh
                     {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
                   </button>
                 </div>
+                {/* Выбор шрифта */}
+                <div className="flex items-center justify-between">
+                  <span>Шрифт</span>
+                  <select 
+                    onChange={(e) => onFontChange(e.target.value)} 
+                    value={currentFont}
+                    className={`w-32 h-10 rounded-full ${t.bg} border ${t.border} ${t.text} px-2 py-1 focus:outline-none focus:ring-2 ${t.searchRing}`}
+                  >
+                    {fonts.map(font => (
+                      <option key={font.name} value={font.class}>{font.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             )}
              <div className="flex gap-3 mt-4">
@@ -120,7 +149,7 @@ const NovelList = ({ novels, onSelectNovel, theme, setTheme, genreFilter, onClea
   const [searchQuery, setSearchQuery] = useState('');
   const filteredNovels = useMemo(() => novels.filter(novel => (!genreFilter || novel.genres.includes(genreFilter)) && novel.title.toLowerCase().includes(searchQuery.toLowerCase())), [novels, searchQuery, genreFilter]);
   if (!novels.length && !searchQuery) { return <div className={`p-4 text-center ${t.text}`}>Загрузка библиотеки...</div> }
-  return (<div className={`p-4 ${t.text}`}><div className="flex justify-between items-center mb-4"><h1 className="text-3xl font-bold">Библиотека</h1><button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className={`p-2 rounded-full ${t.componentBg} ${t.border} border`}>{theme === 'dark' ? <SunIcon /> : <MoonIcon />}</button></div>{genreFilter && (<div className={`flex items-center justify-between p-3 mb-4 rounded-lg border ${t.border} ${t.componentBg}`}><p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p><button onClick={onClearGenreFilter} className={`text-xs font-bold text-${t.accent} hover:underline`}>Сбросить</button></div>)}<div className="relative mb-6"><SearchIcon className={t.searchPlaceholder} /><input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-2 pl-10 pr-4 ${t.text} ${t.searchPlaceholder} focus:outline-none focus:ring-2 ${t.searchRing} transition-shadow duration-300`} /></div><div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4">{filteredNovels.map((novel, index) => (<div key={novel.id} onClick={() => onSelectNovel(novel)} className="cursor-pointer group relative animate-fade-in-down" style={{ animationDelay: `${index * 50}ms` }}><div className={`absolute -inset-1 bg-gradient-to-r from-pink-400 to-purple-500 rounded-lg blur-md opacity-0 group-hover:opacity-70 transition duration-500`}></div><div className="relative"><img src={novel.coverUrl} alt={novel.title} className={`w-full aspect-[2/3] object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 ${t.border} border`} /><h2 className={`mt-2 font-semibold text-xs truncate ${t.text}`}>{novel.title}</h2></div></div>))}</div></div>);
+  return (<div className={`p-4 ${t.text}`}><div className="flex justify-between items-center mb-4"><h1 className="text-3xl font-bold">Библиотека</h1><button onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} className={`p-2 rounded-full ${t.componentBg} ${t.border} border`}>{theme === 'dark' ? <SunIcon /> : <MoonIcon />}</button></div>{genreFilter && (<div className={`flex items-center justify-between p-3 mb-4 rounded-lg border ${t.border} ${t.componentBg}`}><p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p><button onClick={onClearGenreFilter} className={`text-xs font-bold text-${t.accent} hover:underline`}>Сбросить</button></div>)}<div className="relative mb-6"><SearchIcon className={t.searchPlaceholder} /><input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-2 pl-10 pr-4 ${t.text} ${t.searchPlaceholder} focus:outline-none focus:ring-2 ${t.searchRing} transition-shadow duration-300`} /></div><div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4">{filteredNovels.map((novel, index) => (<div key={novel.id} onClick={() => onSelectNovel(novel)} className="cursor-pointer group relative animate-fade-in-down" style={{ animationDelay: `${index * 50}ms` }}><div className={`absolute -inset-1 bg-gradient-to-r from-pink-400 to-purple-500 rounded-lg blur-xl opacity-0 group-hover:opacity-70 transition duration-500`}></div><div className="relative"><img src={novel.coverUrl} alt={novel.title} className={`w-full aspect-[2/3] object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 ${t.border} border`} /><h2 className={`mt-2 font-semibold text-xs truncate ${t.text}`}>{novel.title}</h2></div></div>))}</div></div>);
 };
 
 const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscription, botUsername, userId, chaptersCache, lastReadData }) => {
@@ -158,10 +187,10 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
     const handlePlanSelect = (plan) => setSelectedPlan(plan);
     const handlePaymentMethodSelect = async (method) => { const tg = window.Telegram?.WebApp; if (tg && userId && selectedPlan) { const userDocRef = doc(db, "users", userId); try { await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true }); tg.openTelegramLink(`https://t.me/${botUsername}?start=true`); } catch (error) { console.error("Ошибка записи в Firebase:", error); tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова."); } } };
     
-    return (<div className={t.text}>{isSubModalOpen && !selectedPlan && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} theme={theme} />}{isSubModalOpen && selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} theme={theme} plan={selectedPlan} />}<div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className={`absolute inset-0 bg-gradient-to-t ${theme === 'dark' ? 'from-gray-900 via-gray-900/80' : 'from-stone-100 via-stone-100/80'} to-transparent`}></div><div className="absolute bottom-4 left-4"><h1 className="text-3xl font-bold font-sans" style={{textShadow: '1px 1px 3px rgba(0,0,0,0.5)'}}>{novel.title}</h1><p className="text-sm font-sans" style={{textShadow: '1px 1px 2px rgba(0,0,0,0.5)'}}>{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 ${theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-stone-200 text-stone-700 hover:bg-stone-300'}`}>{genre}</button>))}</div><p className={`text-sm mb-6 ${theme === 'dark' ? 'text-gray-300' : 'text-stone-600'} font-serif`}>{novel.description}</p>{lastReadChapterId && <button onClick={handleContinueReading} className={`w-full py-3 mb-4 rounded-lg bg-${t.accent} text-white font-bold transition-transform hover:scale-105`}>Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className={`text-sm font-semibold text-${t.accent}`}>{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p className={t.text}>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => { const showLock = !hasActiveSubscription && chapter.isPaid; return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-all duration-200 hover:border-${t.accentHover} border ${t.border} flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>{lastReadChapterId === chapter.id && <span className={`absolute left-2 text-xs text-${t.accent}`}>●</span>}<div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>{showLock ? <LockIcon className={t.text} /> : <ArrowRightIcon className={t.text}/>}</div>); })}</div>)}</div></div>)
+    return (<div className={t.text}><div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className={`absolute inset-0 bg-gradient-to-t ${theme === 'dark' ? 'from-gray-900 via-gray-900/80' : 'from-stone-100 via-stone-100/80'} to-transparent`}></div><div className="absolute bottom-4 left-4"><h1 className={`text-3xl font-bold font-sans text-pink-400`} style={{textShadow: '1px 1px 3px rgba(0,0,0,0.5)'}}>{novel.title}</h1><p className="text-sm font-sans" style={{textShadow: '1px 1px 2px rgba(0,0,0,0.5)'}}>{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 ${theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-stone-200 text-stone-700 hover:bg-stone-300'}`}>{genre}</button>))}</div><p className={`text-sm mb-6 ${theme === 'dark' ? 'text-gray-300' : 'text-stone-600'} font-body`}>{novel.description}</p>{lastReadChapterId && <button onClick={handleContinueReading} className={`w-full py-3 mb-4 rounded-lg bg-${t.accent} text-white font-bold transition-transform hover:scale-105`}>Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className={`text-sm font-semibold text-${t.accent}`}>{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p className={t.text}>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => { const showLock = !hasActiveSubscription && chapter.isPaid; return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-all duration-200 hover:border-${t.accentHover} border ${t.border} flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>{lastReadChapterId === chapter.id && <span className={`absolute left-2 text-xs text-${t.accent}`}>●</span>}<div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>{showLock ? <LockIcon className={t.text} /> : <ArrowRightIcon className={t.text}/>}</div>); })}</div>)}</div></div>)
 };
 
-const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName }) => {
+const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName, currentFontClass }) => {
   const t = themes[theme];
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
@@ -248,9 +277,9 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName }) =>
   return (
     <div className={`min-h-screen transition-colors duration-300 ${t.bg}`}>
       <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto pb-24">
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center font-sans">{novel.title}</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center font-sans text-pink-400">{novel.title}</h1>
         <h2 className="text-lg sm:text-xl mb-8 text-center opacity-80 font-sans">{chapter.title}</h2>
-        <div className={`whitespace-pre-wrap leading-relaxed ${t.text} font-serif`} style={{ fontSize: `${fontSize}px` }}>{chapter.content}</div>
+        <div className={`whitespace-pre-wrap leading-relaxed ${t.text} ${currentFontClass}`} style={{ fontSize: `${fontSize}px` }}>{chapter.content}</div>
         
         <div className="mt-12 border-t pt-8">
           <div className="flex items-center gap-4 mb-8">
@@ -260,24 +289,24 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName }) =>
             </button>
           </div>
 
-          <h3 className="text-2xl font-bold mb-4">Комментарии</h3>
+          <h3 className={`text-2xl font-bold mb-4 ${t.text}`}>Комментарии</h3>
           <div className="space-y-4 mb-6">
             {comments.map(comment => (
-              <div key={comment.id} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-stone-50'}`}>
-                <p className="font-bold text-sm">{comment.userName}</p>
+              <div key={comment.id} className={`p-3 rounded-lg ${t.commentBg}`}> 
+                <p className={`font-bold text-sm ${t.commentText}`}>{comment.userName}</p>
                 {editingCommentId === comment.id ? (
                   <div className="flex items-center gap-2 mt-1">
                     <input
                       type="text"
                       value={editingText}
                       onChange={(e) => setEditingText(e.target.value)}
-                      className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-1 px-2 ${t.text}`}
+                      className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-1 px-2 ${t.commentText}`}
                     />
                     <button onClick={() => handleUpdateComment(comment.id)} className={`p-1 rounded-full bg-green-500 text-white`}>✓</button>
                     <button onClick={() => setEditingCommentId(null)} className={`p-1 rounded-full bg-gray-500 text-white`}>✕</button>
                   </div>
                 ) : (
-                  <p className="text-md mt-1">{comment.text}</p>
+                  <p className={`text-md mt-1 ${t.commentText}`}>{comment.text}</p>
                 )}
                  {(userId === comment.userId || userId === "417641827") && (
                   <div className="flex items-center gap-2 mt-2">
@@ -287,7 +316,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName }) =>
                 )}
               </div>
             ))}
-            {comments.length === 0 && <p className="opacity-70">Комментариев пока нет. Будьте первым!</p>}
+            {comments.length === 0 && <p className={`opacity-70 ${t.text}`}>Комментариев пока нет. Будьте первым!</p>}
           </div>
 
           <form onSubmit={handleCommentSubmit} className="flex items-center gap-2">
@@ -296,7 +325,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName }) =>
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="Написать комментарий..."
-              className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-2 px-4 ${t.text} ${t.searchPlaceholder} focus:outline-none focus:ring-2 ${t.searchRing}`}
+              className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-2 px-4 ${t.commentText} ${t.searchPlaceholder} focus:outline-none focus:ring-2 ${t.searchRing}`}
             />
             <button type="submit" className={`p-2 rounded-full bg-${t.accent} text-white`}>
               <SendIcon />
@@ -312,6 +341,7 @@ const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName }) =>
 export default function App() {
   const [theme, setTheme] = useState('light');
   const [fontSize, setFontSize] = useState(18);
+  const [fontClass, setFontClass] = useState('font-body');
   const [page, setPage] = useState('list');
   const [novels, setNovels] = useState([]);
   const [selectedNovel, setSelectedNovel] = useState(null);
@@ -339,16 +369,21 @@ export default function App() {
 
   const handleSetTheme = useCallback((newTheme) => {
     setTheme(newTheme);
-    updateUserDoc({ settings: { theme: newTheme, fontSize } });
-  }, [fontSize, updateUserDoc]);
+    updateUserDoc({ settings: { theme: newTheme, fontSize, fontClass } });
+  }, [fontSize, fontClass, updateUserDoc]);
   
   const handleTextSizeChange = useCallback((amount) => {
     setFontSize(prevSize => {
         const newSize = Math.max(12, Math.min(32, prevSize + amount));
-        updateUserDoc({ settings: { theme, fontSize: newSize } });
+        updateUserDoc({ settings: { theme, fontSize: newSize, fontClass } });
         return newSize;
     });
-  }, [theme, updateUserDoc]);
+  }, [theme, fontClass, updateUserDoc]);
+
+  const handleFontChange = useCallback((newFontClass) => {
+    setFontClass(newFontClass);
+    updateUserDoc({ settings: { theme, fontSize, fontClass: newFontClass } });
+  }, [theme, fontSize, updateUserDoc]);
 
   useEffect(() => {
     const init = async () => {
@@ -373,6 +408,7 @@ export default function App() {
               if (data.settings) {
                 setTheme(data.settings.theme || 'light');
                 setFontSize(data.settings.fontSize || 18);
+                setFontClass(data.settings.fontClass || 'font-body');
               }
             }
         }
@@ -445,7 +481,7 @@ export default function App() {
   const renderPage = () => {
     switch (page) {
       case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chaptersCache={chaptersCache} lastReadData={lastReadData} />;
-      case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} fontSize={fontSize} userId={userId} userName={userName} />;
+      case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} fontSize={fontSize} userId={userId} userName={userName} currentFontClass={fontClass} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={handleSetTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }
   };
@@ -460,6 +496,8 @@ export default function App() {
         isReader={page === 'reader'}
         onTextSizeChange={handleTextSizeChange}
         onThemeChange={() => handleSetTheme(theme === 'dark' ? 'light' : 'dark')}
+        onFontChange={handleFontChange}
+        currentFont={fontClass}
         theme={theme}
       />
     </main>

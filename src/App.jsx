@@ -33,7 +33,8 @@ const SendIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg
 const BookmarkIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m19 21-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>);
 const UserIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>);
 const LibraryIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M4 22h16"/><path d="M7 22V2h10v20"/><path d="M7 12h4"/></svg>);
-
+const ChevronLeftIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m15 18-6-6 6-6"/></svg>;
+const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>;
 
 // --- Components ---
 const LoadingSpinner = () => (
@@ -66,7 +67,7 @@ const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => (
     <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 p-4 text-text-main">
       {novels.length > 0 ? novels.map((novel, index) => (
         <div key={novel.id} onClick={() => onSelectNovel(novel)} className="cursor-pointer group animate-fade-in-down" style={{ animationDelay: `${index * 50}ms` }}>
-          <div className="relative filter drop-shadow-md group-hover:drop-shadow-accent transition-all duration-300">
+          <div className="relative transition-all duration-300">
             <button onClick={(e) => { e.stopPropagation(); onToggleBookmark(novel.id); }} className={`absolute top-2 right-2 z-10 p-1 rounded-full bg-black/30 backdrop-blur-sm text-white transition-colors ${bookmarks.includes(novel.id) ? 'text-accent' : ''}`}>
               <BookmarkIcon filled={bookmarks.includes(novel.id)} width="20" height="20" />
             </button>
@@ -132,7 +133,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
       }
     };
 
-    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4"><h1 className="text-3xl font-bold font-sans text-white drop-shadow-accent">{novel.title}</h1><p className="text-sm font-sans text-white">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button>{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
+    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button>{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
         const showLock = !hasActiveSubscription && chapter.isPaid;
         const isLastRead = lastReadChapterId === chapter.id;
         return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 bg-component-bg rounded-xl cursor-pointer transition-all duration-200 hover:border-accent-hover hover:bg-accent/10 border border-border-color flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>
@@ -448,11 +449,57 @@ const BottomNav = ({ activeTab, setActiveTab }) => {
     )
 }
 
+const NewsSlider = ({ onReadMore }) => {
+    const [news, setNews] = useState([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    useEffect(() => {
+        fetch('./data/news.json')
+            .then(res => res.json())
+            .then(setNews)
+            .catch(err => console.error("Failed to fetch news", err));
+    }, []);
+
+    const nextNews = () => setCurrentIndex((prev) => (prev + 1) % news.length);
+    const prevNews = () => setCurrentIndex((prev) => (prev - 1 + news.length) % news.length);
+
+    if (news.length === 0) return null;
+
+    const currentNewsItem = news[currentIndex];
+
+    return (
+        <div className="p-4">
+            <div className="bg-component-bg p-4 rounded-2xl shadow-md border border-border-color flex items-center gap-4">
+                <img src={currentNewsItem.imageUrl} alt="News" className="w-16 h-16 rounded-full object-cover border-2 border-border-color" />
+                <div className="flex-1">
+                    <h3 className="font-bold text-text-main">{currentNewsItem.title}</h3>
+                    <p className="text-sm text-text-main opacity-70">{currentNewsItem.shortDescription}</p>
+                    <button onClick={() => onReadMore(currentNewsItem)} className="text-sm font-bold text-accent mt-1">Читать далее</button>
+                </div>
+                <div className="flex flex-col">
+                     <button onClick={prevNews} className="p-1 rounded-full hover:bg-background"><ChevronLeftIcon className="w-5 h-5" /></button>
+                     <button onClick={nextNews} className="p-1 rounded-full hover:bg-background"><ChevronRightIcon className="w-5 h-5" /></button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const NewsModal = ({ newsItem, onClose }) => (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <div className="w-full max-w-md p-6 rounded-2xl shadow-lg bg-component-bg text-text-main" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold mb-4">{newsItem.title}</h2>
+            <p className="whitespace-pre-wrap opacity-80">{newsItem.fullText}</p>
+            <button onClick={onClose} className="w-full py-2 mt-6 rounded-lg bg-accent text-white font-bold">Закрыть</button>
+        </div>
+    </div>
+);
+
+
 // --- Главный компонент приложения ---
 export default function App() {
-  const [theme, setTheme] = useState('light');
   const [fontSize, setFontSize] = useState(18);
-  const [fontClass, setFontClass] = useState('font-sans'); // 'font-sans' теперь JetBrains Mono
+  const [fontClass, setFontClass] = useState('font-sans');
   const [page, setPage] = useState('list');
   const [activeTab, setActiveTab] = useState('library');
   const [novels, setNovels] = useState([]);
@@ -468,6 +515,7 @@ export default function App() {
   const [bookmarks, setBookmarks] = useState([]);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [selectedNews, setSelectedNews] = useState(null);
 
   const BOT_USERNAME = "tenebrisverbot";
 
@@ -497,7 +545,7 @@ export default function App() {
         await signInAnonymously(auth);
         if (telegramUserId !== "guest_user") {
             const userDocRef = doc(db, "users", telegramUserId);
-            const unsub = onSnapshot(userDocRef, (docSnap) => {
+            onSnapshot(userDocRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
                     setSubscription(data.subscription || null);
@@ -531,7 +579,7 @@ export default function App() {
       if (page === 'reader') setPage('details');
       else if (page === 'details') { setPage('list'); setGenreFilter(null); }
   }, [page]);
-
+  
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg) return;
@@ -593,7 +641,7 @@ export default function App() {
       setSelectedPlan(plan);
       setIsSubModalOpen(false);
   };
-
+  
   const handlePaymentMethodSelect = async (method) => {
     const tg = window.Telegram?.WebApp;
     if (tg && userId && selectedPlan) {
@@ -621,10 +669,10 @@ export default function App() {
 
   const renderContent = () => {
     if (page === 'details') {
-      return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chaptersCache={chaptersCache} lastReadData={lastReadData} onBack={handleBack}/>;
+      return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chaptersCache={chaptersCache} lastReadData={lastReadData} onBack={handleBack}/>;
     }
     if (page === 'reader') {
-      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} fontSize={fontSize} userId={userId} userName={userName} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chaptersCache[selectedNovel.id] || []} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} />;
+      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} userId={userId} userName={userName} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chaptersCache[selectedNovel.id] || []} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} />;
     }
 
     switch (activeTab) {
@@ -632,7 +680,8 @@ export default function App() {
         return (
           <>
             <Header title="Библиотека" />
-            <NovelList novels={novels.filter(n => (!genreFilter || n.genres.includes(n)))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+            <NewsSlider onReadMore={setSelectedNews} />
+            <NovelList novels={novels.filter(n => (!genreFilter || n.genres.includes(genreFilter)))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
           </>
         )
       case 'search':
@@ -647,7 +696,7 @@ export default function App() {
   };
 
   return (
-    <main className={`bg-background min-h-screen font-sans ${!isUserAdmin ? 'no-select' : ''}`}>
+    <main className={`bg-background min-h-screen font-sans text-text-main ${!isUserAdmin ? 'no-select' : ''}`}>
         <div className="pb-20">
             {renderContent()}
         </div>
@@ -656,7 +705,7 @@ export default function App() {
         )}
         {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
         {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
-
+        {selectedNews && <NewsModal newsItem={selectedNews} onClose={() => setSelectedNews(null)} />}
     </main>
   );
 }

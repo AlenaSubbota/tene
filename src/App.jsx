@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
+import { 
+    getFirestore, doc, getDoc, setDoc, updateDoc, 
+    collection, onSnapshot, query, orderBy, addDoc, 
+    serverTimestamp, runTransaction
+} from "firebase/firestore";
 import { getAuth, signInAnonymously } from "firebase/auth";
 
 // --- Безопасная загрузка ключей ---
@@ -26,14 +30,15 @@ const BackIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg
 const SearchIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 ${className}`}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
 const LockIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>);
 const CrownIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>);
-const HeartIcon = ({ className = ''}) => (<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19.5 12.572a4.5 4.5 0 0 0-6.43-6.234l-.07.064-.07-.064a4.5 4.5 0 0 0-6.43 6.234l6.5 6.235 6.5-6.235z"></path></svg>);
+const HeartIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19.5 12.572a4.5 4.5 0 0 0-6.43-6.234l-.07.064-.07-.064a4.5 4.5 0 0 0-6.43 6.234l6.5 6.235 6.5-6.235z"></path></svg>);
+const SendIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>);
 
 // --- Компонент: Анимация загрузки ---
 const LoadingSpinner = ({ theme }) => {
   const t = themes[theme];
   return (
     <div className={`min-h-screen flex flex-col items-center justify-center ${t.bg}`}>
-      <HeartIcon className="animate-pulse-heart text-pink-400" />
+      <HeartIcon className="animate-pulse-heart text-pink-400" filled />
       <p className={`mt-4 text-lg ${t.text} opacity-70`}>Загрузка новелл...</p>
     </div>
   );
@@ -45,7 +50,7 @@ const themes = {
   dark: { bg: 'bg-gray-900', text: 'text-gray-100', componentBg: 'bg-gray-800', componentText: 'text-gray-200', border: 'border-gray-700', searchBg: 'bg-gray-800', searchPlaceholder: 'placeholder-gray-500', searchRing: 'focus:ring-pink-500', tgBg: '#111827', tgHeader: '#1f2937', accent: 'pink-500', accentHover: 'pink-400' }
 };
 
-// --- Компоненты ---
+// --- КОМПОНЕНТЫ ---
 const SubscriptionModal = ({ onClose, onSelectPlan, theme }) => {
     const t = themes[theme];
     const subscriptionPlans = [{ duration: 1, name: '1 месяц', price: 199 },{ duration: 3, name: '3 месяца', price: 539, popular: true },{ duration: 12, name: '1 год', price: 1899 }];
@@ -101,7 +106,19 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
 
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
     const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
-    useEffect(() => { if (chaptersCache[novel.id]) { setChapters(chaptersCache[novel.id]); setIsLoading(false); } else { setIsLoading(true); fetch(`data/chapters/${novel.id}.json`).then(res => res.json()).then(data => { setChapters(data.chapters || []); setIsLoading(false); }).catch(err => { console.error(err); setChapters([]); setIsLoading(false); }); } }, [novel.id, chaptersCache]);
+    
+    useEffect(() => { 
+        if (chaptersCache[novel.id]) { 
+            setChapters(chaptersCache[novel.id]); 
+            setIsLoading(false); 
+        } else { 
+            setIsLoading(true); 
+            fetch(`./data/chapters/${novel.id}.json`)
+                .then(res => res.json())
+                .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
+                .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
+        } 
+    }, [novel.id, chaptersCache]);
     
     const sortedChapters = useMemo(() => {
         const chaptersCopy = [...chapters];
@@ -117,11 +134,116 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, theme, subscripti
     return (<div className={t.text}>{isSubModalOpen && !selectedPlan && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} theme={theme} />}{isSubModalOpen && selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} theme={theme} plan={selectedPlan} />}<div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className={`absolute inset-0 bg-gradient-to-t ${theme === 'dark' ? 'from-gray-900 via-gray-900/80' : 'from-stone-100 via-stone-100/80'} to-transparent`}></div><div className="absolute bottom-4 left-4"><h1 className="text-3xl font-bold" style={{textShadow: '1px 1px 3px rgba(0,0,0,0.5)'}}>{novel.title}</h1><p className="text-sm" style={{textShadow: '1px 1px 2px rgba(0,0,0,0.5)'}}>{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 ${theme === 'dark' ? 'bg-gray-700 text-gray-200 hover:bg-gray-600' : 'bg-stone-200 text-stone-700 hover:bg-stone-300'}`}>{genre}</button>))}</div><p className={`text-sm mb-6 ${theme === 'dark' ? 'text-gray-300' : 'text-stone-600'}`}>{novel.description}</p>{lastReadChapterId && <button onClick={handleContinueReading} className={`w-full py-3 mb-4 rounded-lg bg-${t.accent} text-white font-bold transition-transform hover:scale-105`}>Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className={`text-sm font-semibold text-${t.accent}`}>{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p className={t.text}>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => { const showLock = !hasActiveSubscription && chapter.isPaid; return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 ${t.componentBg} rounded-xl cursor-pointer transition-all duration-200 hover:border-${t.accentHover} border ${t.border} flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>{lastReadChapterId === chapter.id && <span className={`absolute left-2 text-xs text-${t.accent}`}>●</span>}<div><p className={`font-semibold ${t.componentText}`}>{chapter.title}</p></div>{showLock ? <LockIcon className={t.text} /> : <ArrowRightIcon className={t.text}/>}</div>); })}</div>)}</div></div>)
 };
 
-const ChapterReader = ({ chapter, novel, theme, fontSize }) => {
+const ChapterReader = ({ chapter, novel, theme, fontSize, userId, userName }) => {
   const t = themes[theme];
-  return (<div className={`min-h-screen transition-colors duration-300 ${t.bg}`}><div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto"><h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center">{novel.title}</h1><h2 className="text-lg sm:text-xl mb-8 text-center opacity-80">{chapter.title}</h2><div className={`whitespace-pre-wrap leading-relaxed ${t.text}`} style={{ fontSize: `${fontSize}px` }}>{chapter.content}</div></div></div>);
-};
+  const [comments, setComments] = useState([]);
+  const [newComment, setNewComment] = useState("");
+  const [likeCount, setLikeCount] = useState(0);
+  const [userHasLiked, setUserHasLiked] = useState(false);
 
+  const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
+
+  useEffect(() => {
+    const unsubMeta = onSnapshot(chapterMetaRef, (docSnap) => {
+      setLikeCount(docSnap.data()?.likeCount || 0);
+    });
+
+    const commentsQuery = query(collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`), orderBy("timestamp", "asc"));
+    const unsubComments = onSnapshot(commentsQuery, (querySnapshot) => {
+      const commentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setComments(commentsData);
+    });
+
+    if (userId && userId !== "guest_user") {
+        const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
+        getDoc(likeRef).then(docSnap => setUserHasLiked(docSnap.exists()));
+    }
+
+    return () => {
+      unsubMeta();
+      unsubComments();
+    };
+  }, [chapterMetaRef, novel.id, chapter.id, userId]);
+
+  const handleCommentSubmit = async (e) => {
+    e.preventDefault();
+    if (!newComment.trim() || !userId || userId === "guest_user") return;
+
+    const commentsColRef = collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`);
+    await addDoc(commentsColRef, {
+      userId,
+      userName: userName || "Аноним",
+      text: newComment,
+      timestamp: serverTimestamp()
+    });
+    setNewComment("");
+  };
+
+  const handleLike = async () => {
+    if (!userId || userId === "guest_user") return;
+    
+    const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
+
+    await runTransaction(db, async (transaction) => {
+      const likeDoc = await transaction.get(likeRef);
+      const metaDoc = await transaction.get(chapterMetaRef);
+      const currentLikes = metaDoc.data()?.likeCount || 0;
+
+      if (likeDoc.exists()) {
+        transaction.delete(likeRef);
+        transaction.set(chapterMetaRef, { likeCount: Math.max(0, currentLikes - 1) }, { merge: true });
+        setUserHasLiked(false);
+      } else {
+        transaction.set(likeRef, { timestamp: serverTimestamp() });
+        transaction.set(chapterMetaRef, { likeCount: currentLikes + 1 }, { merge: true });
+        setUserHasLiked(true);
+      }
+    });
+  };
+
+  return (
+    <div className={`min-h-screen transition-colors duration-300 ${t.bg}`}>
+      <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto pb-24">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-center">{novel.title}</h1>
+        <h2 className="text-lg sm:text-xl mb-8 text-center opacity-80">{chapter.title}</h2>
+        <div className={`whitespace-pre-wrap leading-relaxed ${t.text}`} style={{ fontSize: `${fontSize}px` }}>{chapter.content}</div>
+        
+        <div className="mt-12 border-t pt-8">
+          <div className="flex items-center gap-4 mb-8">
+            <button onClick={handleLike} className={`flex items-center gap-2 text-${t.accentHover} transition-transform hover:scale-110`}>
+              <HeartIcon filled={userHasLiked} className={userHasLiked ? `text-${t.accent}` : ''} />
+              <span className="font-bold text-lg">{likeCount}</span>
+            </button>
+          </div>
+
+          <h3 className="text-2xl font-bold mb-4">Комментарии</h3>
+          <div className="space-y-4 mb-6">
+            {comments.map(comment => (
+              <div key={comment.id} className={`p-3 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-stone-50'}`}>
+                <p className="font-bold text-sm">{comment.userName}</p>
+                <p className="text-md mt-1">{comment.text}</p>
+              </div>
+            ))}
+            {comments.length === 0 && <p className="opacity-70">Комментариев пока нет. Будьте первым!</p>}
+          </div>
+
+          <form onSubmit={handleCommentSubmit} className="flex items-center gap-2">
+            <input 
+              type="text"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Написать комментарий..."
+              className={`w-full ${t.searchBg} ${t.border} border rounded-lg py-2 px-4 ${t.text} ${t.searchPlaceholder} focus:outline-none focus:ring-2 ${t.searchRing}`}
+            />
+            <button type="submit" className={`p-2 rounded-full bg-${t.accent} text-white`}>
+              <SendIcon />
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // --- Главный компонент приложения ---
 export default function App() {
@@ -134,6 +256,7 @@ export default function App() {
   const [genreFilter, setGenreFilter] = useState(null);
   const [subscription, setSubscription] = useState(null);
   const [userId, setUserId] = useState(null);
+  const [userName, setUserName] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [chaptersCache, setChaptersCache] = useState({});
   const [lastReadData, setLastReadData] = useState(null);
@@ -158,7 +281,7 @@ export default function App() {
   
   const handleTextSizeChange = useCallback((amount) => {
     setFontSize(prevSize => {
-        const newSize = Math.max(12, Math.min(32, prevSize + amount * 2)); // Увеличил шаг изменения
+        const newSize = Math.max(12, Math.min(32, prevSize + amount));
         updateUserDoc({ settings: { theme, fontSize: newSize } });
         return newSize;
     });
@@ -173,6 +296,7 @@ export default function App() {
           tg.ready();
           tg.expand();
           telegramUserId = tg.initDataUnsafe?.user?.id?.toString() || "guest_user";
+          setUserName(tg.initDataUnsafe?.user?.first_name || null);
         }
         setUserId(telegramUserId);
         await signInAnonymously(auth);
@@ -189,7 +313,7 @@ export default function App() {
               }
             }
         }
-        const response = await fetch(`./data/novels.json`); // ИЗМЕНЕНИЕ: Убрал /data/
+        const response = await fetch(`./data/novels.json`);
         if (!response.ok) throw new Error('Failed to fetch novels');
         const data = await response.json();
         setNovels(data.novels);
@@ -258,7 +382,7 @@ export default function App() {
   const renderPage = () => {
     switch (page) {
       case 'details': return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} theme={theme} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chaptersCache={chaptersCache} lastReadData={lastReadData} />;
-      case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} fontSize={fontSize} />;
+      case 'reader': return <ChapterReader chapter={selectedChapter} novel={selectedNovel} theme={theme} fontSize={fontSize} userId={userId} userName={userName} />;
       case 'list': default: return <NovelList novels={novels} onSelectNovel={handleSelectNovel} theme={theme} setTheme={handleSetTheme} genreFilter={genreFilter} onClearGenreFilter={handleClearGenreFilter} />;
     }
   };

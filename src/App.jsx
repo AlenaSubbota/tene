@@ -83,9 +83,8 @@ const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => (
     </div>
 );
 
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chaptersCache, lastReadData, onBack }) => {
-    const [chapters, setChapters] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+// ИЗМЕНЕНИЕ: Передаем `chapters` и `isLoadingChapters` как пропсы, удаляем всю логику загрузки отсюда
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack }) => {
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [sortOrder, setSortOrder] = useState('newest');
@@ -93,50 +92,12 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const descriptionRef = useRef(null);
     const [isLongDescription, setIsLongDescription] = useState(false);
 
-
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
     const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
 
     useEffect(() => {
-    // Новая функция для загрузки списка глав из Firebase
-    const fetchChaptersFromFirestore = async () => {
-        setIsLoading(true);
-        try {
-            // Создаем ссылку на документ в коллекции chapter_info
-            const docRef = doc(db, 'chapter_info', novel.id.toString());
-            const docSnap = await getDoc(docRef);
-
-            if (docSnap.exists()) {
-                // Если документ существует, берем из него поле 'chapters'
-                const data = docSnap.data();
-                const chaptersData = data.chapters || {};
-                
-                // Преобразуем объект в массив и сортируем по ID
-                const chaptersArray = Object.keys(chaptersData).map(key => ({
-                    id: parseInt(key),
-                    title: `Глава ${key}`, // Генерируем заголовок
-                    isPaid: chaptersData[key].isPaid || false
-                })).sort((a, b) => a.id - b.id);
-                
-                setChapters(chaptersArray);
-            } else {
-                console.log("Документ с главами не найден в chapter_info!");
-                setChapters([]);
-            }
-        } catch (error) {
-            console.error("Ошибка загрузки глав из Firebase:", error);
-            setChapters([]);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    fetchChaptersFromFirestore();
-
-}, [novel.id]); // Убираем chaptersCache из зависимостей
-    
-     useEffect(() => {
         if (descriptionRef.current) {
+            // Небольшая задержка, чтобы DOM успел отрисоваться
             setTimeout(() => {
                  if (descriptionRef.current) {
                     setIsLongDescription(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
@@ -174,7 +135,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
       }
     };
 
-    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`${import.meta.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
+    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`${import.meta.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
         const showLock = !hasActiveSubscription && chapter.isPaid;
         const isLastRead = lastReadChapterId === chapter.id;
         return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 bg-component-bg rounded-xl cursor-pointer transition-all duration-200 hover:border-accent-hover hover:bg-accent/10 border border-border-color flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>
@@ -621,7 +582,11 @@ export default function App() {
   const [userId, setUserId] = useState(null);
   const [userName, setUserName] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [chaptersCache, setChaptersCache] = useState({});
+  
+  // ИЗМЕНЕНИЕ: Переносим состояние глав и загрузки в App
+  const [chapters, setChapters] = useState([]);
+  const [isLoadingChapters, setIsLoadingChapters] = useState(true);
+
   const [lastReadData, setLastReadData] = useState(null);
   const [bookmarks, setBookmarks] = useState([]);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
@@ -690,13 +655,43 @@ export default function App() {
     init();
   }, []);
 
+  // ИЗМЕНЕНИЕ: Переносим логику загрузки глав сюда.
+  // Она будет срабатывать каждый раз, когда меняется `selectedNovel`
   useEffect(() => {
-    if (novels.length > 0) {
-      novels.forEach(novel => {
-        fetch(`${import.meta.env.BASE_URL}data/chapters/${novel.id}.json`).then(res => res.json()).then(data => setChaptersCache(prev => ({ ...prev, [novel.id]: data.chapters || [] }))).catch(err => console.error(`Не удалось предзагрузить главы для ${novel.title}:`, err));
-      });
-    }
-  }, [novels]);
+      if (!selectedNovel) {
+          setChapters([]);
+          return;
+      }
+
+      const fetchChaptersFromFirestore = async () => {
+          setIsLoadingChapters(true);
+          try {
+              const docRef = doc(db, 'chapter_info', selectedNovel.id.toString());
+              const docSnap = await getDoc(docRef);
+              if (docSnap.exists()) {
+                  const data = docSnap.data();
+                  const chaptersData = data.chapters || {};
+                  const chaptersArray = Object.keys(chaptersData).map(key => ({
+                      id: parseInt(key),
+                      title: `Глава ${key}`,
+                      isPaid: chaptersData[key].isPaid || false
+                  })).sort((a, b) => a.id - b.id);
+                  setChapters(chaptersArray);
+              } else {
+                  console.log("Документ с главами не найден в chapter_info!");
+                  setChapters([]);
+              }
+          } catch (error) {
+              console.error("Ошибка загрузки глав из Firebase:", error);
+              setChapters([]);
+          } finally {
+              setIsLoadingChapters(false);
+          }
+      };
+
+      fetchChaptersFromFirestore();
+  }, [selectedNovel]);
+
 
   const handleBack = useCallback(() => {
       if (page === 'reader') setPage('details');
@@ -792,10 +787,36 @@ export default function App() {
 
   const renderContent = () => {
     if (page === 'details') {
-      return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chaptersCache={chaptersCache} lastReadData={lastReadData} onBack={handleBack}/>;
+      return <NovelDetails 
+                novel={selectedNovel} 
+                onSelectChapter={handleSelectChapter} 
+                onGenreSelect={handleGenreSelect} 
+                subscription={subscription} 
+                botUsername={BOT_USERNAME} 
+                userId={userId} 
+                // ИЗМЕНЕНИЕ: Передаем актуальные главы и состояние загрузки
+                chapters={chapters} 
+                isLoadingChapters={isLoadingChapters}
+                lastReadData={lastReadData} 
+                onBack={handleBack}
+              />;
     }
     if (page === 'reader') {
-      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} userId={userId} userName={userName} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chaptersCache[selectedNovel.id] || []} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} />;
+      // ИЗМЕНЕНИЕ: Передаем актуальный список глав
+      return <ChapterReader 
+                chapter={selectedChapter} 
+                novel={selectedNovel} 
+                fontSize={fontSize} 
+                onFontSizeChange={handleTextSizeChange} 
+                userId={userId} 
+                userName={userName} 
+                currentFontClass={fontClass} 
+                onSelectChapter={handleSelectChapter} 
+                allChapters={chapters} 
+                subscription={subscription} 
+                botUsername={BOT_USERNAME} 
+                onBack={handleBack} 
+              />;
     }
 
     switch (activeTab) {
@@ -838,4 +859,3 @@ export default function App() {
     </main>
   );
 }
-

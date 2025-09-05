@@ -176,6 +176,8 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   const [showSettings, setShowSettings] = useState(false);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [chapterContent, setChapterContent] = useState('');
+  const [isLoadingContent, setIsLoadingContent] = useState(true);
 
   const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
   const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
@@ -201,6 +203,36 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
       unsubComments();
     };
   }, [chapterMetaRef, novel.id, chapter.id, userId]);
+
+  useEffect(() => {
+    const fetchContent = async () => {
+        setIsLoadingContent(true);
+        setChapterContent(''); 
+        
+        if (chapter.isPaid && !hasActiveSubscription) {
+            setIsLoadingContent(false);
+            setChapterContent('### 🔒 Для доступа к этой главе необходима подписка.\n\nПожалуйста, оформите подписку в разделе "Профиль", чтобы продолжить чтение.');
+            return;
+        }
+
+        try {
+            const chapterDocRef = doc(db, 'chapter_content', `${novel.id}-${chapter.id}`);
+            const docSnap = await getDoc(chapterDocRef);
+            if (docSnap.exists()) {
+                setChapterContent(docSnap.data().content);
+            } else {
+                setChapterContent('## Ошибка\n\nНе удалось загрузить текст главы. Пожалуйста, попробуйте позже.');
+            }
+        } catch (error) {
+            console.error("Ошибка загрузки главы:", error);
+            setChapterContent('## Ошибка\n\nПроизошла ошибка при загрузке. Проверьте ваше интернет-соединение.');
+        } finally {
+            setIsLoadingContent(false);
+        }
+    };
+
+    fetchContent();
+  }, [novel.id, chapter.id, hasActiveSubscription]);
 
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
@@ -294,8 +326,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
 
   const renderMarkdown = (markdownText) => {
     if (window.marked) {
-      // Добавляем опцию breaks: true
-      const rawHtml = window.marked.parse(markdownText, { breaks: true }); 
+      const rawHtml = window.marked.parse(markdownText);
       return `<div class="prose">${rawHtml}</div>`;
     }
     return markdownText;
@@ -310,7 +341,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         <div 
           className={`whitespace-normal leading-relaxed ${currentFontClass}`} 
           style={{ fontSize: `${fontSize}px` }}
-          dangerouslySetInnerHTML={{ __html: renderMarkdown(chapter.content) }}
+          dangerouslySetInnerHTML={{ __html: isLoadingContent ? '<p>Загрузка...</p>' : renderMarkdown(chapterContent) }}
         />
         
         <div className="text-center my-8 text-accent font-bold text-2xl tracking-widest">
@@ -637,7 +668,7 @@ export default function App() {
   useEffect(() => {
     if (novels.length > 0) {
       novels.forEach(novel => {
-        fetch(`data/chapters/${novel.id}.json`).then(res => res.json()).then(data => setChaptersCache(prev => ({ ...prev, [novel.id]: data.chapters || [] }))).catch(err => console.error(`Не удалось предзагрузить главы для ${novel.title}:`, err));
+        fetch(`${import.meta.env.BASE_URL}data/chapters/${novel.id}.json`).then(res => res.json()).then(data => setChaptersCache(prev => ({ ...prev, [novel.id]: data.chapters || [] }))).catch(err => console.error(`Не удалось предзагрузить главы для ${novel.title}:`, err));
       });
     }
   }, [novels]);
@@ -782,3 +813,4 @@ export default function App() {
     </main>
   );
 }
+

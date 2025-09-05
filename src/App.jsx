@@ -637,7 +637,7 @@ export default function App() {
   useEffect(() => {
     if (novels.length > 0) {
       novels.forEach(novel => {
-        fetch(`${import.meta.env.BASE_URL}data/chapters/${novel.id}.json`).then(res => res.json()).then(data => setChaptersCache(prev => ({ ...prev, [novel.id]: data.chapters || [] }))).catch(err => console.error(`Не удалось предзагрузить главы для ${novel.title}:`, err));
+        fetch(`data/chapters/${novel.id}.json`).then(res => res.json()).then(data => setChaptersCache(prev => ({ ...prev, [novel.id]: data.chapters || [] }))).catch(err => console.error(`Не удалось предзагрузить главы для ${novel.title}:`, err));
       });
     }
   }, [novels]);

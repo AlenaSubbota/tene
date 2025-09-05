@@ -7,3 +7,16 @@
   -ms-user-select: none; /* IE 10 and IE 11 */
   user-select: none; /* Standard syntax */
 }
+
+/* Стили для рендеринга Markdown */
+.prose p {
+  margin-bottom: 1em;
+}
+
+.prose em {
+  font-style: italic;
+}
+
+.prose strong {
+    font-weight: bold;
+}

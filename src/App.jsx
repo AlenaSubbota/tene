@@ -103,7 +103,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
             setIsLoading(false);
         } else {
             setIsLoading(true);
-            fetch(`./data/chapters/${novel.id}.json`)
+            fetch(`/tene/data/chapters/${novel.id}.json`)
                 .then(res => res.json())
                 .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
                 .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
@@ -508,7 +508,7 @@ const NewsSlider = ({ onReadMore }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
 
     useEffect(() => {
-        fetch('./data/news.json')
+        fetch('/tene/data/news.json')
             .then(res => res.json())
             .then(setNews)
             .catch(err => console.error("Failed to fetch news", err));
@@ -636,7 +636,7 @@ export default function App() {
   useEffect(() => {
     if (novels.length > 0) {
       novels.forEach(novel => {
-        fetch(`./data/chapters/${novel.id}.json`).then(res => res.json()).then(data => setChaptersCache(prev => ({ ...prev, [novel.id]: data.chapters || [] }))).catch(err => console.error(`Не удалось предзагрузить главы для ${novel.title}:`, err));
+        fetch(`/tene/data/chapters/${novel.id}.json`).then(res => res.json()).then(data => setChaptersCache(prev => ({ ...prev, [novel.id]: data.chapters || [] }))).catch(err => console.error(`Не удалось предзагрузить главы для ${novel.title}:`, err));
       });
     }
   }, [novels]);

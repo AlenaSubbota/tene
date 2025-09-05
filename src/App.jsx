@@ -83,7 +83,6 @@ const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => (
     </div>
 );
 
-// ИЗМЕНЕНИЕ: Передаем `chapters` и `isLoadingChapters` как пропсы, удаляем всю логику загрузки отсюда
 const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack }) => {
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
@@ -97,7 +96,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
 
     useEffect(() => {
         if (descriptionRef.current) {
-            // Небольшая задержка, чтобы DOM успел отрисоваться
             setTimeout(() => {
                  if (descriptionRef.current) {
                     setIsLongDescription(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
@@ -583,7 +581,6 @@ export default function App() {
   const [userName, setUserName] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // ИЗМЕНЕНИЕ: Переносим состояние глав и загрузки в App
   const [chapters, setChapters] = useState([]);
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
 
@@ -655,14 +652,11 @@ export default function App() {
     init();
   }, []);
 
-  // ИЗМЕНЕНИЕ: Переносим логику загрузки глав сюда.
-  // Она будет срабатывать каждый раз, когда меняется `selectedNovel`
   useEffect(() => {
       if (!selectedNovel) {
           setChapters([]);
           return;
       }
-
       const fetchChaptersFromFirestore = async () => {
           setIsLoadingChapters(true);
           try {
@@ -794,7 +788,6 @@ export default function App() {
                 subscription={subscription} 
                 botUsername={BOT_USERNAME} 
                 userId={userId} 
-                // ИЗМЕНЕНИЕ: Передаем актуальные главы и состояние загрузки
                 chapters={chapters} 
                 isLoadingChapters={isLoadingChapters}
                 lastReadData={lastReadData} 
@@ -802,7 +795,6 @@ export default function App() {
               />;
     }
     if (page === 'reader') {
-      // ИЗМЕНЕНИЕ: Передаем актуальный список глав
       return <ChapterReader 
                 chapter={selectedChapter} 
                 novel={selectedNovel} 

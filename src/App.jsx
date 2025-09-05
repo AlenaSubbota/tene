@@ -20,7 +20,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const ADMIN_ID = "417641827";
+const ADMIN_ID = "417641827"; // Your Admin ID
 
 // --- ICONS ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
@@ -36,6 +36,8 @@ const LibraryIcon = ({ className = '', filled = false }) => (<svg xmlns="http://
 const ChevronLeftIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m15 18-6-6 6-6"/></svg>;
 const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>;
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
+const SunIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2"></path><path d="M12 20v2"></path><path d="m4.93 4.93 1.41 1.41"></path><path d="m17.66 17.66 1.41 1.41"></path><path d="M2 12h2"></path><path d="M20 12h2"></path><path d="m6.34 17.66-1.41 1.41"></path><path d="m19.07 4.93-1.41 1.41"></path></svg>);
+const MoonIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg>);
 
 
 // --- Components ---
@@ -90,8 +92,9 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [sortOrder, setSortOrder] = useState('newest');
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-    const [showReadMore, setShowReadMore] = useState(false);
     const descriptionRef = useRef(null);
+    const [isLongDescription, setIsLongDescription] = useState(false);
+
 
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
     const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
@@ -109,11 +112,17 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
         }
     }, [novel.id, chaptersCache]);
     
-    useEffect(() => {
+     useEffect(() => {
         if (descriptionRef.current) {
-            setShowReadMore(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
+            // A slight delay is needed to ensure the DOM has rendered and we can get the correct height
+            setTimeout(() => {
+                 if (descriptionRef.current) {
+                    setIsLongDescription(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
+                }
+            }, 100);
         }
     }, [novel.description]);
+
 
     const sortedChapters = useMemo(() => {
         const chaptersCopy = [...chapters];
@@ -143,7 +152,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
       }
     };
 
-    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div className={`relative overflow-hidden transition-all duration-300 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p ref={descriptionRef} className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{showReadMore && <div className="text-right mt-1"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 my-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
+    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={novel.coverUrl} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoading ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
         const showLock = !hasActiveSubscription && chapter.isPaid;
         const isLastRead = lastReadChapterId === chapter.id;
         return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 bg-component-bg rounded-xl cursor-pointer transition-all duration-200 hover:border-accent-hover hover:bg-accent/10 border border-border-color flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>
@@ -160,19 +169,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
 };
 
 const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack }) => {
-  const t = {
-    bg: 'bg-background',
-    text: 'text-text-main',
-    componentBg: 'bg-component-bg',
-    border: 'border-border-color',
-    accent: 'text-accent',
-    accentHover: 'text-accent-hover',
-    commentBg: 'bg-background',
-    searchBg: 'bg-component-bg',
-    searchPlaceholder: 'placeholder-text-main/50',
-    searchRing: 'focus:ring-accent',
-  };
-
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState(null);
@@ -183,9 +179,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   const [showSettings, setShowSettings] = useState(false);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
-  const descriptionRef = useRef(null);
-  const [isLongDescription, setIsLongDescription] = useState(false);
-
 
   const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
   const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
@@ -298,13 +291,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
       }
     };
     
-    useEffect(() => {
-        if (descriptionRef.current) {
-            setIsLongDescription(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
-        }
-    }, [novel.description]);
-
-
   const currentChapterIndex = allChapters.findIndex(c => c.id === chapter.id);
   const prevChapter = allChapters[currentChapterIndex - 1];
   const nextChapter = allChapters[currentChapterIndex + 1];
@@ -367,7 +353,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
               placeholder="Написать комментарий..."
               className="w-full bg-component-bg border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent text-sm"
             />
-            <button type="submit" className={`p-2 rounded-full bg-accent text-white flex items-center justify-center`}>
+            <button type="submit" className="p-2 rounded-full bg-accent text-white flex items-center justify-center">
               <SendIcon className="w-5 h-5" />
             </button>
           </form>
@@ -378,7 +364,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         <button onClick={() => handleChapterClick(prevChapter)} disabled={!prevChapter} className="p-2 disabled:opacity-50"><BackIcon/></button>
         <div className="flex gap-2">
             <button onClick={() => setShowChapterList(true)} className="px-4 py-2 rounded-lg bg-background">Оглавление</button>
-            <button onClick={() => setShowSettings(true)} className="px-4 py-2 rounded-lg bg-background"><SettingsIcon /></button>
+            <button onClick={() => setShowSettings(true)} className="p-2 rounded-lg bg-background"><SettingsIcon /></button>
         </div>
         <button onClick={() => handleChapterClick(nextChapter)} disabled={!nextChapter} className="p-2 disabled:opacity-50"><ArrowRightIcon className="opacity-100"/></button>
       </div>
@@ -405,7 +391,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
       )}
       {showSettings && (
          <div className="fixed inset-0 bg-black/50 z-20" onClick={() => setShowSettings(false)}>
-             <div className="absolute bottom-0 left-0 right-0 p-4 rounded-t-2xl bg-component-bg" onClick={e => e.stopPropagation()}>
+             <div className="absolute bottom-0 left-0 right-0 p-4 rounded-t-2xl bg-component-bg text-text-main" onClick={e => e.stopPropagation()}>
                 <h3 className="font-bold text-lg mb-4">Настройки чтения</h3>
                  <div className="flex items-center justify-between">
                   <span>Размер текста</span>
@@ -591,9 +577,10 @@ export default function App() {
   const handleTextSizeChange = useCallback((amount) => {
     setFontSize(prevSize => {
         const newSize = Math.max(12, Math.min(32, prevSize + amount));
+        updateUserDoc({ settings: { fontSize: newSize, fontClass } });
         return newSize;
     });
-  }, []);
+  }, [fontClass, updateUserDoc]);
 
   useEffect(() => {
     const init = async () => {
@@ -616,6 +603,10 @@ export default function App() {
                     setSubscription(data.subscription || null);
                     setLastReadData(data.lastRead || null);
                     setBookmarks(data.bookmarks || []);
+                    if (data.settings) {
+                        setFontSize(data.settings.fontSize || 16);
+                        setFontClass(data.settings.fontClass || 'font-sans');
+                    }
                 }
             });
         }
@@ -737,7 +728,7 @@ export default function App() {
       return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chaptersCache={chaptersCache} lastReadData={lastReadData} onBack={handleBack}/>;
     }
     if (page === 'reader') {
-      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onTextSizeChange={handleTextSizeChange} userId={userId} userName={userName} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chaptersCache[selectedNovel.id] || []} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} />;
+      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} userId={userId} userName={userName} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chaptersCache[selectedNovel.id] || []} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} />;
     }
 
     switch (activeTab) {
@@ -746,8 +737,15 @@ export default function App() {
           <>
             <Header title="Библиотека" />
             <NewsSlider onReadMore={setSelectedNews} />
+            <div className="p-4">
+                {genreFilter && (
+                    <div className="flex items-center justify-between p-3 mb-4 rounded-lg border border-border-color bg-component-bg text-text-main">
+                        <p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p>
+                        <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
+                    </div>
+                )}
+            </div>
             <NovelList novels={novels.filter(n => (!genreFilter || n.genres.includes(genreFilter)))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
-             {genreFilter && <div className="p-4 text-center"><button onClick={handleClearGenreFilter} className="text-accent font-semibold text-sm">Сбросить фильтр</button></div>}
           </>
         )
       case 'search':
@@ -772,7 +770,6 @@ export default function App() {
         {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
         {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
         {selectedNews && <NewsModal newsItem={selectedNews} onClose={() => setSelectedNews(null)} />}
-
     </main>
   );
 }

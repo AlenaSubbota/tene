@@ -294,7 +294,8 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
 
   const renderMarkdown = (markdownText) => {
     if (window.marked) {
-      const rawHtml = window.marked.parse(markdownText);
+      // Добавляем опцию breaks: true
+      const rawHtml = window.marked.parse(markdownText, { breaks: true }); 
       return `<div class="prose">${rawHtml}</div>`;
     }
     return markdownText;

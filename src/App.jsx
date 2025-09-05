@@ -159,7 +159,20 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     </div></div>)
 };
 
-const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack, onTextSizeChange }) => {
+const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack }) => {
+  const t = {
+    bg: 'bg-background',
+    text: 'text-text-main',
+    componentBg: 'bg-component-bg',
+    border: 'border-border-color',
+    accent: 'text-accent',
+    accentHover: 'text-accent-hover',
+    commentBg: 'bg-background',
+    searchBg: 'bg-component-bg',
+    searchPlaceholder: 'placeholder-text-main/50',
+    searchRing: 'focus:ring-accent',
+  };
+
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState(null);
@@ -167,9 +180,12 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
   const [likeCount, setLikeCount] = useState(0);
   const [userHasLiked, setUserHasLiked] = useState(false);
   const [showChapterList, setShowChapterList] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const descriptionRef = useRef(null);
+  const [isLongDescription, setIsLongDescription] = useState(false);
+
 
   const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
   const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
@@ -199,16 +215,26 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
     if (!newComment.trim() || !userId || userId === "guest_user") return;
+
     const commentsColRef = collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`);
-    await addDoc(commentsColRef, { userId, userName: userName || "Аноним", text: newComment, timestamp: serverTimestamp() });
+    await addDoc(commentsColRef, {
+      userId,
+      userName: userName || "Аноним",
+      text: newComment,
+      timestamp: serverTimestamp()
+    });
     setNewComment("");
   };
-    const handleEdit = (comment) => { setEditingCommentId(comment.id); setEditingText(comment.text); };
+    const handleEdit = (comment) => {
+    setEditingCommentId(comment.id);
+    setEditingText(comment.text);
+  };
     const handleUpdateComment = async (commentId) => {
     if (!editingText.trim()) return;
     const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
     await updateDoc(commentRef, { text: editingText });
-    setEditingCommentId(null); setEditingText("");
+    setEditingCommentId(null);
+    setEditingText("");
   };
     const handleDelete = async (commentId) => {
     const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
@@ -217,11 +243,14 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
 
   const handleLike = async () => {
     if (!userId || userId === "guest_user") return;
+
     const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
+
     await runTransaction(db, async (transaction) => {
       const likeDoc = await transaction.get(likeRef);
       const metaDoc = await transaction.get(chapterMetaRef);
       const currentLikes = metaDoc.data()?.likeCount || 0;
+
       if (likeDoc.exists()) {
         transaction.delete(likeRef);
         transaction.set(chapterMetaRef, { likeCount: Math.max(0, currentLikes - 1) }, { merge: true });
@@ -268,6 +297,13 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
         });
       }
     };
+    
+    useEffect(() => {
+        if (descriptionRef.current) {
+            setIsLongDescription(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
+        }
+    }, [novel.description]);
+
 
   const currentChapterIndex = allChapters.findIndex(c => c.id === chapter.id);
   const prevChapter = allChapters[currentChapterIndex - 1];
@@ -280,7 +316,10 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
         <h2 className="text-lg sm:text-xl mb-8 text-center opacity-80 font-sans">{chapter.title}</h2>
         <div className={`whitespace-pre-wrap leading-relaxed ${currentFontClass}`} style={{ fontSize: `${fontSize}px` }}>{chapter.content}</div>
         
-        <div className="text-center my-8 text-accent opacity-50 text-xl font-bold">╚══ ≪ °❈° ≫ ══╝</div>
+        <div className="text-center my-8 text-accent font-bold text-2xl tracking-widest">
+            ╚══ ≪ °❈° ≫ ══╝
+        </div>
+
 
         <div className="border-t border-border-color pt-8">
           <div className="flex items-center gap-4 mb-8">
@@ -294,15 +333,20 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
           <div className="space-y-4 mb-6">
             {comments.map(comment => (
               <div key={comment.id} className="p-3 rounded-lg bg-component-bg border border-border-color">
-                <p className="font-bold text-xs">{comment.userName}</p>
+                <p className="font-bold text-sm">{comment.userName}</p>
                 {editingCommentId === comment.id ? (
                   <div className="flex items-center gap-2 mt-1">
-                    <input type="text" value={editingText} onChange={(e) => setEditingText(e.target.value)} className="w-full bg-background border border-border-color rounded-lg py-1 px-2 text-text-main text-sm" />
+                    <input
+                      type="text"
+                      value={editingText}
+                      onChange={(e) => setEditingText(e.target.value)}
+                      className="w-full bg-background border border-border-color rounded-lg py-1 px-2 text-text-main text-sm"
+                    />
                     <button onClick={() => handleUpdateComment(comment.id)} className="p-1 rounded-full bg-green-500 text-white">✓</button>
                     <button onClick={() => setEditingCommentId(null)} className="p-1 rounded-full bg-gray-500 text-white">✕</button>
                   </div>
                 ) : (
-                  <p className="text-sm mt-1">{comment.text}</p>
+                  <p className="text-sm mt-1 opacity-90">{comment.text}</p>
                 )}
                  {(userId === comment.userId || userId === ADMIN_ID) && (
                   <div className="flex items-center gap-2 mt-2">
@@ -316,46 +360,62 @@ const ChapterReader = ({ chapter, novel, fontSize, userId, userName, currentFont
           </div>
 
           <form onSubmit={handleCommentSubmit} className="flex items-center gap-2">
-            <input type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Написать комментарий..." className="w-full bg-component-bg border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent" />
-            <button type="submit" className="p-2 rounded-full bg-accent text-white flex-shrink-0"><SendIcon /></button>
+            <input
+              type="text"
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Написать комментарий..."
+              className="w-full bg-component-bg border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent text-sm"
+            />
+            <button type="submit" className={`p-2 rounded-full bg-accent text-white flex items-center justify-center`}>
+              <SendIcon className="w-5 h-5" />
+            </button>
           </form>
         </div>
       </div>
-      
-      <div className="fixed bottom-0 left-0 right-0 p-2 border-t border-border-color bg-component-bg flex justify-between items-center z-10">
+      {/* Chapter Navigation */}
+      <div className="fixed bottom-0 left-0 right-0 p-2 border-t border-border-color bg-component-bg flex justify-between items-center z-10 text-text-main">
         <button onClick={() => handleChapterClick(prevChapter)} disabled={!prevChapter} className="p-2 disabled:opacity-50"><BackIcon/></button>
         <div className="flex gap-2">
             <button onClick={() => setShowChapterList(true)} className="px-4 py-2 rounded-lg bg-background">Оглавление</button>
-            <button onClick={() => setIsSettingsOpen(true)} className="p-2 rounded-lg bg-background"><SettingsIcon /></button>
+            <button onClick={() => setShowSettings(true)} className="px-4 py-2 rounded-lg bg-background"><SettingsIcon /></button>
         </div>
         <button onClick={() => handleChapterClick(nextChapter)} disabled={!nextChapter} className="p-2 disabled:opacity-50"><ArrowRightIcon className="opacity-100"/></button>
       </div>
 
       {showChapterList && (
         <div className="fixed inset-0 bg-black/50 z-20" onClick={() => setShowChapterList(false)}>
-          <div className="absolute bottom-0 left-0 right-0 max-h-1/2 p-4 rounded-t-2xl bg-component-bg overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <h3 className="font-bold text-lg mb-4">Главы</h3>
-            <div className="flex flex-col gap-2">
-              {allChapters.map(chap => (
-                <button key={chap.id} onClick={() => handleChapterClick(chap)} className={`p-2 text-left rounded-md ${chap.id === chapter.id ? "bg-accent text-white" : "bg-background"}`}>{chap.title}</button>
-              ))}
+          <div className="absolute bottom-0 left-0 right-0 max-h-[45vh] p-4 rounded-t-2xl bg-component-bg flex flex-col" onClick={e => e.stopPropagation()}>
+            <h3 className="font-bold text-lg mb-4 flex-shrink-0">Главы</h3>
+            <div className="overflow-y-auto">
+              <div className="flex flex-col gap-2">
+                {allChapters.map(chap => (
+                  <button
+                    key={chap.id}
+                    onClick={() => handleChapterClick(chap)}
+                    className={`p-2 text-left rounded-md ${chap.id === chapter.id ? "bg-accent text-white" : "bg-background"}`}
+                  >
+                    {chap.title}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       )}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40" onClick={() => setIsSettingsOpen(false)}>
-            <div className={`absolute bottom-0 left-0 right-0 p-4 rounded-t-2xl bg-component-bg text-text-main`} onClick={e => e.stopPropagation()}>
+      {showSettings && (
+         <div className="fixed inset-0 bg-black/50 z-20" onClick={() => setShowSettings(false)}>
+             <div className="absolute bottom-0 left-0 right-0 p-4 rounded-t-2xl bg-component-bg" onClick={e => e.stopPropagation()}>
                 <h3 className="font-bold text-lg mb-4">Настройки чтения</h3>
                  <div className="flex items-center justify-between">
                   <span>Размер текста</span>
                   <div className="w-28 h-12 rounded-full bg-background flex items-center justify-around border border-border-color">
-                    <button onClick={() => onTextSizeChange(-1)} className="text-2xl font-bold">-</button>
-                    <button onClick={() => onTextSizeChange(1)} className="text-2xl font-bold">+</button>
+                    <button onClick={() => onFontSizeChange(-1)} className="text-2xl font-bold">-</button>
+                    <button onClick={() => onFontSizeChange(1)} className="text-2xl font-bold">+</button>
                   </div>
                 </div>
-            </div>
-        </div>
+             </div>
+         </div>
       )}
       {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
       {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}

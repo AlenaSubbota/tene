@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import {
     getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
     collection, onSnapshot, query, orderBy, addDoc,
-    serverTimestamp, runTransaction
+    serverTimestamp, runTransaction, limit
 } from "firebase/firestore";
 import { getAuth, signInAnonymously } from "firebase/auth";
 
@@ -115,23 +115,33 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
     const handlePlanSelect = (plan) => setSelectedPlan(plan);
     const handlePaymentMethodSelect = async (method) => {
-      const tg = window.Telegram?.WebApp;
-      if (tg && userId && selectedPlan) {
-        tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
-          if (confirmed) {
-            const userDocRef = doc(db, "users", userId);
-            try {
-              await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
-              tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
-              tg.close();
-            } catch (error) {
-              console.error("Ошибка записи в Firebase:", error);
-              tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
+        const tg = window.Telegram?.WebApp;
+        if (!tg || !userId || !selectedPlan) {
+            console.error("Telegram Web App, userId, or selectedPlan is not available.");
+            if (tg) tg.showAlert("Произошла ошибка. Пожалуйста, попробуйте еще раз.");
+            return;
+        }
+
+        tg.showConfirm(
+            "Вы будете перенаправлены в бот для завершения оплаты. Если бот не реагирует после того, как вы выбрали тариф, не волнуйтесь! Попробуйте отправить команду /start еще раз.",
+            async (confirmed) => {
+                if (!confirmed) return;
+
+                const userDocRef = doc(db, "users", userId);
+                try {
+                    await setDoc(userDocRef, {
+                        pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() }
+                    }, { merge: true });
+                    tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
+                    tg.close();
+                } catch (error) {
+                    console.error("Ошибка записи в Firebase:", error);
+                    tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
+                }
             }
-          }
-        });
-      }
+        );
     };
+
 
     return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`${import.meta.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
         const showLock = !hasActiveSubscription && chapter.isPaid;
@@ -754,24 +764,34 @@ export default function App() {
       setIsSubModalOpen(false);
   };
   
-  const handlePaymentMethodSelect = async (method) => {
-    const tg = window.Telegram?.WebApp;
-    if (tg && userId && selectedPlan) {
-      tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
-        if (confirmed) {
-          const userDocRef = doc(db, "users", userId);
-          try {
-            await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
-            tg.openTelegramLink(`https://t.me/${BOT_USERNAME}?start=true`);
-            tg.close();
-          } catch (error) {
-            console.error("Ошибка записи в Firebase:", error);
-            tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
-          }
+    const handlePaymentMethodSelect = async (method) => {
+        const tg = window.Telegram?.WebApp;
+        if (!tg || !userId || !selectedPlan) {
+            console.error("Telegram Web App, userId, or selectedPlan is not available.");
+            if (tg) tg.showAlert("Произошла ошибка. Пожалуйста, попробуйте еще раз.");
+            return;
         }
-      });
-    }
-  };
+
+        tg.showConfirm(
+            "Вы будете перенаправлены в бот для завершения оплаты. Если бот не реагирует после того, как вы выбрали тариф, не волнуйтесь! Попробуйте отправить команду /start еще раз.",
+            async (confirmed) => {
+                if (!confirmed) return;
+
+                const userDocRef = doc(db, "users", userId);
+                try {
+                    await setDoc(userDocRef, {
+                        pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() }
+                    }, { merge: true });
+                    tg.openTelegramLink(`https://t.me/${BOT_USERNAME}?start=true`);
+                    tg.close();
+                } catch (error) {
+                    console.error("Ошибка записи в Firebase:", error);
+                    tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
+                }
+            }
+        );
+    };
+
 
   if (isLoading) {
     return <LoadingSpinner />;

@@ -620,7 +620,7 @@ export default function App() {
                 }
             });
         }
-        const response = await fetch(`./data/novels.json`);
+        const response = await fetch(`/tene/data/novels.json`);
         if (!response.ok) throw new Error('Failed to fetch novels');
         const data = await response.json();
         setNovels(data.novels);

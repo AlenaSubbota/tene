@@ -3,7 +3,7 @@
     {
       "id": 1,
       "title": "Твой Райан",
-      "coverUrl": "https://florentinablaine-sudo.github.io/tene/covers/rayan.jpg",
+     "coverUrl": "/tene/covers/rayan.jpg",
       "author": "백설홍 / Solhong Baek / Baek Solhong / Пэк Сорон",
       "genres": ["Драма", "Комедия", "Повседневность", "Романтика", "Сёдзе", "Военные", "Исторические"],
       "description": "— Райан, говорите? 
@@ -19,7 +19,7 @@
     {
       "id": 2,
       "title": "Номер 30:Тёмное лето",
-      "coverUrl": "https://florentinablaine-sudo.github.io/tene/covers/leto.jpg",
+      "coverUrl": "/tene/covers/leto.jpg",
       "author": "손금 / songeum / Сон Гым / Son Geum",
       "genres": ["18+", "Военное", "Постапокалиптика", "Приключения", "Романтика", "Фэнтези", "Монстры", "Мрачный мир", "Эротика" ],
       "description": "Однажды утром Ханна получает письмо от умершего возлюбленного. Сразу после ночи, проведённой с его другом.

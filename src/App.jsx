@@ -37,6 +37,7 @@ const ChevronLeftIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/20
 const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>;
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 
+
 // --- Components ---
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
@@ -45,39 +46,13 @@ const LoadingSpinner = () => (
   </div>
 );
 
-// ИЗМЕНЕНИЕ: Добавили `botUsername` как пропс
-const SubscriptionModal = ({ onClose, onSelectPlan, botUsername }) => {
+const SubscriptionModal = ({ onClose, onSelectPlan }) => {
     const subscriptionPlans = [{ duration: 1, name: '1 месяц', price: 199 },{ duration: 3, name: '3 месяца', price: 539, popular: true },{ duration: 12, name: '1 год', price: 1899 }];
     return (<div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className="w-full max-w-sm rounded-2xl p-6 shadow-lg bg-component-bg text-text-main"><CrownIcon className="mx-auto mb-4 text-accent" /><h3 className="text-xl text-center font-bold">Получите доступ ко всем главам</h3><p className="mt-2 mb-6 text-sm text-center opacity-70">Выберите подходящий тариф подписки:</p><div className="space-y-3">{subscriptionPlans.map(plan => (<button key={plan.duration} onClick={() => onSelectPlan(plan)} className="relative w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 border-border-color bg-background hover:border-accent-hover"><p className="font-bold">{plan.name}</p><p className="text-sm">{plan.price} ₽</p></button>))}</div><button onClick={onClose} className="w-full py-3 mt-4 rounded-lg border border-border-color">Не сейчас</button></div></div>);
 };
-// ИЗМЕНЕНИЕ: Добавили `botUsername` и `userId` как пропсы
-const PaymentMethodModal = ({ onClose, onSelectMethod, plan, botUsername, userId }) => {
-    // ИЗМЕНЕНИЕ: Вынесли логику отправки в Firebase сюда, чтобы передавать её в `onSelectMethod`
-    const handlePaymentRequest = async (method) => {
-        const tg = window.Telegram?.WebApp;
-        if (tg && userId && plan) {
-            tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
-                if (confirmed) {
-                    const userDocRef = doc(db, "users", userId);
-                    try {
-                        // ИЗМЕНЕНИЕ: Используем `updateDoc` и `serverTimestamp`
-                        await updateDoc(userDocRef, { 
-                            pendingSubscription: { ...plan, method: method, date: serverTimestamp() } 
-                        });
-                        tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
-                        tg.close();
-                    } catch (error) {
-                        console.error("Ошибка записи в Firebase:", error);
-                        tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
-                    }
-                }
-            });
-        }
-    };
-
-    return (<div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className="w-full max-w-sm rounded-2xl p-6 shadow-lg bg-component-bg text-text-main"><h3 className="text-xl text-center font-bold">Выберите способ оплаты</h3><p className="mt-2 mb-6 text-sm text-center opacity-70">Тариф: {plan.name} ({plan.price} ₽)</p><div className="space-y-3"><button onClick={() => handlePaymentRequest('card')} className="w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 border-border-color bg-background hover:border-accent-hover"><p className="font-bold">💳 Банковской картой</p><p className="text-sm opacity-70">Ручная проверка (до 24 часов)</p></button><button onClick={() => handlePaymentRequest('tribut')} className="w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 border-border-color bg-background hover:border-accent-hover"><p className="font-bold">❤️ Донат через tribut</p><p className="text-sm opacity-70">Более быстрый способ</p></button></div><button onClick={onClose} className="w-full py-3 mt-4 rounded-lg border border-border-color">Назад</button></div></div>)
+const PaymentMethodModal = ({ onClose, onSelectMethod, plan }) => {
+    return (<div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className="w-full max-w-sm rounded-2xl p-6 shadow-lg bg-component-bg text-text-main"><h3 className="text-xl text-center font-bold">Выберите способ оплаты</h3><p className="mt-2 mb-6 text-sm text-center opacity-70">Тариф: {plan.name} ({plan.price} ₽)</p><div className="space-y-3"><button onClick={() => onSelectMethod('card')} className="w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 border-border-color bg-background hover:border-accent-hover"><p className="font-bold">💳 Банковской картой</p><p className="text-sm opacity-70">Ручная проверка (до 24 часов)</p></button><button onClick={() => onSelectMethod('tribut')} className="w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 border-border-color bg-background hover:border-accent-hover"><p className="font-bold">❤️ Донат через tribut</p><p className="text-sm opacity-70">Более быстрый способ</p></button></div><button onClick={onClose} className="w-full py-3 mt-4 rounded-lg border border-border-color">Назад</button></div></div>)
 };
-
 
 const Header = ({ title, onBack }) => (
     <div className="sticky top-0 bg-component-bg z-20 py-3 px-4 flex items-center border-b border-border-color shadow-sm text-text-main">
@@ -116,7 +91,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const descriptionRef = useRef(null);
     const [isLongDescription, setIsLongDescription] = useState(false);
 
-
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
     const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
 
@@ -140,8 +114,24 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const handleChapterClick = (chapter) => { if (!hasActiveSubscription && chapter.isPaid) setIsSubModalOpen(true); else onSelectChapter(chapter); };
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
     const handlePlanSelect = (plan) => setSelectedPlan(plan);
-    
-    // Удаляем handlePaymentMethodSelect, т.к. логика переехала в PaymentMethodModal
+    const handlePaymentMethodSelect = async (method) => {
+      const tg = window.Telegram?.WebApp;
+      if (tg && userId && selectedPlan) {
+        tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
+          if (confirmed) {
+            const userDocRef = doc(db, "users", userId);
+            try {
+              await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
+              tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
+              tg.close();
+            } catch (error) {
+              console.error("Ошибка записи в Firebase:", error);
+              tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
+            }
+          }
+        });
+      }
+    };
 
     return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`${import.meta.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
         const showLock = !hasActiveSubscription && chapter.isPaid;
@@ -155,7 +145,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
         </div>);
     })}</div>)}
     {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
-    {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} plan={selectedPlan} botUsername={botUsername} userId={userId}/>}
+    {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
     </div></div>)
 };
 
@@ -295,7 +285,24 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         setIsSubModalOpen(false);
     };
 
-    // Удаляем handlePaymentMethodSelect, т.к. логика переехала в PaymentMethodModal
+    const handlePaymentMethodSelect = async (method) => {
+      const tg = window.Telegram?.WebApp;
+      if (tg && userId && selectedPlan) {
+        tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
+          if (confirmed) {
+            const userDocRef = doc(db, "users", userId);
+            try {
+              await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
+              tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
+              tg.close();
+            } catch (error) {
+              console.error("Ошибка записи в Firebase:", error);
+              tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
+            }
+          }
+        });
+      }
+    };
     
   const currentChapterIndex = allChapters.findIndex(c => c.id === chapter.id);
   const prevChapter = allChapters[currentChapterIndex - 1];
@@ -422,8 +429,8 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
              </div>
          </div>
       )}
-      {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} botUsername={botUsername} />}
-      {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} plan={selectedPlan} botUsername={botUsername} userId={userId} />}
+      {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
+      {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
     </div>
   );
 };
@@ -589,16 +596,9 @@ export default function App() {
     if (userId && userId !== "guest_user") {
         const userDocRef = doc(db, "users", userId);
         try {
-            // ИЗМЕНЕНИЕ: Используем `updateDoc` вместо `setDoc` с `merge`, так как мы только обновляем
-            // существующий документ пользователя. Это более семантически верно.
-            await updateDoc(userDocRef, dataToUpdate);
+            await setDoc(userDocRef, dataToUpdate, { merge: true });
         } catch(e) {
-            if (e.code === 'not-found') {
-                // Если документа нет, создаем его
-                await setDoc(userDocRef, dataToUpdate);
-            } else {
-                console.error("Не удалось обновить данные пользователя:", e);
-            }
+            console.error("Не удалось обновить данные пользователя:", e);
         }
     }
   }, [userId]);
@@ -626,11 +626,6 @@ export default function App() {
         await signInAnonymously(auth);
         if (telegramUserId !== "guest_user") {
             const userDocRef = doc(db, "users", telegramUserId);
-            // Создаем документ, если он не существует
-            const docSnap = await getDoc(userDocRef);
-            if (!docSnap.exists()) {
-                await setDoc(userDocRef, { userId: telegramUserId });
-            }
             onSnapshot(userDocRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
@@ -759,7 +754,24 @@ export default function App() {
       setIsSubModalOpen(false);
   };
   
-    // Удаляем handlePaymentMethodSelect, т.к. логика переехала в PaymentMethodModal
+  const handlePaymentMethodSelect = async (method) => {
+    const tg = window.Telegram?.WebApp;
+    if (tg && userId && selectedPlan) {
+      tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
+        if (confirmed) {
+          const userDocRef = doc(db, "users", userId);
+          try {
+            await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
+            tg.openTelegramLink(`https://t.me/${BOT_USERNAME}?start=true`);
+            tg.close();
+          } catch (error) {
+            console.error("Ошибка записи в Firebase:", error);
+            tg.showAlert("Не удалось сохранить ваш выбор. Попробуйте снова.");
+          }
+        }
+      });
+    }
+  };
 
   if (isLoading) {
     return <LoadingSpinner />;
@@ -811,7 +823,7 @@ export default function App() {
                     <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
                 </div>
             )}
-            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(n.genre))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(genreFilter))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
           </>
         )
       case 'search':
@@ -833,8 +845,8 @@ export default function App() {
         {page === 'list' && (
             <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
         )}
-        {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} botUsername={BOT_USERNAME} />}
-        {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} plan={selectedPlan} botUsername={BOT_USERNAME} userId={userId}/>}
+        {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
+        {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
         {selectedNews && <NewsModal newsItem={selectedNews} onClose={() => setSelectedNews(null)} />}
     </main>
   );

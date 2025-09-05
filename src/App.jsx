@@ -98,17 +98,42 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
 
     useEffect(() => {
-        if (chaptersCache[novel.id]) {
-            setChapters(chaptersCache[novel.id]);
+    // Новая функция для загрузки списка глав из Firebase
+    const fetchChaptersFromFirestore = async () => {
+        setIsLoading(true);
+        try {
+            // Создаем ссылку на документ в коллекции chapter_info
+            const docRef = doc(db, 'chapter_info', novel.id.toString());
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                // Если документ существует, берем из него поле 'chapters'
+                const data = docSnap.data();
+                const chaptersData = data.chapters || {};
+                
+                // Преобразуем объект в массив и сортируем по ID
+                const chaptersArray = Object.keys(chaptersData).map(key => ({
+                    id: parseInt(key),
+                    title: `Глава ${key}`, // Генерируем заголовок
+                    isPaid: chaptersData[key].isPaid || false
+                })).sort((a, b) => a.id - b.id);
+                
+                setChapters(chaptersArray);
+            } else {
+                console.log("Документ с главами не найден в chapter_info!");
+                setChapters([]);
+            }
+        } catch (error) {
+            console.error("Ошибка загрузки глав из Firebase:", error);
+            setChapters([]);
+        } finally {
             setIsLoading(false);
-        } else {
-            setIsLoading(true);
-            fetch(`${import.meta.env.BASE_URL}data/chapters/${novel.id}.json`)
-                .then(res => res.json())
-                .then(data => { setChapters(data.chapters || []); setIsLoading(false); })
-                .catch(err => { console.error(err); setChapters([]); setIsLoading(false); });
         }
-    }, [novel.id, chaptersCache]);
+    };
+
+    fetchChaptersFromFirestore();
+
+}, [novel.id]); // Убираем chaptersCache из зависимостей
     
      useEffect(() => {
         if (descriptionRef.current) {

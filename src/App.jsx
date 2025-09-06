@@ -83,16 +83,13 @@ const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => (
     </div>
 );
 
-const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, userName, chapters, isLoadingChapters, lastReadData, onBack }) => {
+const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack }) => {
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [sortOrder, setSortOrder] = useState('newest');
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const descriptionRef = useRef(null);
     const [isLongDescription, setIsLongDescription] = useState(false);
-    const [novelComments, setNovelComments] = useState([]);
-    const [newNovelComment, setNewNovelComment] = useState("");
-    const novelCommentInputRef = useRef(null);
 
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
     const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
@@ -107,16 +104,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
         }
     }, [novel.description]);
 
-    useEffect(() => {
-        if (!novel.id) return;
-        const commentsQuery = query(collection(db, `novels_metadata/${novel.id}/comments`), orderBy("timestamp", "desc"));
-        const unsubscribe = onSnapshot(commentsQuery, (querySnapshot) => {
-            const commentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setNovelComments(commentsData);
-        });
-        return () => unsubscribe();
-    }, [novel.id]);
-
 
     const sortedChapters = useMemo(() => {
         const chaptersCopy = [...chapters];
@@ -127,7 +114,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const handleChapterClick = (chapter) => { if (!hasActiveSubscription && chapter.isPaid) setIsSubModalOpen(true); else onSelectChapter(chapter); };
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
     const handlePlanSelect = (plan) => setSelectedPlan(plan);
-
     const handlePaymentMethodSelect = async (method) => {
         const tg = window.Telegram?.WebApp;
         if (!tg || !userId || !selectedPlan) {
@@ -156,102 +142,21 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
         );
     };
 
-    const handleNovelQuote = (commentToQuote) => {
-        const quoteText = `> ${commentToQuote.userName}:\n> ${commentToQuote.text.split('\n').join('\n> ')}\n\n`;
-        setNewNovelComment(quoteText);
-        novelCommentInputRef.current?.focus();
-    };
 
-    const handleNovelCommentSubmit = async (e) => {
-        e.preventDefault();
-        if (!newNovelComment.trim() || !userId || userId === "guest_user") return;
-
-        const commentsColRef = collection(db, `novels_metadata/${novel.id}/comments`);
-        try {
-            await addDoc(commentsColRef, {
-                userId,
-                userName: userName || "Аноним",
-                text: newNovelComment,
-                timestamp: serverTimestamp()
-            });
-            setNewNovelComment("");
-        } catch (error) {
-            console.error("Ошибка отправки отзыва:", error);
-        }
-    };
-
-
-    return (<div className="text-text-main">
-        <Header title={novel.title} onBack={onBack} />
-        <div className="relative h-64">
-            <img src={`${import.meta.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/>
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div>
-            <div className="absolute bottom-4 left-4 right-4">
-                <h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1>
-                <p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p>
+    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`${import.meta.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
+        const showLock = !hasActiveSubscription && chapter.isPaid;
+        const isLastRead = lastReadChapterId === chapter.id;
+        return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 bg-component-bg rounded-xl cursor-pointer transition-all duration-200 hover:border-accent-hover hover:bg-accent/10 border border-border-color flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>
+            <div className="flex items-center gap-3">
+                {isLastRead && <span className="w-2 h-2 rounded-full bg-accent"></span>}
+                <p className="font-semibold">{chapter.title}</p>
             </div>
-        </div>
-        <div className="p-4">
-            <div className="flex flex-wrap gap-2 mb-4">
-                {novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}
-            </div>
-            <div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}>
-                <p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p>
-            </div>
-            {isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}
-            {lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}
-            
-            <div className="border-t border-border-color pt-4 mt-6">
-                <h3 className="text-xl font-bold mb-4">Отзывы</h3>
-                <div className="space-y-4 mb-6">
-                    {novelComments.map(comment => (
-                        <div key={comment.id} className="p-3 rounded-lg bg-component-bg border border-border-color">
-                            <p className="font-bold text-sm">{comment.userName}</p>
-                            <div className="text-sm mt-1 opacity-90 prose prose-p:my-1" dangerouslySetInnerHTML={{ __html: window.marked ? window.marked.parse(comment.text.replace(/\n/g, '<br>')) : '' }} />
-                            <div className="flex items-center gap-3 mt-2 text-xs opacity-60">
-                                <button onClick={() => handleNovelQuote(comment)} className="hover:underline">Цитировать</button>
-                            </div>
-                        </div>
-                    ))}
-                    {novelComments.length === 0 && <p className="opacity-70 text-sm">Отзывов пока нет. Станьте первым!</p>}
-                </div>
-
-                <form onSubmit={handleNovelCommentSubmit} className="flex items-center gap-2">
-                    <textarea
-                        ref={novelCommentInputRef}
-                        value={newNovelComment}
-                        onChange={(e) => setNewNovelComment(e.target.value)}
-                        placeholder="Оставить отзыв..."
-                        className="w-full bg-component-bg border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent text-sm resize-y min-h-[40px]"
-                        rows="1"
-                    />
-                    <button type="submit" className="p-2 rounded-full bg-accent text-white flex items-center justify-center self-end">
-                    <SendIcon className="w-5 h-5" />
-                    </button>
-                </form>
-            </div>
-
-
-            <div className="flex justify-between items-center mb-4 mt-6 pt-6 border-t border-border-color">
-                <h2 className="text-xl font-bold">Главы</h2>
-                <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button>
-            </div>
-            {hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}
-            {isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
-                const showLock = !hasActiveSubscription && chapter.isPaid;
-                const isLastRead = lastReadChapterId === chapter.id;
-                return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 bg-component-bg rounded-xl cursor-pointer transition-all duration-200 hover:border-accent-hover hover:bg-accent/10 border border-border-color flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>
-                    <div className="flex items-center gap-3">
-                        {isLastRead && <span className="w-2 h-2 rounded-full bg-accent"></span>}
-                        <p className="font-semibold">{chapter.title}</p>
-                    </div>
-                    {showLock ? <LockIcon /> : <ArrowRightIcon/>}
-                </div>);
-            })}</div>)}
-        </div>
-        {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
-        {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
-    </div>)
+            {showLock ? <LockIcon /> : <ArrowRightIcon/>}
+        </div>);
+    })}</div>)}
+    {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
+    {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
+    </div></div>)
 };
 
 const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack }) => {
@@ -267,7 +172,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [chapterContent, setChapterContent] = useState('');
   const [isLoadingContent, setIsLoadingContent] = useState(true);
-  const commentInputRef = useRef(null);
 
   const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
   const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
@@ -323,12 +227,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
 
     fetchContent();
   }, [novel.id, chapter.id, hasActiveSubscription]);
-
-  const handleQuote = (commentToQuote) => {
-    const quoteText = `> ${commentToQuote.userName}:\n> ${commentToQuote.text.split('\n').join('\n> ')}\n\n`;
-    setNewComment(quoteText);
-    commentInputRef.current?.focus();
-  };
 
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
@@ -470,13 +368,12 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
                     <button onClick={() => setEditingCommentId(null)} className="p-1 rounded-full bg-gray-500 text-white">✕</button>
                   </div>
                 ) : (
-                  <div className="text-sm mt-1 opacity-90 prose prose-p:my-1" dangerouslySetInnerHTML={{ __html: window.marked ? window.marked.parse(comment.text.replace(/\n/g, '<br>')) : '' }} />
+                  <p className="text-sm mt-1 opacity-90">{comment.text}</p>
                 )}
-                 {(userId === comment.userId || userId === ADMIN_ID) && !editingCommentId &&(
-                  <div className="flex items-center gap-3 mt-2 text-xs opacity-60">
-                    <button onClick={() => handleEdit(comment)} className="hover:underline">Редактировать</button>
-                    <button onClick={() => handleDelete(comment.id)} className="hover:underline">Удалить</button>
-                    <button onClick={() => handleQuote(comment)} className="hover:underline">Цитировать</button>
+                 {(userId === comment.userId || userId === ADMIN_ID) && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <button onClick={() => handleEdit(comment)} className="text-xs text-gray-500">Редактировать</button>
+                    <button onClick={() => handleDelete(comment.id)} className="text-xs text-red-500">Удалить</button>
                   </div>
                 )}
               </div>
@@ -485,15 +382,14 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
           </div>
 
           <form onSubmit={handleCommentSubmit} className="flex items-center gap-2">
-            <textarea
-              ref={commentInputRef}
+            <input
+              type="text"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder="Написать комментарий..."
-              className="w-full bg-component-bg border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent text-sm resize-y min-h-[40px]"
-              rows="1"
+              className="w-full bg-component-bg border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent text-sm"
             />
-            <button type="submit" className="p-2 rounded-full bg-accent text-white flex items-center justify-center self-end">
+            <button type="submit" className="p-2 rounded-full bg-accent text-white flex items-center justify-center">
               <SendIcon className="w-5 h-5" />
             </button>
           </form>
@@ -912,7 +808,6 @@ export default function App() {
                 subscription={subscription} 
                 botUsername={BOT_USERNAME} 
                 userId={userId} 
-                userName={userName}
                 chapters={chapters} 
                 isLoadingChapters={isLoadingChapters}
                 lastReadData={lastReadData} 
@@ -976,4 +871,3 @@ export default function App() {
     </main>
   );
 }
-

@@ -127,6 +127,8 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
             async (confirmed) => {
                 if (!confirmed) return;
                 
+                // Примечание: здесь используется Telegram ID, а не Firebase UID. Это нормально,
+                // так как эта часть кода работает только внутри Telegram.
                 const userDocRef = doc(db, "users", tg.initDataUnsafe?.user?.id?.toString());
                 try {
                     await setDoc(userDocRef, {
@@ -891,7 +893,7 @@ export default function App() {
                     <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
                 </div>
             )}
-            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(genreFilter))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(n.genre))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
           </>
         )
       case 'search':

@@ -262,23 +262,29 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
 
     const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
 
-    await runTransaction(db, async (transaction) => {
-      const likeDoc = await transaction.get(likeRef);
-      const metaDoc = await transaction.get(chapterMetaRef);
-      const currentLikes = metaDoc.data()?.likeCount || 0;
+    try {
+        await runTransaction(db, async (transaction) => {
+            const likeDoc = await transaction.get(likeRef);
+            const metaDoc = await transaction.get(chapterMetaRef);
+            const currentLikes = metaDoc.data()?.likeCount || 0;
 
-      if (likeDoc.exists()) {
-        transaction.delete(likeRef);
-        transaction.set(chapterMetaRef, { likeCount: Math.max(0, currentLikes - 1) }, { merge: true });
-        setUserHasLiked(false);
-      } else {
-        transaction.set(likeRef, { timestamp: serverTimestamp() });
-        transaction.set(chapterMetaRef, { likeCount: currentLikes + 1 }, { merge: true });
-        setUserHasLiked(true);
-      }
-    });
-  };
+            if (likeDoc.exists()) {
+                transaction.delete(likeRef);
+                transaction.set(chapterMetaRef, { likeCount: Math.max(0, currentLikes - 1) }, { merge: true });
+            } else {
+                transaction.set(likeRef, { timestamp: serverTimestamp() });
+                transaction.set(chapterMetaRef, { likeCount: currentLikes + 1 }, { merge: true });
+            }
+        });
+        
+        // Обновляем состояние ПОСЛЕ успешного завершения транзакции
+        setUserHasLiked(prev => !prev);
+        console.log("Лайк успешно обновлен!");
 
+    } catch (error) {
+        console.error("Ошибка при обновлении лайка:", error);
+    }
+};
     const handleChapterClick = (chapter) => {
         if (!chapter) return;
         if (!hasActiveSubscription && chapter.isPaid) {

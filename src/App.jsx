@@ -177,32 +177,38 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
 
   useEffect(() => {
+    // Подписываемся на изменения счетчика лайков
     const unsubMeta = onSnapshot(chapterMetaRef, (docSnap) => {
       setLikeCount(docSnap.data()?.likeCount || 0);
     });
 
+    // Подписываемся на изменения комментариев
     const commentsQuery = query(collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`), orderBy("timestamp", "asc"));
     const unsubComments = onSnapshot(commentsQuery, (querySnapshot) => {
       const commentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setComments(commentsData);
     });
 
+    let unsubLike = () => {}; // Пустая функция отписки по умолчанию
     if (userId && userId !== "guest_user") {
         const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
-        getDoc(likeRef).then(docSnap => setUserHasLiked(docSnap.exists()));
+        // ИЗМЕНЕНИЕ: Заменяем getDoc на onSnapshot для лайка.
+        // Теперь состояние "лайкнул ли пользователь" будет обновляться в реальном времени.
+        unsubLike = onSnapshot(likeRef, (docSnap) => {
+            setUserHasLiked(docSnap.exists());
+        });
     }
 
     return () => {
       unsubMeta();
       unsubComments();
+      unsubLike(); // Отписываемся от всех слушателей при размонтировании
     };
   }, [chapterMetaRef, novel.id, chapter.id, userId]);
 
-  // Внутри компонента ChapterReader
-useEffect(() => {
+  useEffect(() => {
     const fetchContent = async () => {
         setIsLoadingContent(true);
-        // Сбрасываем контент перед загрузкой нового
         setChapterContent(''); 
         
         if (chapter.isPaid && !hasActiveSubscription) {
@@ -228,20 +234,29 @@ useEffect(() => {
     };
 
     fetchContent();
-  }, [novel.id, chapter.id, hasActiveSubscription]); // Зависимости корректны
+  }, [novel.id, chapter.id, hasActiveSubscription]);
 
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
     if (!newComment.trim() || !userId || userId === "guest_user") return;
 
-    const commentsColRef = collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`);
-    await addDoc(commentsColRef, {
-      userId,
-      userName: userName || "Аноним",
-      text: newComment,
-      timestamp: serverTimestamp()
-    });
-    setNewComment("");
+    // ИЗМЕНЕНИЕ: Убеждаемся, что родительский документ существует.
+    // setDoc с { merge: true } создаст документ, если его нет, и ничего не сделает, если он есть.
+    // Это решает проблему с пропадающими комментариями.
+    try {
+        await setDoc(chapterMetaRef, {}, { merge: true });
+        const commentsColRef = collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`);
+        await addDoc(commentsColRef, {
+          userId,
+          userName: userName || "Аноним",
+          text: newComment,
+          timestamp: serverTimestamp()
+        });
+        setNewComment("");
+    } catch (error) {
+        console.error("Ошибка добавления комментария:", error);
+        // Можно добавить уведомление для пользователя
+    }
   };
     const handleEdit = (comment) => {
     setEditingCommentId(comment.id);
@@ -278,15 +293,12 @@ useEffect(() => {
                 transaction.set(chapterMetaRef, { likeCount: currentLikes + 1 }, { merge: true });
             }
         });
-        
-        // Обновляем состояние ПОСЛЕ успешного завершения транзакции
-        setUserHasLiked(prev => !prev);
-        console.log("Лайк успешно обновлен!");
-
+        // Примечание: setUserHasLiked() теперь не нужен, так как onSnapshot сделает это за нас.
     } catch (error) {
         console.error("Ошибка при обновлении лайка:", error);
     }
 };
+
     const handleChapterClick = (chapter) => {
         if (!chapter) return;
         if (!hasActiveSubscription && chapter.isPaid) {

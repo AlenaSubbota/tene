@@ -8,13 +8,14 @@ import {
 import { getAuth, signInAnonymously } from "firebase/auth";
 
 // --- Firebase Config ---
+// ✨ ИСПРАВЛЕНО: Замена import.meta.env на process.env для совместимости
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_API_KEY,
-  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_APP_ID
+  apiKey: process.env.VITE_API_KEY,
+  authDomain: process.env.VITE_AUTH_DOMAIN,
+  projectId: process.env.VITE_PROJECT_ID,
+  storageBucket: process.env.VITE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
@@ -72,7 +73,7 @@ const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => (
             <button onClick={(e) => { e.stopPropagation(); onToggleBookmark(novel.id); }} className={`absolute top-2 right-2 z-10 p-1 rounded-full bg-black/30 backdrop-blur-sm text-white transition-colors ${bookmarks.includes(novel.id) ? 'text-accent' : ''}`}>
               <BookmarkIcon filled={bookmarks.includes(novel.id)} width="20" height="20" />
             </button>
-            <img src={`${import.meta.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full aspect-[2/3] object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 border border-border-color" />
+            <img src={`/tene/${novel.coverUrl}`} alt={novel.title} className="w-full aspect-[2/3] object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 border border-border-color" />
             <h2 className="mt-2 font-semibold text-xs truncate">{novel.title}</h2>
           </div>
         </div>
@@ -126,8 +127,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
             async (confirmed) => {
                 if (!confirmed) return;
                 
-                // Примечание: здесь используется Telegram ID, а не Firebase UID. Это нормально,
-                // так как эта часть кода работает только внутри Telegram.
                 const userDocRef = doc(db, "users", tg.initDataUnsafe?.user?.id?.toString());
                 try {
                     await setDoc(userDocRef, {
@@ -144,7 +143,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     };
 
 
-    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`${import.meta.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
+    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`/tene/${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
         const showLock = !hasActiveSubscription && chapter.isPaid;
         const isLastRead = lastReadChapterId === chapter.id;
         return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 bg-component-bg rounded-xl cursor-pointer transition-all duration-200 hover:border-accent-hover hover:bg-accent/10 border border-border-color flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>
@@ -488,7 +487,6 @@ const BookmarksPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) =
     </div>
 )
 
-// ✨ ИЗМЕНЕНО: Добавлен `userId` для отображения в профиле
 const ProfilePage = ({ subscription, onGetSubscriptionClick, userId }) => {
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
 
@@ -496,7 +494,6 @@ const ProfilePage = ({ subscription, onGetSubscriptionClick, userId }) => {
         if (userId) {
             navigator.clipboard.writeText(userId)
                 .then(() => {
-                    // Можно добавить уведомление об успешном копировании
                     console.log("Firebase UID скопирован в буфер обмена");
                 })
                 .catch(err => {
@@ -530,7 +527,6 @@ const ProfilePage = ({ subscription, onGetSubscriptionClick, userId }) => {
                         </div>
                     )}
                 </div>
-                {/* ✨ НОВЫЙ БЛОК: Отображение Firebase UID */}
                 <div className="p-4 rounded-lg bg-component-bg border border-border-color">
                     <h3 className="font-bold mb-2">Ваш ID для администрирования</h3>
                     <p className="text-sm opacity-70 mb-3">
@@ -578,7 +574,7 @@ const NewsSlider = ({ onReadMore }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
 
     useEffect(() => {
-        fetch(`${import.meta.env.BASE_URL}data/news.json`)
+        fetch(`/tene/data/news.json`)
             .then(res => res.json())
             .then(setNews)
             .catch(err => console.error("Failed to fetch news", err));
@@ -673,7 +669,7 @@ export default function App() {
         const firebaseUser = userCredential.user;
         setUserId(firebaseUser.uid);
         
-        console.log("Мой Firebase UID:", firebaseUser.uid); // Временный лог для получения UID
+        console.log("Мой Firebase UID:", firebaseUser.uid); 
 
         const idTokenResult = await firebaseUser.getIdTokenResult();
         setIsUserAdmin(!!idTokenResult.claims.admin);
@@ -688,8 +684,6 @@ export default function App() {
         }
         
         if (firebaseUser.uid) {
-            // Примечание: документы пользователей в Firestore будут храниться под Firebase UID,
-            // а не под Telegram ID. Это обеспечивает безопасность.
             const userDocRef = doc(db, "users", firebaseUser.uid);
             onSnapshot(userDocRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -704,7 +698,7 @@ export default function App() {
                 }
             });
         }
-        const response = await fetch(`${import.meta.env.BASE_URL}data/novels.json`);
+        const response = await fetch(`/tene/data/novels.json`);
         if (!response.ok) throw new Error('Failed to fetch novels');
         const data = await response.json();
         setNovels(data.novels);

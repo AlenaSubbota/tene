@@ -94,15 +94,53 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
     const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
 
-    useEffect(() => {
-        if (descriptionRef.current) {
-            setTimeout(() => {
-                 if (descriptionRef.current) {
-                    setIsLongDescription(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
-                }
-            }, 100);
+   useEffect(() => {
+    const init = async () => {
+      try {
+        // Получаем имя пользователя из Telegram
+        const tg = window.Telegram?.WebApp;
+        let telegramUserName = "Аноним";
+        if (tg) {
+          tg.ready();
+          tg.expand();
+          telegramUserName = tg.initDataUnsafe?.user?.first_name || "Аноним";
         }
-    }, [novel.description]);
+        setUserName(telegramUserName);
+
+        // Анонимно входим в Firebase и получаем стабильный ID
+        const userCredential = await signInAnonymously(auth);
+        const firebaseUserId = userCredential.user.uid;
+        setUserId(firebaseUserId); // ← ВАЖНО: Используем UID из Firebase
+
+        // Используем Firebase UID для загрузки данных пользователя (закладки, подписка и т.д.)
+        if (firebaseUserId) {
+            const userDocRef = doc(db, "users", firebaseUserId);
+            onSnapshot(userDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    setSubscription(data.subscription || null);
+                    setLastReadData(data.lastRead || null);
+                    setBookmarks(data.bookmarks || []);
+                    if (data.settings) {
+                        setFontSize(data.settings.fontSize || 16);
+                        setFontClass(data.settings.fontClass || 'font-sans');
+                    }
+                }
+            });
+        }
+
+        const response = await fetch(`${import.meta.env.BASE_URL}data/novels.json`);
+        if (!response.ok) throw new Error('Failed to fetch novels');
+        const data = await response.json();
+        setNovels(data.novels);
+      } catch (error) {
+        console.error("Ошибка инициализации:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    init();
+  }, []); // Пустой массив зависимостей, чтобы этот код выполнился один раз
 
 
     const sortedChapters = useMemo(() => {

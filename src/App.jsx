@@ -314,7 +314,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
             const userDocRef = doc(db, "users", userId);
             try {
               await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
-              tg.openTelegramLink(`https://t.me/${botUsername}?start=true`);
+              tg.openTelegramLink(`https://t.me/${botUsername}?start=${userId}`);
               tg.close();
             } catch (error) {
               console.error("Ошибка записи в Firebase:", error);

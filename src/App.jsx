@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import {
     getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
     collection, onSnapshot, query, orderBy, addDoc,
-    serverTimestamp, runTransaction, limit
+    serverTimestamp, runTransaction
 } from "firebase/firestore";
 import { getAuth, signInAnonymously } from "firebase/auth";
 
@@ -20,9 +20,9 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-const ADMIN_ID = "417641827"; // Your Admin ID
+// 🗑️ УДАЛЕНО: Небезопасный ADMIN_ID
 
-// --- ICONS ---
+// --- ICONS (без изменений) ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
 const BackIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>);
 const SearchIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
@@ -38,7 +38,7 @@ const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 
 
-// --- Components ---
+// --- Components (без изменений) ---
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
     <HeartIcon className="animate-pulse-heart text-accent" filled />
@@ -159,7 +159,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     </div></div>)
 };
 
-const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack }) => {
+const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack, isUserAdmin }) => { // ✨ isUserAdmin добавлен
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState(null);
@@ -176,9 +176,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
   const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
 
-  // --- ИЗМЕНЕНИЕ №1: Подписка на данные в реальном времени ---
   useEffect(() => {
-    // Подписываемся на изменения счетчика лайков и комментариев
     const unsubMeta = onSnapshot(chapterMetaRef, (docSnap) => {
       setLikeCount(docSnap.data()?.likeCount || 0);
     });
@@ -189,17 +187,14 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
       setComments(commentsData);
     });
 
-    let unsubLike = () => {}; // Пустая функция отписки
-    if (userId && userId !== "guest_user") {
+    let unsubLike = () => {};
+    if (userId) {
         const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
-        // Заменяем однократную загрузку getDoc на "слушатель" onSnapshot.
-        // Теперь UI будет МГНОВЕННО реагировать на постановку/снятие лайка.
         unsubLike = onSnapshot(likeRef, (docSnap) => {
             setUserHasLiked(docSnap.exists());
         });
     }
 
-    // Отписываемся от всех слушателей при уходе со страницы
     return () => {
       unsubMeta();
       unsubComments();
@@ -237,14 +232,10 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     fetchContent();
   }, [novel.id, chapter.id, hasActiveSubscription]);
 
-  // --- ИЗМЕНЕНИЕ №2: Гарантированное создание документа для комментариев ---
   const handleCommentSubmit = async (e) => {
     e.preventDefault();
-    if (!newComment.trim() || !userId || userId === "guest_user") return;
+    if (!newComment.trim() || !userId) return;
 
-    // Перед добавлением комментария мы "пустым" запросом создаем
-    // родительский документ, если он не существует. Это решает проблему
-    // с пропадающими комментариями.
     try {
         await setDoc(chapterMetaRef, {}, { merge: true });
         const commentsColRef = collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`);
@@ -276,16 +267,14 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     await deleteDoc(commentRef);
   };
 
-  // --- ИЗМЕНЕНИЕ №3: Упрощение транзакции лайка ---
   const handleLike = async () => {
-    if (!userId || userId === "guest_user") return;
+    if (!userId) return;
 
     const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
 
     try {
         await runTransaction(db, async (transaction) => {
             const likeDoc = await transaction.get(likeRef);
-            // Гарантируем, что мета-документ существует
             const metaDoc = await transaction.get(chapterMetaRef);
             const currentLikes = metaDoc.data()?.likeCount || 0;
 
@@ -297,8 +286,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
                 transaction.set(chapterMetaRef, { likeCount: currentLikes + 1 }, { merge: true });
             }
         });
-        // Обновление UI теперь происходит автоматически через onSnapshot,
-        // поэтому здесь ничего больше делать не нужно.
     } catch (error) {
         console.error("Ошибка при обновлении лайка:", error);
     }
@@ -395,7 +382,8 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
                 ) : (
                   <p className="text-sm mt-1 opacity-90">{comment.text}</p>
                 )}
-                 {(userId === comment.userId || userId === ADMIN_ID) && (
+                 {/* ✨ ИЗМЕНЕНО: Проверка прав администратора */}
+                 {(userId === comment.userId || isUserAdmin) && (
                   <div className="flex items-center gap-2 mt-2">
                     <button onClick={() => handleEdit(comment)} className="text-xs text-gray-500">Редактировать</button>
                     <button onClick={() => handleDelete(comment.id)} className="text-xs text-red-500">Удалить</button>
@@ -615,6 +603,7 @@ export default function App() {
   const [userId, setUserId] = useState(null);
   const [userName, setUserName] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUserAdmin, setIsUserAdmin] = useState(false); // ✨ Новое состояние для админа
   
   const [chapters, setChapters] = useState([]);
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
@@ -628,7 +617,7 @@ export default function App() {
   const BOT_USERNAME = "tenebrisverbot";
 
   const updateUserDoc = useCallback(async (dataToUpdate) => {
-    if (userId && userId !== "guest_user") {
+    if (userId) { // Убрана проверка на "guest_user", так как все получают Firebase UID
         const userDocRef = doc(db, "users", userId);
         try {
             await setDoc(userDocRef, dataToUpdate, { merge: true });
@@ -646,53 +635,54 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
+  // 🔐 ИЗМЕНЕНО: Исправлена логика аутентификации и добавлена проверка админа
   useEffect(() => {
-  const init = async () => {
-    try {
-      // Сначала анонимно входим в Firebase, чтобы получить стабильный UID
-      const userCredential = await signInAnonymously(auth);
-      const firebaseUserId = userCredential.user.uid;
-      setUserId(firebaseUserId); // <-- ВАЖНО: Устанавливаем userId из Firebase
+    const init = async () => {
+      try {
+        const userCredential = await signInAnonymously(auth);
+        const firebaseUser = userCredential.user;
+        setUserId(firebaseUser.uid);
+        
+        // Получаем токен и проверяем права администратора
+        const idTokenResult = await firebaseUser.getIdTokenResult();
+        setIsUserAdmin(!!idTokenResult.claims.admin);
 
-      // Получаем информацию из Telegram, если она доступна
-      const tg = window.Telegram?.WebApp;
-      if (tg) {
-        tg.ready();
-        tg.expand();
-        setUserName(tg.initDataUnsafe?.user?.first_name || "Аноним");
-      } else {
-        setUserName("Аноним");
+        const tg = window.Telegram?.WebApp;
+        if (tg) {
+          tg.ready();
+          tg.expand();
+          setUserName(tg.initDataUnsafe?.user?.first_name || "Аноним");
+        } else {
+          setUserName("Аноним");
+        }
+        
+        if (firebaseUser.uid) {
+            const userDocRef = doc(db, "users", firebaseUser.uid);
+            onSnapshot(userDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    setSubscription(data.subscription || null);
+                    setLastReadData(data.lastRead || null);
+                    setBookmarks(data.bookmarks || []);
+                    if (data.settings) {
+                        setFontSize(data.settings.fontSize || 16);
+                        setFontClass(data.settings.fontClass || 'font-sans');
+                    }
+                }
+            });
+        }
+        const response = await fetch(`${import.meta.env.BASE_URL}data/novels.json`);
+        if (!response.ok) throw new Error('Failed to fetch novels');
+        const data = await response.json();
+        setNovels(data.novels);
+      } catch (error) {
+        console.error("Ошибка инициализации:", error);
+      } finally {
+        setIsLoading(false);
       }
-
-      // Теперь используем firebaseUserId для загрузки данных пользователя
-      if (firebaseUserId) {
-        const userDocRef = doc(db, "users", firebaseUserId);
-        onSnapshot(userDocRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setSubscription(data.subscription || null);
-            setLastReadData(data.lastRead || null);
-            setBookmarks(data.bookmarks || []);
-            if (data.settings) {
-              setFontSize(data.settings.fontSize || 16);
-              setFontClass(data.settings.fontClass || 'font-sans');
-            }
-          }
-        });
-      }
-      
-      const response = await fetch(`${import.meta.env.BASE_URL}data/novels.json`);
-      if (!response.ok) throw new Error('Failed to fetch novels');
-      const data = await response.json();
-      setNovels(data.novels);
-    } catch (error) {
-      console.error("Ошибка инициализации:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  init();
-}, []); // Пустой массив зависимостей гарантирует, что этот код выполнится один раз
+    };
+    init();
+  }, []);
 
   useEffect(() => {
       if (!selectedNovel) {
@@ -757,7 +747,7 @@ export default function App() {
   const handleSelectChapter = useCallback(async (chapter) => {
     setSelectedChapter(chapter);
     setPage('reader');
-    if (userId && userId !== "guest_user" && selectedNovel) {
+    if (userId && selectedNovel) {
         const newLastReadData = {
             ...(lastReadData || {}),
             [selectedNovel.id]: {
@@ -829,8 +819,6 @@ export default function App() {
     return <LoadingSpinner />;
   }
   
-  const isUserAdmin = userId === ADMIN_ID;
-
   const renderContent = () => {
     if (page === 'details') {
       return <NovelDetails 
@@ -860,6 +848,7 @@ export default function App() {
                 subscription={subscription} 
                 botUsername={BOT_USERNAME} 
                 onBack={handleBack} 
+                isUserAdmin={isUserAdmin} // ✨ Передаем статус админа
               />;
     }
 
@@ -890,6 +879,7 @@ export default function App() {
   };
 
   return (
+    // ✨ ИЗМЕНЕНО: Проверка прав администратора
     <main className={`bg-background min-h-screen font-sans text-text-main ${!isUserAdmin ? 'no-select' : ''}`}>
         <div className="pb-20">
             {renderContent()}

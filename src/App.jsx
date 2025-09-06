@@ -125,8 +125,10 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
             "Вы будете перенаправлены в бот для завершения оплаты. Если бот не реагирует после того, как вы выбрали тариф, не волнуйтесь! Попробуйте отправить команду /start еще раз.",
             async (confirmed) => {
                 if (!confirmed) return;
-
-                const userDocRef = doc(db, "users", userId);
+                
+                // Примечание: здесь используется Telegram ID, а не Firebase UID. Это нормально,
+                // так как эта часть кода работает только внутри Telegram.
+                const userDocRef = doc(db, "users", tg.initDataUnsafe?.user?.id?.toString());
                 try {
                     await setDoc(userDocRef, {
                         pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() }
@@ -158,7 +160,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     </div></div>)
 };
 
-const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack, isUserAdmin }) => { // ✨ isUserAdmin добавлен
+const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack, isUserAdmin }) => {
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState(null);
@@ -381,7 +383,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
                 ) : (
                   <p className="text-sm mt-1 opacity-90">{comment.text}</p>
                 )}
-                 {/* ✨ ИЗМЕНЕНО: Проверка прав администратора */}
                  {(userId === comment.userId || isUserAdmin) && (
                   <div className="flex items-center gap-2 mt-2">
                     <button onClick={() => handleEdit(comment)} className="text-xs text-gray-500">Редактировать</button>
@@ -633,7 +634,7 @@ export default function App() {
   const [userId, setUserId] = useState(null);
   const [userName, setUserName] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isUserAdmin, setIsUserAdmin] = useState(false); // ✨ Новое состояние для админа
+  const [isUserAdmin, setIsUserAdmin] = useState(false);
   
   const [chapters, setChapters] = useState([]);
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
@@ -665,7 +666,6 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // 🔐 ИЗМЕНЕНО: Исправлена логика аутентификации и добавлена проверка админа
   useEffect(() => {
     const init = async () => {
       try {
@@ -673,6 +673,8 @@ export default function App() {
         const firebaseUser = userCredential.user;
         setUserId(firebaseUser.uid);
         
+        console.log("Мой Firebase UID:", firebaseUser.uid); // Временный лог для получения UID
+
         const idTokenResult = await firebaseUser.getIdTokenResult();
         setIsUserAdmin(!!idTokenResult.claims.admin);
 
@@ -686,6 +688,8 @@ export default function App() {
         }
         
         if (firebaseUser.uid) {
+            // Примечание: документы пользователей в Firestore будут храниться под Firebase UID,
+            // а не под Telegram ID. Это обеспечивает безопасность.
             const userDocRef = doc(db, "users", firebaseUser.uid);
             onSnapshot(userDocRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -827,8 +831,8 @@ export default function App() {
             "Вы будете перенаправлены в бот для завершения оплаты. Если бот не реагирует после того, как вы выбрали тариф, не волнуйтесь! Попробуйте отправить команду /start еще раз.",
             async (confirmed) => {
                 if (!confirmed) return;
-
-                const userDocRef = doc(db, "users", userId);
+                
+                const userDocRef = doc(db, "users", tg.initDataUnsafe?.user?.id?.toString());
                 try {
                     await setDoc(userDocRef, {
                         pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() }
@@ -877,7 +881,7 @@ export default function App() {
                 subscription={subscription} 
                 botUsername={BOT_USERNAME} 
                 onBack={handleBack} 
-                isUserAdmin={isUserAdmin} // ✨ Передаем статус админа
+                isUserAdmin={isUserAdmin} 
               />;
     }
 
@@ -901,7 +905,6 @@ export default function App() {
       case 'bookmarks':
         return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'profile':
-        // ✨ ИЗМЕНЕНО: Передаем userId в ProfilePage
         return <ProfilePage subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} />
       default:
         return <Header title="Библиотека" />
@@ -909,7 +912,6 @@ export default function App() {
   };
 
   return (
-    // ✨ ИЗМЕНЕНО: Проверка прав администратора
     <main className={`bg-background min-h-screen font-sans text-text-main ${!isUserAdmin ? 'no-select' : ''}`}>
         <div className="pb-20">
             {renderContent()}

@@ -575,8 +575,8 @@ const NewsSlider = ({ onReadMore }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
 
     useEffect(() => {
-        fetch(`/data/news.json`)
-            .then(res => res.json())
+    fetch(`/tene/data/news.json`)
+        .then(res => res.json())
             .then(setNews)
             .catch(err => console.error("Failed to fetch news", err));
     }, []);
@@ -699,10 +699,10 @@ export default function App() {
                 }
             });
         }
-        const response = await fetch(`/data/novels.json`);
-        if (!response.ok) throw new Error('Failed to fetch novels');
-        const data = await response.json();
-        setNovels(data.novels);
+        const response = await fetch(`/tene/data/novels.json`);
+if (!response.ok) throw new Error('Failed to fetch novels');
+const data = await response.json();
+setNovels(data.novels);
       } catch (error) {
         console.error("Ошибка инициализации:", error);
       } finally {

@@ -21,7 +21,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// --- ICONS (без изменений) ---
+// --- ICONS ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
 const BackIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>);
 const SearchIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
@@ -37,11 +37,11 @@ const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 
 
-// --- Components (без изменений) ---
+// --- Components ---
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
     <HeartIcon className="animate-pulse-heart text-accent" filled />
-    <p className="mt-4 text-lg opacity-70">Загрузка новелл...</p>
+    <p className="mt-4 text-lg opacity-70">Загрузка...</p>
   </div>
 );
 
@@ -661,20 +661,25 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // useEffect #1: Auth and loading main content
+  // ИСПРАВЛЕНО: Возвращен один useEffect с правильной логикой
   useEffect(() => {
     const init = async () => {
       try {
+        // Сначала загружаем новеллы, чтобы пользователь не видел пустой экран
+        const response = await fetch(`/tene/data/novels.json`);
+        if (!response.ok) {
+            console.error("Ошибка загрузки novels.json. Статус:", response.status);
+            throw new Error('Failed to fetch novels');
+        }
+        const data = await response.json();
+        setNovels(data.novels);
+
+        // Затем проводим аутентификацию и загрузку пользовательских данных
         const userCredential = await signInAnonymously(auth);
         const firebaseUser = userCredential.user;
-        setUserId(firebaseUser.uid);
-        
-        const idTokenResult = await firebaseUser.getIdTokenResult();
-        setIsUserAdmin(!!idTokenResult.claims.admin);
 
         const tg = window.Telegram?.WebApp;
         let telegramId = null;
-
         if (tg) {
           tg.ready();
           tg.expand();
@@ -684,44 +689,40 @@ export default function App() {
           setUserName("Аноним");
         }
 
-        if (firebaseUser.uid && telegramId) {
-            const userDocRef = doc(db, "users", firebaseUser.uid);
-            await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
-        }
+        setUserId(firebaseUser.uid);
+        const idTokenResult = await firebaseUser.getIdTokenResult();
+        setIsUserAdmin(!!idTokenResult.claims.admin);
 
-        const response = await fetch(`/tene/data/novels.json`);
-        if (!response.ok) throw new Error('Failed to fetch novels');
-        const data = await response.json();
-        setNovels(data.novels);
+        if (firebaseUser.uid) {
+            const userDocRef = doc(db, "users", firebaseUser.uid);
+            
+            if (telegramId) {
+                // Эта операция теперь не должна вызывать ошибку из-за правил
+                await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
+            }
+
+            onSnapshot(userDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    setSubscription(data.subscription || null);
+                    setLastReadData(data.lastRead || null);
+                    setBookmarks(data.bookmarks || []);
+                    if (data.settings) {
+                        setFontSize(data.settings.fontSize || 16);
+                        setFontClass(data.settings.fontClass || 'font-sans');
+                    }
+                }
+            });
+        }
+        
       } catch (error) {
-        console.error("Ошибка инициализации:", error);
+        console.error("Критическая ошибка инициализации:", error);
       } finally {
         setIsLoading(false);
       }
     };
     init();
-  }, []); // This hook runs once on mount
-
-  // useEffect #2: Subscribing to user-specific data
-  useEffect(() => {
-    if (userId) {
-      const userDocRef = doc(db, "users", userId);
-      const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-          if (docSnap.exists()) {
-              const data = docSnap.data();
-              setSubscription(data.subscription || null);
-              setLastReadData(data.lastRead || null);
-              setBookmarks(data.bookmarks || []);
-              if (data.settings) {
-                  setFontSize(data.settings.fontSize || 16);
-                  setFontClass(data.settings.fontClass || 'font-sans');
-              }
-          }
-      });
-      return () => unsubscribe();
-    }
-  }, [userId]); // This hook runs whenever userId changes
-
+  }, []);
 
   useEffect(() => {
       if (!selectedNovel) {
@@ -903,7 +904,7 @@ export default function App() {
                     <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
                 </div>
             )}
-            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(n.genre))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(genreFilter))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
           </>
         )
       case 'search':

@@ -8,14 +8,13 @@ import {
 import { getAuth, signInAnonymously } from "firebase/auth";
 
 // --- Firebase Config ---
-// ✨ ИСПРАВЛЕНО: Замена import.meta.env на process.env для совместимости
 const firebaseConfig = {
-  apiKey: process.env.VITE_API_KEY,
-  authDomain: process.env.VITE_AUTH_DOMAIN,
-  projectId: process.env.VITE_PROJECT_ID,
-  storageBucket: process.env.VITE_STORAGE_BUCKET,
-  messagingSenderId: process.env.VITE_MESSAGING_SENDER_ID,
-  appId: process.env.VITE_APP_ID
+  apiKey: import.meta.env.VITE_API_KEY,
+  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
@@ -576,7 +575,7 @@ const NewsSlider = ({ onReadMore }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
 
     useEffect(() => {
-        fetch(`/tene/data/news.json`)
+        fetch(`/data/news.json`)
             .then(res => res.json())
             .then(setNews)
             .catch(err => console.error("Failed to fetch news", err));
@@ -700,7 +699,7 @@ export default function App() {
                 }
             });
         }
-        const response = await fetch(`/tene/data/novels.json`);
+        const response = await fetch(`/data/novels.json`);
         if (!response.ok) throw new Error('Failed to fetch novels');
         const data = await response.json();
         setNovels(data.novels);

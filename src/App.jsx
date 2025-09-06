@@ -198,9 +198,11 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     };
   }, [chapterMetaRef, novel.id, chapter.id, userId]);
 
-  useEffect(() => {
+  // Внутри компонента ChapterReader
+useEffect(() => {
     const fetchContent = async () => {
         setIsLoadingContent(true);
+        // Сбрасываем контент перед загрузкой нового
         setChapterContent(''); 
         
         if (chapter.isPaid && !hasActiveSubscription) {
@@ -226,7 +228,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     };
 
     fetchContent();
-  }, [novel.id, chapter.id, hasActiveSubscription]);
+  }, [novel.id, chapter.id, hasActiveSubscription]); // Зависимости корректны
 
   const handleCommentSubmit = async (e) => {
     e.preventDefault();

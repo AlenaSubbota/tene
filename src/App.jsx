@@ -9,20 +9,19 @@ import { getAuth, signInAnonymously } from "firebase/auth";
 
 // --- Firebase Config ---
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_API_KEY,
-  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_APP_ID
+  apiKey: process.env.VITE_API_KEY,
+  authDomain: process.env.VITE_AUTH_DOMAIN,
+  projectId: process.env.VITE_PROJECT_ID,
+  storageBucket: process.env.VITE_STORAGE_BUCKET,
+  messagingSenderId: process.env.VITE_MESSAGING_SENDER_ID,
+  appId: process.env.VITE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-// 🗑️ УДАЛЕНО: Небезопасный ADMIN_ID
 
-// --- ICONS (без изменений) ---
+// --- ICONS ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
 const BackIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>);
 const SearchIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
@@ -38,7 +37,7 @@ const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 
 
-// --- Components (без изменений) ---
+// --- Components ---
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
     <HeartIcon className="animate-pulse-heart text-accent" filled />
@@ -73,7 +72,7 @@ const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => (
             <button onClick={(e) => { e.stopPropagation(); onToggleBookmark(novel.id); }} className={`absolute top-2 right-2 z-10 p-1 rounded-full bg-black/30 backdrop-blur-sm text-white transition-colors ${bookmarks.includes(novel.id) ? 'text-accent' : ''}`}>
               <BookmarkIcon filled={bookmarks.includes(novel.id)} width="20" height="20" />
             </button>
-            <img src={`${import.meta.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full aspect-[2/3] object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 border border-border-color" />
+            <img src={`${process.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full aspect-[2/3] object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 border border-border-color" />
             <h2 className="mt-2 font-semibold text-xs truncate">{novel.title}</h2>
           </div>
         </div>
@@ -143,7 +142,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     };
 
 
-    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`${import.meta.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
+    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`${process.env.BASE_URL}${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {new Date(subscription.expires_at).toLocaleDateString()}</p>)}{isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
         const showLock = !hasActiveSubscription && chapter.isPaid;
         const isLastRead = lastReadChapterId === chapter.id;
         return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 bg-component-bg rounded-xl cursor-pointer transition-all duration-200 hover:border-accent-hover hover:bg-accent/10 border border-border-color flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>
@@ -488,8 +487,22 @@ const BookmarksPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) =
     </div>
 )
 
-const ProfilePage = ({ subscription, onGetSubscriptionClick }) => {
+// ✨ ИЗМЕНЕНО: Добавлен `userId` для отображения в профиле
+const ProfilePage = ({ subscription, onGetSubscriptionClick, userId }) => {
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
+
+    const handleCopyId = () => {
+        if (userId) {
+            navigator.clipboard.writeText(userId)
+                .then(() => {
+                    // Можно добавить уведомление об успешном копировании
+                    console.log("Firebase UID скопирован в буфер обмена");
+                })
+                .catch(err => {
+                    console.error('Не удалось скопировать UID: ', err);
+                });
+        }
+    };
 
     return (
         <div>
@@ -515,6 +528,23 @@ const ProfilePage = ({ subscription, onGetSubscriptionClick }) => {
                             </button>
                         </div>
                     )}
+                </div>
+                {/* ✨ НОВЫЙ БЛОК: Отображение Firebase UID */}
+                <div className="p-4 rounded-lg bg-component-bg border border-border-color">
+                    <h3 className="font-bold mb-2">Ваш ID для администрирования</h3>
+                    <p className="text-sm opacity-70 mb-3">
+                        Этот ID нужен для назначения прав администратора через Telegram-бота.
+                    </p>
+                    <div className="bg-background p-2 rounded-md text-xs break-all mb-3">
+                        <code>{userId || "Загрузка..."}</code>
+                    </div>
+                    <button 
+                        onClick={handleCopyId} 
+                        disabled={!userId}
+                        className="w-full py-2 rounded-lg bg-gray-200 text-gray-800 font-bold transition-all hover:scale-105 disabled:opacity-50"
+                    >
+                        Копировать ID
+                    </button>
                 </div>
             </div>
         </div>
@@ -547,7 +577,7 @@ const NewsSlider = ({ onReadMore }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
 
     useEffect(() => {
-        fetch(`${import.meta.env.BASE_URL}data/news.json`)
+        fetch(`${process.env.BASE_URL}data/news.json`)
             .then(res => res.json())
             .then(setNews)
             .catch(err => console.error("Failed to fetch news", err));
@@ -617,7 +647,7 @@ export default function App() {
   const BOT_USERNAME = "tenebrisverbot";
 
   const updateUserDoc = useCallback(async (dataToUpdate) => {
-    if (userId) { // Убрана проверка на "guest_user", так как все получают Firebase UID
+    if (userId) { 
         const userDocRef = doc(db, "users", userId);
         try {
             await setDoc(userDocRef, dataToUpdate, { merge: true });
@@ -643,7 +673,6 @@ export default function App() {
         const firebaseUser = userCredential.user;
         setUserId(firebaseUser.uid);
         
-        // Получаем токен и проверяем права администратора
         const idTokenResult = await firebaseUser.getIdTokenResult();
         setIsUserAdmin(!!idTokenResult.claims.admin);
 
@@ -671,7 +700,7 @@ export default function App() {
                 }
             });
         }
-        const response = await fetch(`${import.meta.env.BASE_URL}data/novels.json`);
+        const response = await fetch(`${process.env.BASE_URL}data/novels.json`);
         if (!response.ok) throw new Error('Failed to fetch novels');
         const data = await response.json();
         setNovels(data.novels);
@@ -872,7 +901,8 @@ export default function App() {
       case 'bookmarks':
         return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'profile':
-        return <ProfilePage subscription={subscription} onGetSubscriptionClick={handleGetSubscription} />
+        // ✨ ИЗМЕНЕНО: Передаем userId в ProfilePage
+        return <ProfilePage subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} />
       default:
         return <Header title="Библиотека" />
     }
@@ -893,3 +923,4 @@ export default function App() {
     </main>
   );
 }
+

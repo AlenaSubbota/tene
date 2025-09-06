@@ -663,53 +663,60 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const userCredential = await signInAnonymously(auth);
-        const firebaseUser = userCredential.user;
-        setUserId(firebaseUser.uid);
-        
+  // Первый useEffect: Авторизация и загрузка основного контента
+useEffect(() => {
+  const init = async () => {
+    try {
+      const userCredential = await signInAnonymously(auth);
+      const firebaseUser = userCredential.user;
+      setUserId(firebaseUser.uid);
 
-        const idTokenResult = await firebaseUser.getIdTokenResult();
-        setIsUserAdmin(!!idTokenResult.claims.admin);
+      const idTokenResult = await firebaseUser.getIdTokenResult();
+      setIsUserAdmin(!!idTokenResult.claims.admin);
 
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
-          tg.ready();
-          tg.expand();
-          setUserName(tg.initDataUnsafe?.user?.first_name || "Аноним");
-        } else {
-          setUserName("Аноним");
-        }
-        
-        if (firebaseUser.uid) {
-            const userDocRef = doc(db, "users", userId);
-            onSnapshot(userDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    setSubscription(data.subscription || null);
-                    setLastReadData(data.lastRead || null);
-                    setBookmarks(data.bookmarks || []);
-                    if (data.settings) {
-                        setFontSize(data.settings.fontSize || 16);
-                        setFontClass(data.settings.fontClass || 'font-sans');
-                    }
-                }
-            });
-        }
-        const response = await fetch(`/tene/data/novels.json`);
-if (!response.ok) throw new Error('Failed to fetch novels');
-const data = await response.json();
-setNovels(data.novels);
-      } catch (error) {
-        console.error("Ошибка инициализации:", error);
-      } finally {
-        setIsLoading(false);
+      const tg = window.Telegram?.WebApp;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+        setUserName(tg.initDataUnsafe?.user?.first_name || "Аноним");
+      } else {
+        setUserName("Аноним");
       }
-    };
-    init();
-  }, []);
+
+      // Загружаем новеллы
+      const response = await fetch(`/tene/data/novels.json`);
+      if (!response.ok) throw new Error('Failed to fetch novels');
+      const data = await response.json();
+      setNovels(data.novels);
+    } catch (error) {
+      console.error("Ошибка инициализации:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  init();
+}, []); // Этот хук запускается один раз
+
+// Второй useEffect: Подписка на данные пользователя (закладки, подписка и т.д.)
+useEffect(() => {
+  if (userId) {
+    const userDocRef = doc(db, "users", userId);
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setSubscription(data.subscription || null);
+        setLastReadData(data.lastRead || null);
+        setBookmarks(data.bookmarks || []);
+        if (data.settings) {
+          setFontSize(data.settings.fontSize || 16);
+          setFontClass(data.settings.fontClass || 'font-sans');
+        }
+      }
+    });
+    // Отписываемся от слушателя при размонтировании компонента
+    return () => unsubscribe();
+  }
+}, [userId]); // Этот хук запускается, как только userId станет доступен
 
   useEffect(() => {
       if (!selectedNovel) {

@@ -21,7 +21,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// --- ICONS ---
+// --- ICONS (без изменений) ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
 const BackIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>);
 const SearchIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
@@ -37,7 +37,7 @@ const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 
 
-// --- Components ---
+// --- Components (без изменений) ---
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
     <HeartIcon className="animate-pulse-heart text-accent" filled />
@@ -126,8 +126,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
             async (confirmed) => {
                 if (!confirmed) return;
                 
-                // Примечание: здесь используется Telegram ID, а не Firebase UID. Это нормально,
-                // так как эта часть кода работает только внутри Telegram.
+                // ИСПРАВЛЕНО: Используем Firebase UID
                 const userDocRef = doc(db, "users", userId);
                 try {
                     await setDoc(userDocRef, {
@@ -313,6 +312,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
       if (tg && userId && selectedPlan) {
         tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
           if (confirmed) {
+            // ИСПРАВЛЕНО: Используем Firebase UID
             const userDocRef = doc(db, "users", userId);
             try {
               await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
@@ -663,60 +663,67 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // Первый useEffect: Авторизация и загрузка основного контента
-useEffect(() => {
-  const init = async () => {
-    try {
-      const userCredential = await signInAnonymously(auth);
-      const firebaseUser = userCredential.user;
-      setUserId(firebaseUser.uid);
+  // useEffect #1: Auth and loading main content
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const userCredential = await signInAnonymously(auth);
+        const firebaseUser = userCredential.user;
+        setUserId(firebaseUser.uid);
+        
+        const idTokenResult = await firebaseUser.getIdTokenResult();
+        setIsUserAdmin(!!idTokenResult.claims.admin);
 
-      const idTokenResult = await firebaseUser.getIdTokenResult();
-      setIsUserAdmin(!!idTokenResult.claims.admin);
+        const tg = window.Telegram?.WebApp;
+        let telegramId = null;
 
-      const tg = window.Telegram?.WebApp;
-      if (tg) {
-        tg.ready();
-        tg.expand();
-        setUserName(tg.initDataUnsafe?.user?.first_name || "Аноним");
-      } else {
-        setUserName("Аноним");
-      }
-
-      // Загружаем новеллы
-      const response = await fetch(`/tene/data/novels.json`);
-      if (!response.ok) throw new Error('Failed to fetch novels');
-      const data = await response.json();
-      setNovels(data.novels);
-    } catch (error) {
-      console.error("Ошибка инициализации:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  init();
-}, []); // Этот хук запускается один раз
-
-// Второй useEffect: Подписка на данные пользователя (закладки, подписка и т.д.)
-useEffect(() => {
-  if (userId) {
-    const userDocRef = doc(db, "users", userId);
-    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setSubscription(data.subscription || null);
-        setLastReadData(data.lastRead || null);
-        setBookmarks(data.bookmarks || []);
-        if (data.settings) {
-          setFontSize(data.settings.fontSize || 16);
-          setFontClass(data.settings.fontClass || 'font-sans');
+        if (tg) {
+          tg.ready();
+          tg.expand();
+          setUserName(tg.initDataUnsafe?.user?.first_name || "Аноним");
+          telegramId = tg.initDataUnsafe?.user?.id?.toString();
+        } else {
+          setUserName("Аноним");
         }
+        
+        if (firebaseUser.uid && telegramId) {
+            const userDocRef = doc(db, "users", firebaseUser.uid);
+            await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
+        }
+        
+        const response = await fetch(`/tene/data/novels.json`);
+        if (!response.ok) throw new Error('Failed to fetch novels');
+        const data = await response.json();
+        setNovels(data.novels);
+      } catch (error) {
+        console.error("Ошибка инициализации:", error);
+      } finally {
+        setIsLoading(false);
       }
-    });
-    // Отписываемся от слушателя при размонтировании компонента
-    return () => unsubscribe();
-  }
-}, [userId]); // Этот хук запускается, как только userId станет доступен
+    };
+    init();
+  }, []);
+
+  // useEffect #2: Subscribing to user-specific data
+  useEffect(() => {
+    if (userId) {
+      const userDocRef = doc(db, "users", userId);
+      const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+              const data = docSnap.data();
+              setSubscription(data.subscription || null);
+              setLastReadData(data.lastRead || null);
+              setBookmarks(data.bookmarks || []);
+              if (data.settings) {
+                  setFontSize(data.settings.fontSize || 16);
+                  setFontClass(data.settings.fontClass || 'font-sans');
+              }
+          }
+      });
+      return () => unsubscribe();
+    }
+  }, [userId]);
+
 
   useEffect(() => {
       if (!selectedNovel) {
@@ -833,6 +840,7 @@ useEffect(() => {
             async (confirmed) => {
                 if (!confirmed) return;
                 
+                // ИСПРАВЛЕНО: Используем Firebase UID
                 const userDocRef = doc(db, "users", userId);
                 try {
                     await setDoc(userDocRef, {
@@ -926,4 +934,3 @@ useEffect(() => {
     </main>
   );
 }
-

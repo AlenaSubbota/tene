@@ -126,6 +126,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
             async (confirmed) => {
                 if (!confirmed) return;
                 
+                // ИСПРАВЛЕНО: Используем Firebase UID
                 const userDocRef = doc(db, "users", userId);
                 try {
                     await setDoc(userDocRef, {
@@ -311,6 +312,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
       if (tg && userId && selectedPlan) {
         tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.", async (confirmed) => {
           if (confirmed) {
+            // ИСПРАВЛЕНО: Используем Firebase UID
             const userDocRef = doc(db, "users", userId);
             try {
               await setDoc(userDocRef, { pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() } }, { merge: true });
@@ -661,15 +663,20 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // ИСПРАВЛЕНО: Возвращен один useEffect с правильной логикой
+  // useEffect #1: Auth and loading main content
   useEffect(() => {
     const init = async () => {
       try {
         const userCredential = await signInAnonymously(auth);
         const firebaseUser = userCredential.user;
+        setUserId(firebaseUser.uid);
+        
+        const idTokenResult = await firebaseUser.getIdTokenResult();
+        setIsUserAdmin(!!idTokenResult.claims.admin);
 
         const tg = window.Telegram?.WebApp;
         let telegramId = null;
+
         if (tg) {
           tg.ready();
           tg.expand();
@@ -678,30 +685,10 @@ export default function App() {
         } else {
           setUserName("Аноним");
         }
-
-        setUserId(firebaseUser.uid);
-        const idTokenResult = await firebaseUser.getIdTokenResult();
-        setIsUserAdmin(!!idTokenResult.claims.admin);
-
-        if (firebaseUser.uid) {
+        
+        if (firebaseUser.uid && telegramId) {
             const userDocRef = doc(db, "users", firebaseUser.uid);
-            
-            if (telegramId) {
-                await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
-            }
-
-            onSnapshot(userDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    setSubscription(data.subscription || null);
-                    setLastReadData(data.lastRead || null);
-                    setBookmarks(data.bookmarks || []);
-                    if (data.settings) {
-                        setFontSize(data.settings.fontSize || 16);
-                        setFontClass(data.settings.fontClass || 'font-sans');
-                    }
-                }
-            });
+            await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
         }
         
         const response = await fetch(`/tene/data/novels.json`);
@@ -716,6 +703,26 @@ export default function App() {
     };
     init();
   }, []);
+
+  // useEffect #2: Subscribing to user-specific data
+  useEffect(() => {
+    if (userId) {
+      const userDocRef = doc(db, "users", userId);
+      const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+              const data = docSnap.data();
+              setSubscription(data.subscription || null);
+              setLastReadData(data.lastRead || null);
+              setBookmarks(data.bookmarks || []);
+              if (data.settings) {
+                  setFontSize(data.settings.fontSize || 16);
+                  setFontClass(data.settings.fontClass || 'font-sans');
+              }
+          }
+      });
+      return () => unsubscribe();
+    }
+  }, [userId]);
 
 
   useEffect(() => {
@@ -833,6 +840,7 @@ export default function App() {
             async (confirmed) => {
                 if (!confirmed) return;
                 
+                // ИСПРАВЛЕНО: Используем Firebase UID
                 const userDocRef = doc(db, "users", userId);
                 try {
                     await setDoc(userDocRef, {
@@ -898,7 +906,7 @@ export default function App() {
                     <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
                 </div>
             )}
-            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(genreFilter))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(n.genre))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
           </>
         )
       case 'search':

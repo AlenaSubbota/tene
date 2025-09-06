@@ -128,7 +128,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
                 
                 // Примечание: здесь используется Telegram ID, а не Firebase UID. Это нормально,
                 // так как эта часть кода работает только внутри Telegram.
-                const userDocRef = doc(db, "users", tg.initDataUnsafe?.user?.id?.toString());
+                const userDocRef = doc(db, "users", userId);
                 try {
                     await setDoc(userDocRef, {
                         pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() }
@@ -684,7 +684,7 @@ export default function App() {
         }
         
         if (firebaseUser.uid) {
-            const userDocRef = doc(db, "users", tg.initDataUnsafe?.user?.id?.toString());
+            const userDocRef = doc(db, "users", userId);
             onSnapshot(userDocRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();
@@ -826,7 +826,7 @@ setNovels(data.novels);
             async (confirmed) => {
                 if (!confirmed) return;
                 
-                const userDocRef = doc(db, "users", tg.initDataUnsafe?.user?.id?.toString());
+                const userDocRef = doc(db, "users", userId);
                 try {
                     await setDoc(userDocRef, {
                         pendingSubscription: { ...selectedPlan, method: method, date: new Date().toISOString() }

@@ -670,7 +670,6 @@ export default function App() {
         const firebaseUser = userCredential.user;
         setUserId(firebaseUser.uid);
         
-        console.log("Мой Firebase UID:", firebaseUser.uid); 
 
         const idTokenResult = await firebaseUser.getIdTokenResult();
         setIsUserAdmin(!!idTokenResult.claims.admin);
@@ -685,7 +684,7 @@ export default function App() {
         }
         
         if (firebaseUser.uid) {
-            const userDocRef = doc(db, "users", firebaseUser.uid);
+            const userDocRef = doc(db, "users", tg.initDataUnsafe?.user?.id?.toString());
             onSnapshot(userDocRef, (docSnap) => {
                 if (docSnap.exists()) {
                     const data = docSnap.data();

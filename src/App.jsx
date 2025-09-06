@@ -207,7 +207,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
                     {novelComments.map(comment => (
                         <div key={comment.id} className="p-3 rounded-lg bg-component-bg border border-border-color">
                             <p className="font-bold text-sm">{comment.userName}</p>
-                            <div className="text-sm mt-1 opacity-90 prose-p:my-1" dangerouslySetInnerHTML={{ __html: window.marked ? window.marked.parse(comment.text.replace(/\n/g, '<br>')) : '' }} />
+                            <div className="text-sm mt-1 opacity-90 prose prose-p:my-1" dangerouslySetInnerHTML={{ __html: window.marked ? window.marked.parse(comment.text.replace(/\n/g, '<br>')) : '' }} />
                             <div className="flex items-center gap-3 mt-2 text-xs opacity-60">
                                 <button onClick={() => handleNovelQuote(comment)} className="hover:underline">Цитировать</button>
                             </div>
@@ -976,3 +976,4 @@ export default function App() {
     </main>
   );
 }
+

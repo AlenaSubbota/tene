@@ -897,6 +897,7 @@ export default function App() {
                     <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
                 </div>
             )}
+            {/* ИСПРАВЛЕНИЕ ОПЕЧАТКИ */}
             <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(genreFilter))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
           </>
         )

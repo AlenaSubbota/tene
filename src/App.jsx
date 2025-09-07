@@ -37,7 +37,6 @@ const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 
 // --- Components ---
-
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
     <HeartIcon className="animate-pulse-heart text-accent" filled />
@@ -157,7 +156,11 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     </div></div>)
 };
 
-const Comment = React.memo(({ comment, level = 0, onReply, onLike, onEdit, onDelete, onUpdate, isUserAdmin, currentUserId, editingCommentId, editingText, setEditingText, replyingTo, replyText, setReplyText, onCommentSubmit }) => {
+// =========================================================================================
+// ============================= НАЧАЛО ИСПРАВЛЕННОГО БЛОКА ================================
+// =========================================================================================
+
+const Comment = React.memo(({ comment, onReply, onLike, onEdit, onDelete, onUpdate, isUserAdmin, currentUserId, editingCommentId, editingText, setEditingText, replyingTo, replyText, setReplyText, onCommentSubmit }) => {
     const formatDate = (timestamp) => {
         if (!timestamp?.toDate) return '';
         const date = timestamp.toDate();
@@ -165,7 +168,7 @@ const Comment = React.memo(({ comment, level = 0, onReply, onLike, onEdit, onDel
     };
 
     return (
-        <div style={{ marginLeft: `${level * 16}px` }} className="flex flex-col">
+        <div className="flex flex-col">
             <div className="p-3 rounded-lg bg-component-bg border border-border-color">
                 <div className="flex justify-between items-center text-xs opacity-70 mb-1">
                     <p className="font-bold text-sm text-text-main opacity-100">{comment.userName}</p>
@@ -203,7 +206,26 @@ const Comment = React.memo(({ comment, level = 0, onReply, onLike, onEdit, onDel
 
             {comment.replies && comment.replies.length > 0 && (
                 <div className="mt-2 space-y-2 border-l-2 border-border-color pl-2">
-                    {comment.replies.map(reply => <Comment key={reply.id} comment={reply} onReply={onReply} onLike={onLike} onEdit={onEdit} onDelete={onDelete} onUpdate={onUpdate} isUserAdmin={isUserAdmin} currentUserId={currentUserId} editingCommentId={editingCommentId} editingText={editingText} setEditingText={setEditingText} replyingTo={replyingTo} replyText={replyText} setReplyText={setReplyText} onCommentSubmit={onCommentSubmit} />)}
+                    {comment.replies.map(reply => 
+                        <Comment 
+                            key={reply.id} 
+                            comment={reply} 
+                            onReply={onReply} 
+                            onLike={onLike} 
+                            onEdit={onEdit} 
+                            onDelete={onDelete} 
+                            onUpdate={onUpdate} 
+                            isUserAdmin={isUserAdmin} 
+                            currentUserId={currentUserId} 
+                            editingCommentId={editingCommentId} 
+                            editingText={editingText} 
+                            setEditingText={setEditingText} 
+                            replyingTo={replyingTo} 
+                            replyText={replyText} 
+                            setReplyText={setReplyText} 
+                            onCommentSubmit={onCommentSubmit} 
+                        />
+                    )}
                 </div>
             )}
         </div>
@@ -295,7 +317,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     fetchContent();
   }, [novel.id, chapter.id, hasActiveSubscription]);
 
-  const handleCommentSubmit = async (e, parentId = null) => {
+  const handleCommentSubmit = useCallback(async (e, parentId = null) => {
     e.preventDefault();
     const text = parentId ? replyText : newComment;
     if (!text.trim() || !userId) return;
@@ -316,12 +338,22 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     } catch (error) {
         console.error("Ошибка добавления комментария:", error);
     }
-  };
+  }, [userId, userName, newComment, replyText, chapterMetaRef, novel.id, chapter.id]);
 
-  const handleCommentLike = async (commentId) => {
+  const handleCommentLike = useCallback(async (commentId) => {
     if (!userId) return;
     const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
     const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${commentId}/likes`, userId);
+    
+    // Optimistic UI update
+    setComments(prevComments => prevComments.map(c => {
+        if (c.id === commentId) {
+            const newLikeCount = c.userHasLiked ? (c.likeCount || 1) - 1 : (c.likeCount || 0) + 1;
+            return { ...c, userHasLiked: !c.userHasLiked, likeCount: newLikeCount };
+        }
+        return c;
+    }));
+
     try {
         await runTransaction(db, async (transaction) => {
             const likeDoc = await transaction.get(likeRef);
@@ -338,10 +370,11 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         });
     } catch (error) {
         console.error("Ошибка при обновлении лайка комментария:", error);
+        // Revert UI on error if needed
     }
-  };
+  }, [userId, novel.id, chapter.id]);
   
-    const handleEdit = (comment) => {
+    const handleEdit = useCallback((comment) => {
         if (comment) {
             setEditingCommentId(comment.id);
             setEditingText(comment.text);
@@ -349,20 +382,20 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
             setEditingCommentId(null);
             setEditingText("");
         }
-    };
+    }, []);
 
-    const handleUpdateComment = async (commentId) => {
+    const handleUpdateComment = useCallback(async (commentId) => {
         if (!editingText.trim()) return;
         const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
         await updateDoc(commentRef, { text: editingText });
         setEditingCommentId(null);
         setEditingText("");
-    };
+    }, [editingText, novel.id, chapter.id]);
 
-    const handleDelete = async (commentId) => {
+    const handleDelete = useCallback(async (commentId) => {
         const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
         await deleteDoc(commentRef);
-    };
+    }, [novel.id, chapter.id]);
 
   const handleLike = async () => {
     if (!userId) return;
@@ -479,7 +512,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
                     <Comment 
                         key={comment.id} 
                         comment={comment}
-                        onReply={(commentId) => { setReplyingTo(commentId === replyingTo ? null : commentId); setReplyText(''); }}
+                        onReply={useCallback((commentId) => { setReplyingTo(commentId === replyingTo ? null : commentId); setReplyText(''); }, [replyingTo])}
                         onLike={handleCommentLike}
                         onEdit={handleEdit}
                         onDelete={handleDelete}
@@ -561,6 +594,11 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     </div>
   );
 };
+
+// =========================================================================================
+// ============================= КОНЕЦ ИСПРАВЛЕННОГО БЛОКА =================================
+// =========================================================================================
+
 
 const SearchPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -767,11 +805,9 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // ИСПРАВЛЕНО: Возвращен один useEffect с правильной логикой
   useEffect(() => {
     const init = async () => {
       try {
-        // Сначала загружаем новеллы, чтобы пользователь не видел пустой экран
         const response = await fetch(`/tene/data/novels.json`);
         if (!response.ok) {
             console.error("Ошибка загрузки novels.json. Статус:", response.status);
@@ -780,7 +816,6 @@ export default function App() {
         const data = await response.json();
         setNovels(data.novels);
 
-        // Затем проводим аутентификацию и загрузку пользовательских данных
         const userCredential = await signInAnonymously(auth);
         const firebaseUser = userCredential.user;
 
@@ -803,7 +838,6 @@ export default function App() {
             const userDocRef = doc(db, "users", firebaseUser.uid);
             
             if (telegramId) {
-                // Эта операция теперь не должна вызывать ошибку из-за правил
                 await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
             }
 
@@ -1010,11 +1044,11 @@ export default function App() {
                     <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
                 </div>
             )}
-            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(n.genre))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(genreFilter))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
           </>
         )
       case 'search':
-        return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+        return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
       case 'bookmarks':
         return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
       case 'profile':

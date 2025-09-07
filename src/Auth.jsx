@@ -1,9 +1,8 @@
 // src/Auth.jsx
 import React from 'react';
-// ИЗМЕНЕНИЕ: Импортируем signInWithRedirect и linkWithRedirect вместо signInWithPopup
 import { GoogleAuthProvider, signInWithRedirect, linkWithRedirect, signOut } from "firebase/auth";
 
-// --- Иконки (остаются без изменений) ---
+// --- Иконки ---
 const GoogleIcon = () => (
     <svg className="w-5 h-5 mr-2" viewBox="0 0 48 48">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
@@ -13,8 +12,6 @@ const GoogleIcon = () => (
         <path fill="none" d="M0 0h48v48H0z"></path>
     </svg>
 );
-const CrownIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>);
-
 
 // --- Компонент Auth ---
 export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
@@ -23,14 +20,12 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
     const handleSignIn = async () => {
         try {
             if (auth.currentUser && auth.currentUser.isAnonymous) {
-                // ИЗМЕНЕНИЕ: Используем linkWithRedirect
                 await linkWithRedirect(auth.currentUser, provider);
             } else {
-                // ИЗМЕНЕНИЕ: Используем signInWithRedirect
                 await signInWithRedirect(auth, provider);
             }
         } catch (error) {
-            console.error("Ошибка входа или привязки:", error);
+            console.error("Ошибка входа через редирект:", error);
         }
     };
 

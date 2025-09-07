@@ -10,18 +10,19 @@ import {
     onAuthStateChanged, 
     signInAnonymously,
     browserLocalPersistence,
-    getRedirectResult // <-- ИЗМЕНЕНИЕ: Убраны лишние импорты и добавлен этот
+    getRedirectResult
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
 
 // --- Firebase Config ---
+// ИЗМЕНЕНИЕ: Ключи вставлены прямо сюда для 100% гарантии
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_API_KEY,
-  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_APP_ID
+  apiKey: "AIzaSyDfDGFXGFGkzmgYFAHI1q6AZiLy7esuPrw",
+  authDomain: "tenebris-verbum.firebaseapp.com",
+  projectId: "tenebris-verbum",
+  storageBucket: "tenebris-verbum.firebasestorage.app",
+  messagingSenderId: "637080257821",
+  appId: "1:637080257821:web:7f7440e0bcef2ce7178df4"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -762,7 +763,6 @@ export default function App() {
   
   const userId = user?.uid;
 
-  // ИЗМЕНЕНИЕ: Добавляем этот useEffect для обработки результата перенаправления
   useEffect(() => {
     getRedirectResult(auth)
       .then((result) => {

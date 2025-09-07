@@ -1,64 +1,53 @@
-import React, { useState, useEffect } from 'react';
-import { RecaptchaVerifier, signInWithPhoneNumber, signOut } from "firebase/auth";
+import React, { useState } from 'react';
+import { 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    signOut 
+} from "firebase/auth";
 
 // --- Компонент Auth ---
 export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
-    const [phoneNumber, setPhoneNumber] = useState('');
-    const [verificationCode, setVerificationCode] = useState('');
-    const [confirmationResult, setConfirmationResult] = useState(null);
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [isLoginView, setIsLoginView] = useState(true); // Переключатель между входом и регистрацией
     const [error, setError] = useState('');
 
-    // Инициализация reCAPTCHA
-    useEffect(() => {
-        if (!window.recaptchaVerifier) {
-            window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
-                'size': 'invisible',
-                'callback': (response) => {
-                    // reCAPTCHA solved, allow signInWithPhoneNumber.
-                    console.log("reCAPTCHA solved");
-                }
-            });
-        }
-    }, [auth]);
-    
-    // Функция отправки номера телефона
-    const handleSendCode = async () => {
+    const handleAuthAction = async () => {
         setError('');
-        if (!phoneNumber || !/^\+[1-9]\d{1,14}$/.test(phoneNumber)) {
-            setError("Пожалуйста, введите корректный номер в формате +79123456789");
+        if (!email || !password) {
+            setError('Пожалуйста, заполните все поля.');
             return;
         }
-        try {
-            const appVerifier = window.recaptchaVerifier;
-            const result = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
-            setConfirmationResult(result);
-        } catch (error) {
-            // --- ИЗМЕНЕНИЯ ЗДЕСЬ ---
-            console.error("Детальная ошибка при отправке кода:", error);
-            // Показываем более информативную ошибку
-            setError(`Ошибка: ${error.code}. Попробуйте снова.`); 
-            // --- КОНЕЦ ИЗМЕНЕНИЙ ---
-            
-            // В случае ошибки, возможно, потребуется сбросить reCAPTCHA
-            window.recaptchaVerifier.render().then(widgetId => {
-                window.grecaptcha.reset(widgetId);
-            });
-        }
-    };
 
-    // Функция проверки кода из СМС
-    const handleVerifyCode = async () => {
-        setError('');
-        if (!verificationCode || verificationCode.length !== 6) {
-            setError("Код должен состоять из 6 цифр.");
-            return;
-        }
         try {
-            await confirmationResult.confirm(verificationCode);
-            setConfirmationResult(null); // Сбрасываем после успешного входа
-        } catch (error) {
-            console.error("Ошибка при проверке кода:", error);
-            setError("Неверный код. Попробуйте снова.");
+            if (isLoginView) {
+                // Вход существующего пользователя
+                await signInWithEmailAndPassword(auth, email, password);
+            } else {
+                // Регистрация нового пользователя
+                await createUserWithEmailAndPassword(auth, email, password);
+            }
+        } catch (err) {
+            console.error("Ошибка аутентификации:", err);
+            // Преобразуем коды ошибок Firebase в понятные сообщения
+            switch (err.code) {
+                case 'auth/invalid-email':
+                    setError('Некорректный формат email.');
+                    break;
+                case 'auth/user-not-found':
+                case 'auth/wrong-password':
+                case 'auth/invalid-credential':
+                    setError('Неверный email или пароль.');
+                    break;
+                case 'auth/email-already-in-use':
+                    setError('Этот email уже зарегистрирован.');
+                    break;
+                case 'auth/weak-password':
+                    setError('Пароль слишком слабый (должен быть не менее 6 символов).');
+                    break;
+                default:
+                    setError('Произошла ошибка. Попробуйте снова.');
+            }
         }
     };
 
@@ -75,10 +64,9 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
                 // --- ИНТЕРФЕЙС ДЛЯ ЗАЛОГИНЕННОГО ПОЛЬЗОВАТЕЛЯ ---
                 <div className="p-4 rounded-lg bg-component-bg border border-border-color">
                     <div className="flex items-center space-x-4 mb-4">
-                        <img src={user.photoURL || 'https://placehold.co/64x64/F5F1ED/2C3A47?text=👤'} alt="Avatar" className="w-16 h-16 rounded-full" />
+                         <img src={user.photoURL || 'https://placehold.co/64x64/F5F1ED/2C3A47?text=👤'} alt="Avatar" className="w-16 h-16 rounded-full" />
                         <div>
-                            <h3 className="font-bold">{user.phoneNumber}</h3>
-                            <p className="text-sm opacity-70">Пользователь</p>
+                            <h3 className="font-bold">{user.email}</h3>
                         </div>
                     </div>
                     <button onClick={handleSignOut} className="w-full py-2 rounded-lg bg-gray-200 text-gray-800 font-bold">Выйти</button>
@@ -86,40 +74,33 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
             ) : (
                 // --- ИНТЕРФЕЙС ДЛЯ АНОНИМНОГО ПОЛЬЗОВАТЕЛЯ ---
                 <div className="p-4 rounded-lg bg-component-bg border border-border-color">
-                    <h3 className="font-bold mb-2">Войдите в аккаунт</h3>
+                    <h3 className="font-bold mb-2">{isLoginView ? 'Войдите в аккаунт' : 'Создайте аккаунт'}</h3>
                     <p className="text-sm opacity-70 mb-3">
-                        Чтобы синхронизировать ваши закладки, подписку и прогресс чтения между устройствами.
+                        Чтобы синхронизировать ваши закладки, подписку и прогресс чтения.
                     </p>
                     
-                    {!confirmationResult ? (
-                        // --- ЭТАП 1: ВВОД НОМЕРА ТЕЛЕФОНА ---
-                        <div className="space-y-3">
-                            <input
-                                type="tel"
-                                value={phoneNumber}
-                                onChange={(e) => setPhoneNumber(e.target.value)}
-                                placeholder="+79123456789"
-                                className="w-full bg-background border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
-                            />
-                            <button onClick={handleSendCode} className="w-full py-2 rounded-lg bg-accent text-white font-bold">
-                                Отправить код
-                            </button>
-                        </div>
-                    ) : (
-                        // --- ЭТАП 2: ВВОД КОДА ИЗ СМС ---
-                        <div className="space-y-3">
-                            <input
-                                type="number"
-                                value={verificationCode}
-                                onChange={(e) => setVerificationCode(e.target.value)}
-                                placeholder="Код из СМС"
-                                className="w-full bg-background border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
-                            />
-                            <button onClick={handleVerifyCode} className="w-full py-2 rounded-lg bg-accent text-white font-bold">
-                                Подтвердить
-                            </button>
-                        </div>
-                    )}
+                    <div className="space-y-3">
+                        <input
+                            type="email"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="Email"
+                            className="w-full bg-background border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                        />
+                         <input
+                            type="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Пароль"
+                            className="w-full bg-background border border-border-color rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                        />
+                        <button onClick={handleAuthAction} className="w-full py-2 rounded-lg bg-accent text-white font-bold">
+                            {isLoginView ? 'Войти' : 'Зарегистрироваться'}
+                        </button>
+                    </div>
+                     <button onClick={() => setIsLoginView(!isLoginView)} className="w-full text-center text-xs mt-4 text-accent hover:underline">
+                        {isLoginView ? 'У меня еще нет аккаунта' : 'У меня уже есть аккаунт'}
+                    </button>
                     {error && <p className="text-red-500 text-xs mt-2 text-center">{error}</p>}
                 </div>
             )}

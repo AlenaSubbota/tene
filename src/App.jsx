@@ -5,8 +5,15 @@ import {
     collection, onSnapshot, query, orderBy, addDoc,
     serverTimestamp, runTransaction
 } from "firebase/firestore";
-import { getAuth, onAuthStateChanged, signInAnonymously } from "firebase/auth";
-import { Auth } from './Auth.jsx'; // Импортируем новый компонент
+import { 
+    getAuth, 
+    onAuthStateChanged, 
+    signInAnonymously, 
+    getRedirectResult, 
+    linkWithCredential, 
+    GoogleAuthProvider 
+} from "firebase/auth";
+import { Auth } from './Auth.jsx';
 
 // --- Firebase Config ---
 const firebaseConfig = {
@@ -774,7 +781,7 @@ export default function App() {
   }, [fontClass, updateUserDoc]);
 
   // --- Новая логика аутентификации ---
-  useEffect(() => {
+useEffect(() => {
     const init = async () => {
       try {
         const response = await fetch(`/tene/data/novels.json`);
@@ -785,6 +792,31 @@ export default function App() {
         const data = await response.json();
         setNovels(data.novels);
         
+        // --- ОБРАБОТКА РЕДИРЕКТА ---
+        try {
+            const result = await getRedirectResult(auth);
+            if (result) {
+                // Пользователь успешно вернулся после редиректа
+                console.log("Результат редиректа:", result.user);
+            }
+        } catch (error) {
+            console.error("Ошибка после редиректа:", error);
+            // Обработка ошибки, если email уже занят другим аккаунтом
+            if (error.code === 'auth/account-exists-with-different-credential' && auth.currentUser) {
+                const credential = GoogleAuthProvider.credentialFromError(error);
+                if (credential) {
+                    try {
+                        // Пытаемся связать анонимный аккаунт с Google
+                        await linkWithCredential(auth.currentUser, credential);
+                        console.log("Анонимный аккаунт успешно связан!");
+                    } catch (linkError) {
+                        console.error("Ошибка привязки аккаунтов после редиректа:", linkError);
+                    }
+                }
+            }
+        }
+        // --- КОНЕЦ ОБРАБОТКИ РЕДИРЕКТА ---
+
         onAuthStateChanged(auth, async (firebaseUser) => {
             if (firebaseUser) {
                 // Пользователь вошел (или это существующий аноним)
@@ -806,7 +838,7 @@ export default function App() {
                     }
                 });
 
-                // Привязка Telegram ID, если он есть
+                // Привязка Telegram ID
                 const tg = window.Telegram?.WebApp;
                 if (tg && !firebaseUser.isAnonymous) {
                     const telegramId = tg.initDataUnsafe?.user?.id?.toString();

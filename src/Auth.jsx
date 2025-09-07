@@ -6,7 +6,7 @@ import {
 } from "firebase/auth";
 
 // --- Компонент Auth ---
-export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
+export const Auth = ({ user, auth }) => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [isLoginView, setIsLoginView] = useState(true); // Переключатель между входом и регистрацией
@@ -56,8 +56,6 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
         signOut(auth).catch(error => console.error("Ошибка выхода:", error));
     };
     
-    const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
-
     return (
         <div className="p-4 space-y-4">
             {user && !user.isAnonymous ? (
@@ -104,29 +102,6 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
                     {error && <p className="text-red-500 text-xs mt-2 text-center">{error}</p>}
                 </div>
             )}
-
-            {/* --- БЛОК ПОДПИСКИ (ОСТАЕТСЯ БЕЗ ИЗМЕНЕНИЙ) --- */}
-            <div className="p-4 rounded-lg bg-component-bg border border-border-color">
-                <h3 className="font-bold mb-2">Подписка</h3>
-                 {hasActiveSubscription ? (
-                    <div>
-                        <p className="text-green-500">Активна</p>
-                        <p className="text-sm opacity-70">
-                            Заканчивается: {new Date(subscription.expires_at).toLocaleDateString()}
-                        </p>
-                    </div>
-                ) : (
-                    <div>
-                        <p className="text-red-500">Неактивна</p>
-                         <p className="text-sm opacity-70 mb-3">
-                            Оформите подписку, чтобы получить доступ ко всем платным главам.
-                        </p>
-                        <button onClick={onGetSubscriptionClick} className="w-full py-2 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105">
-                            Оформить подписку
-                        </button>
-                    </div>
-                )}
-            </div>
         </div>
     );
 };

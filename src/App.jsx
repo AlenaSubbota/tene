@@ -15,6 +15,7 @@ import {
     updateProfile
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
+import { AuthScreen } from './AuthScreen.jsx';
 
 // --- Firebase Config ---
 const firebaseConfig = {
@@ -842,13 +843,10 @@ export default function App() {
         setIsLoading(false);
 
       } else {
-        // Пользователя нет. Входим анонимно. onAuthStateChanged сработает снова.
-        signInAnonymously(auth).catch(error => {
-          console.error("Anonymous sign-in failed:", error);
-          setUser(null);
-          setIsUserAdmin(false);
-          setIsLoading(false);
-        });
+        // Пользователя нет, прекращаем загрузку и показываем экран входа.
+        setUser(null);
+        setIsUserAdmin(false);
+        setIsLoading(false);
       }
     });
     
@@ -998,9 +996,9 @@ export default function App() {
     };
 
 
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
+  if (!user || user.isAnonymous) {
+  return <AuthScreen user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} auth={auth} />;
+}
   
   const renderContent = () => {
     if (page === 'details') {

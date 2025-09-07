@@ -156,6 +156,22 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     </div></div>)
 };
 
+const groupComments = (commentsList) => {
+    const commentMap = {};
+    const topLevelComments = [];
+    commentsList.forEach(comment => {
+        commentMap[comment.id] = { ...comment, replies: [] };
+    });
+    commentsList.forEach(comment => {
+        if (comment.replyTo && commentMap[comment.replyTo]) {
+            commentMap[comment.replyTo].replies.push(commentMap[comment.id]);
+        } else {
+            topLevelComments.push(commentMap[comment.id]);
+        }
+    });
+    return topLevelComments;
+};
+
 const Comment = React.memo(({ comment, onReply, onLike, onEdit, onDelete, onUpdate, isUserAdmin, currentUserId, editingCommentId, editingText, setEditingText, replyingTo, replyText, setReplyText, onCommentSubmit }) => {
     const formatDate = (timestamp) => {
         if (!timestamp?.toDate) return '';
@@ -464,22 +480,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     return markdownText;
   };
 
-  const groupComments = (commentsList) => {
-      const commentMap = {};
-      const topLevelComments = [];
-      commentsList.forEach(comment => {
-          commentMap[comment.id] = { ...comment, replies: [] };
-      });
-      commentsList.forEach(comment => {
-          if (comment.replyTo && commentMap[comment.replyTo]) {
-              commentMap[comment.replyTo].replies.push(commentMap[comment.id]);
-          } else {
-              topLevelComments.push(commentMap[comment.id]);
-          }
-      });
-      return topLevelComments;
-  };
-  
   return (
     <div className="min-h-screen transition-colors duration-300 bg-background text-text-main">
       <Header title={novel.title} onBack={onBack} />

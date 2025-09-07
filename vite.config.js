@@ -6,7 +6,6 @@ export default defineConfig({
   plugins: [react()],
   base: '/tene/', // <-- ЗАМЕНИТЕ 'novel-reader-app' НА ИМЯ ВАШЕГО РЕПОЗИТОРИЯ
   build: {
-    outDir: 'docs', // Мы будем собирать проект в папку 'docs', а не 'dist'
-    target: 'esnext' // Добавлено для поддержки import.meta.env
+    outDir: 'docs' // Мы будем собирать проект в папку 'docs', а не 'dist'
   }
 })

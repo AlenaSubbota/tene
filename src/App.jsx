@@ -5,15 +5,15 @@ import {
     collection, onSnapshot, query, orderBy, addDoc,
     serverTimestamp, runTransaction
 } from "firebase/firestore";
-import {
-    getAuth,
-    onAuthStateChanged,
-    signInAnonymously,
-    getRedirectResult,
-    linkWithCredential,
-    GoogleAuthProvider
+import { 
+    getAuth, 
+    onAuthStateChanged, 
+    signInAnonymously, 
+    getRedirectResult, 
+    linkWithCredential, 
+    GoogleAuthProvider 
 } from "firebase/auth";
-import { Auth } from './Auth.jsx'; // Убедитесь, что этот импорт есть
+import { Auth } from './Auth.jsx';
 
 // --- Firebase Config ---
 const firebaseConfig = {
@@ -44,7 +44,7 @@ const ChevronLeftIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/20
 const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>;
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 
-// --- Компоненты (остаются без изменений, кроме ProfilePage) ---
+// --- Компоненты (остаются без изменений) ---
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
     <HeartIcon className="animate-pulse-heart text-accent" filled />
@@ -744,7 +744,7 @@ export default function App() {
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
   const [subscription, setSubscription] = useState(null);
-  const [user, setUser] = useState(null); // <-- Заменяем userId и userName
+  const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
   
@@ -759,7 +759,7 @@ export default function App() {
 
   const BOT_USERNAME = "tenebrisverbot";
   
-  const userId = user?.uid; // <-- Получаем userId из объекта user
+  const userId = user?.uid;
 
   const updateUserDoc = useCallback(async (dataToUpdate) => {
     if (userId) { 
@@ -780,86 +780,78 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // --- Новая логика аутентификации ---
- useEffect(() => {
-    // Этот слушатель будет нашим единственным источником правды о пользователе.
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        setIsLoading(true); // Начинаем загрузку при смене пользователя
-        if (firebaseUser) {
-            // Пользователь вошел (или это существующий аноним)
-            setUser(firebaseUser);
-            const idTokenResult = await firebaseUser.getIdTokenResult();
-            setIsUserAdmin(!!idTokenResult.claims.admin);
+  // --- ИСПРАВЛЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
+  useEffect(() => {
+    let unsubUser = () => {};
 
-            const userDocRef = doc(db, "users", firebaseUser.uid);
-            onSnapshot(userDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    setSubscription(data.subscription || null);
-                    setLastReadData(data.lastRead || null);
-                    setBookmarks(data.bookmarks || []);
-                    if (data.settings) {
-                        setFontSize(data.settings.fontSize || 16);
-                        setFontClass(data.settings.fontClass || 'font-sans');
-                    }
-                }
-            });
-
-             // Привязка Telegram ID, если он есть и пользователь не анонимный
-            const tg = window.Telegram?.WebApp;
-            if (tg && !firebaseUser.isAnonymous) {
-                const telegramId = tg.initDataUnsafe?.user?.id?.toString();
-                if (telegramId) {
-                   await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
-                }
-            }
-        } else {
-            // Пользователь не вошел, создаем анонимного
-            signInAnonymously(auth).catch(error => {
-                console.error("Ошибка анонимного входа:", error);
-            });
-        }
-        setIsLoading(false); // Завершаем загрузку, когда есть окончательный статус пользователя
-    });
-
-    // Эта функция выполняется один раз при загрузке, чтобы обработать редирект
-    const handleInitialAuth = async () => {
+    const init = async () => {
         try {
-            const result = await getRedirectResult(auth);
-            if (result) {
-                // Пользователь только что вошел через редирект.
-                // Слушатель onAuthStateChanged выше скоро получит этого пользователя.
-                console.log("Результат редиректа успешный:", result.user);
-            }
-        } catch (error) {
-            // Обработка ошибок редиректа, особенно для привязки анонимного аккаунта
-            if (error.code === 'auth/account-exists-with-different-credential' && auth.currentUser?.isAnonymous) {
-                const credential = GoogleAuthProvider.credentialFromError(error);
-                if (credential) {
-                    try {
-                        await linkWithCredential(auth.currentUser, credential);
-                        // После привязки onAuthStateChanged сработает с обновленным пользователем
-                    } catch (linkError) {
-                        console.error("Ошибка привязки аккаунта после редиректа:", linkError);
-                    }
+            // Сначала обрабатываем результат редиректа
+            try {
+                const result = await getRedirectResult(auth);
+                if (result) {
+                    console.log("Результат редиректа успешный:", result.user);
                 }
-            } else {
-                console.error("Ошибка обработки результата редиректа:", error);
+            } catch (error) {
+                if (error.code === 'auth/account-exists-with-different-credential' && auth.currentUser?.isAnonymous) {
+                    const credential = GoogleAuthProvider.credentialFromError(error);
+                    if (credential) {
+                        await linkWithCredential(auth.currentUser, credential);
+                    }
+                } else {
+                    console.error("Ошибка обработки результата редиректа:", error);
+                }
             }
+
+            // Загружаем статические данные
+            const response = await fetch(`/tene/data/novels.json`);
+            if (!response.ok) throw new Error('Failed to fetch novels');
+            const data = await response.json();
+            setNovels(data.novels);
+
+            // Устанавливаем слушатель состояния аутентификации
+            unsubUser = onAuthStateChanged(auth, async (firebaseUser) => {
+                if (firebaseUser) {
+                    setUser(firebaseUser);
+                    const idTokenResult = await firebaseUser.getIdTokenResult();
+                    setIsUserAdmin(!!idTokenResult.claims.admin);
+
+                    const userDocRef = doc(db, "users", firebaseUser.uid);
+                    onSnapshot(userDocRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            const data = docSnap.data();
+                            setSubscription(data.subscription || null);
+                            setLastReadData(data.lastRead || null);
+                            setBookmarks(data.bookmarks || []);
+                            if (data.settings) {
+                                setFontSize(data.settings.fontSize || 16);
+                                setFontClass(data.settings.fontClass || 'font-sans');
+                            }
+                        }
+                    });
+
+                    const tg = window.Telegram?.WebApp;
+                    if (tg && !firebaseUser.isAnonymous) {
+                        const telegramId = tg.initDataUnsafe?.user?.id?.toString();
+                        if (telegramId) {
+                           await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
+                        }
+                    }
+                } else {
+                    await signInAnonymously(auth);
+                }
+                setIsLoading(false);
+            });
+        } catch (error) {
+            console.error("Критическая ошибка инициализации:", error);
+            setIsLoading(false);
         }
     };
 
-    // Запускаем все процессы инициализации
-    Promise.all([
-        handleInitialAuth(),
-        fetch(`/tene/data/novels.json`).then(res => res.json()).then(setNovels)
-    ]).catch(error => {
-        console.error("Критическая ошибка инициализации:", error);
-        setIsLoading(false);
-    });
-
-    return () => unsubscribe(); // Отключаем слушатель при размонтировании компонента
+    init();
+    return () => unsubUser();
   }, []);
+
 
   useEffect(() => {
       if (!selectedNovel) {
@@ -904,6 +896,8 @@ export default function App() {
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg) return;
+    tg.ready();
+    tg.expand();
     tg.onEvent('backButtonClicked', handleBack);
     if (page === 'list') {
         tg.BackButton.hide();
@@ -1041,13 +1035,13 @@ export default function App() {
                     <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
                 </div>
             )}
-            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(n))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(genreFilter))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
           </>
         )
       case 'search':
-        return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
+        return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'bookmarks':
-        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
+        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'profile':
         return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} />
       default:

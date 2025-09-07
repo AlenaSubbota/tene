@@ -6,18 +6,17 @@ import {
     serverTimestamp, runTransaction
 } from "firebase/firestore";
 import { 
-    getAuth, // <--- ИЗМЕНЕНИЕ
+    getAuth,
     onAuthStateChanged, 
     signInAnonymously,
     browserLocalPersistence,
     getRedirectResult,
-    setPersistence // <--- ДОБАВЛЕНО
+    setPersistence
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
 
 
 // --- Firebase Config ---
-// ИЗМЕНЕНИЕ: Ключи вставлены прямо сюда для 100% гарантии
 const firebaseConfig = {
   apiKey: "AIzaSyDfDGFXGFGkzmgYFAHI1q6AZiLy7esuPrw",
   authDomain: "tenebris-verbum.firebaseapp.com",
@@ -29,10 +28,10 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app); // <--- ИЗМЕНЕНИЕ
-setPersistence(auth, browserLocalPersistence); // <--- ИЗМЕНЕНИЕ
+const auth = getAuth(app);
+setPersistence(auth, browserLocalPersistence);
 
-// --- Иконки (остаются без изменений) ---
+// --- Иконки ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
 const BackIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>);
 const SearchIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
@@ -47,7 +46,7 @@ const ChevronLeftIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/20
 const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>;
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 
-// --- Компоненты (остаются без изменений) ---
+// --- Компоненты ---
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
     <HeartIcon className="animate-pulse-heart text-accent" filled />
@@ -764,62 +763,11 @@ export default function App() {
   
   const userId = user?.uid;
 
-  // Новый, исправленный код для вставки
-useEffect(() => {
-    setIsLoading(true); // Начинаем загрузку
+  // --- УДАЛИТЕ СТАРЫЕ useEffect, КОТОРЫЕ БЫЛИ ЗДЕСЬ ---
 
-    getRedirectResult(auth)
-        .then((result) => {
-            if (result) {
-                // Если есть результат редиректа, это наш пользователь
-                console.log("Результат перенаправления получен:", result.user);
-                // setUser(result.user); // onAuthStateChanged сделает это за нас
-            }
-        })
-        .catch((error) => {
-            console.error("Ошибка при получении результата перенаправления:", error);
-        })
-        .finally(() => {
-            // Теперь, когда редирект обработан, устанавливаем слушатель
-            const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-                // ... (остальной код из вашего второго useEffect остается здесь)
-                if (firebaseUser) {
-                    setUser(firebaseUser);
-                    // ... (и так далее)
-                } else {
-                    await signInAnonymously(auth);
-                }
-                setIsLoading(false); 
-            });
-
-            // Не забудьте вернуть функцию отписки
-            return () => unsubAuth();
-        });
-}, []); // Пустой массив зависимостей остается
-
-  const updateUserDoc = useCallback(async (dataToUpdate) => {
-    if (userId) { 
-        const userDocRef = doc(db, "users", userId);
-        try {
-            await setDoc(userDocRef, dataToUpdate, { merge: true });
-        } catch(e) {
-            console.error("Не удалось обновить данные пользователя:", e);
-        }
-    }
-  }, [userId]);
-
-  const handleTextSizeChange = useCallback((amount) => {
-    setFontSize(prevSize => {
-        const newSize = Math.max(12, Math.min(32, prevSize + amount));
-        updateUserDoc({ settings: { fontSize: newSize, fontClass } });
-        return newSize;
-    });
-  }, [fontClass, updateUserDoc]);
-
-  // --- УПРОЩЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
+  // --- НОВЫЙ ЕДИНЫЙ useEffect ДЛЯ ВСЕЙ ЛОГИКИ АУТЕНТИФИКАЦИИ ---
   useEffect(() => {
     setIsLoading(true);
-    
     fetch(`/tene/data/novels.json`)
       .then(res => res.json())
       .then(data => setNovels(data.novels))
@@ -852,7 +800,7 @@ useEffect(() => {
             setBookmarks([]);
           }
         });
-
+        
         const tg = window.Telegram?.WebApp;
         if (tg && !firebaseUser.isAnonymous) {
             const telegramId = tg.initDataUnsafe?.user?.id?.toString();
@@ -860,11 +808,20 @@ useEffect(() => {
                await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
             }
         }
+        setIsLoading(false);
+
       } else {
-        setUser(null);
-        await signInAnonymously(auth);
+        signInAnonymously(auth).catch(error => {
+          console.error("Anonymous sign-in failed:", error);
+          setUser(null);
+          setIsUserAdmin(false);
+          setIsLoading(false);
+        });
       }
-      setIsLoading(false); 
+    });
+
+    getRedirectResult(auth).catch((error) => {
+      console.error("Ошибка при получении результата перенаправления:", error);
     });
 
     return () => {
@@ -927,6 +884,25 @@ useEffect(() => {
     }
     return () => tg.offEvent('backButtonClicked', handleBack);
   }, [page, handleBack]);
+
+  const updateUserDoc = useCallback(async (dataToUpdate) => {
+    if (userId) { 
+        const userDocRef = doc(db, "users", userId);
+        try {
+            await setDoc(userDocRef, dataToUpdate, { merge: true });
+        } catch(e) {
+            console.error("Не удалось обновить данные пользователя:", e);
+        }
+    }
+  }, [userId]);
+
+  const handleTextSizeChange = useCallback((amount) => {
+    setFontSize(prevSize => {
+        const newSize = Math.max(12, Math.min(32, prevSize + amount));
+        updateUserDoc({ settings: { fontSize: newSize, fontClass } });
+        return newSize;
+    });
+  }, [fontClass, updateUserDoc]);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;

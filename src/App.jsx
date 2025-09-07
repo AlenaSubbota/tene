@@ -156,10 +156,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     </div></div>)
 };
 
-// =========================================================================================
-// ============================= НАЧАЛО ИСПРАВЛЕННОГО БЛОКА ================================
-// =========================================================================================
-
 const Comment = React.memo(({ comment, onReply, onLike, onEdit, onDelete, onUpdate, isUserAdmin, currentUserId, editingCommentId, editingText, setEditingText, replyingTo, replyText, setReplyText, onCommentSubmit }) => {
     const formatDate = (timestamp) => {
         if (!timestamp?.toDate) return '';
@@ -597,11 +593,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     </div>
   );
 };
-
-// =========================================================================================
-// ============================= КОНЕЦ ИСПРАВЛЕННОГО БЛОКА =================================
-// =========================================================================================
-
 
 const SearchPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -1075,4 +1066,3 @@ export default function App() {
     </main>
   );
 }
-

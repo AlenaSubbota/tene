@@ -635,7 +635,7 @@ const BookmarksPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) =
     </div>
 )
 
-const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId }) => {
+const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth }) => {
     const handleCopyId = () => {
         if (userId) {
             navigator.clipboard.writeText(userId)
@@ -647,7 +647,9 @@ const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId }) => 
     return (
         <div>
             <Header title="Профиль" />
-            <Auth user={user} subscription={subscription} onGetSubscriptionClick={onGetSubscriptionClick} />
+            {/* 👇 И вот здесь он передаётся дальше в компонент Auth */}
+            <Auth user={user} subscription={subscription} onGetSubscriptionClick={onGetSubscriptionClick} auth={auth} />
+            
             <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4">
                 <h3 className="font-bold mb-2">Ваш ID для администрирования</h3>
                 <p className="text-sm opacity-70 mb-3">
@@ -1035,7 +1037,7 @@ export default function App() {
       case 'bookmarks':
         return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'profile':
-        return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} />
+         return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} auth={auth} />
       default:
         return <Header title="Библиотека" />
     }

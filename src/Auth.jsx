@@ -1,7 +1,7 @@
 // src/Auth.jsx
 import React from 'react';
-// 👇 ИМПОРТИРУЕМ signInWithPopup и linkWithPopup
-import { getAuth, GoogleAuthProvider, signInWithPopup, linkWithPopup, signOut } from "firebase/auth";
+// 👇 Убираем getAuth, signInWithPopup, linkWithPopup. Оставляем только то, что нужно для провайдера.
+import { GoogleAuthProvider, signInWithPopup, linkWithPopup, signOut } from "firebase/auth";
 
 // --- Иконки (остаются без изменений) ---
 const GoogleIcon = () => (
@@ -19,23 +19,25 @@ const CrownIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/sv
 
 
 // --- Компонент Auth ---
-export const Auth = ({ user, subscription, onGetSubscriptionClick }) => {
-    const auth = getAuth();
+// 👇 Добавляем 'auth' в список props
+export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
+    // 💥 Убираем: const auth = getAuth();
     const provider = new GoogleAuthProvider();
 
     const handleSignIn = async () => {
         try {
             if (auth.currentUser && auth.currentUser.isAnonymous) {
-                // ✅ ПРАВИЛЬНО: Связываем анонимного пользователя с Google через попап
                 await linkWithPopup(auth.currentUser, provider);
             } else {
-                // ✅ ПРАВИЛЬНО: Входим через попап
                 await signInWithPopup(auth, provider);
             }
         } catch (error) {
             console.error("Ошибка входа или привязки:", error);
-            // Тут можно добавить уведомление для пользователя, если вход не удался
         }
+    };
+
+    const handleSignOut = () => {
+        signOut(auth).catch(error => console.error("Ошибка выхода:", error));
     };
     
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();

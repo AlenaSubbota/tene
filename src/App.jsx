@@ -6,12 +6,9 @@ import {
     serverTimestamp, runTransaction
 } from "firebase/firestore";
 import { 
-    getAuth, 
+     getAuth, 
     onAuthStateChanged, 
-    signInAnonymously, 
-    getRedirectResult, 
-    linkWithCredential, 
-    GoogleAuthProvider 
+    signInAnonymously,
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
 

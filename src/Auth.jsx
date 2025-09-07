@@ -1,5 +1,7 @@
+// src/Auth.jsx
 import React from 'react';
-import { getAuth, GoogleAuthProvider, signInWithRedirect, linkWithRedirect, signOut } from "firebase/auth";
+// 👇 ИМПОРТИРУЕМ signInWithPopup и linkWithPopup
+import { getAuth, GoogleAuthProvider, signInWithPopup, linkWithPopup, signOut } from "firebase/auth";
 
 // --- Иконки (остаются без изменений) ---
 const GoogleIcon = () => (
@@ -22,21 +24,18 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick }) => {
     const provider = new GoogleAuthProvider();
 
     const handleSignIn = async () => {
-        // Если текущий пользователь анонимный, пытаемся связать аккаунты
-        if (auth.currentUser && auth.currentUser.isAnonymous) {
-            try {
-                await linkWithRedirect(auth.currentUser, provider);
-            } catch (error) {
-                console.error("Ошибка привязки аккаунтов:", error);
+        try {
+            if (auth.currentUser && auth.currentUser.isAnonymous) {
+                // ✅ ПРАВИЛЬНО: Связываем анонимного пользователя с Google через попап
+                await linkWithPopup(auth.currentUser, provider);
+            } else {
+                // ✅ ПРАВИЛЬНО: Входим через попап
+                await signInWithPopup(auth, provider);
             }
-        } else {
-            // Иначе — просто входим
-            await signInWithRedirect(auth, provider);
+        } catch (error) {
+            console.error("Ошибка входа или привязки:", error);
+            // Тут можно добавить уведомление для пользователя, если вход не удался
         }
-    };
-
-    const handleSignOut = () => {
-        signOut(auth).catch(error => console.error("Ошибка выхода:", error));
     };
     
     const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();

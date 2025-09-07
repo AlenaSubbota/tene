@@ -764,17 +764,38 @@ export default function App() {
   
   const userId = user?.uid;
 
-  useEffect(() => {
+  // Новый, исправленный код для вставки
+useEffect(() => {
+    setIsLoading(true); // Начинаем загрузку
+
     getRedirectResult(auth)
-      .then((result) => {
-        if (result) {
-          console.log("Результат перенаправления получен:", result.user);
-        }
-      })
-      .catch((error) => {
-        console.error("Ошибка при получении результата перенаправления:", error);
-      });
-  }, []);
+        .then((result) => {
+            if (result) {
+                // Если есть результат редиректа, это наш пользователь
+                console.log("Результат перенаправления получен:", result.user);
+                // setUser(result.user); // onAuthStateChanged сделает это за нас
+            }
+        })
+        .catch((error) => {
+            console.error("Ошибка при получении результата перенаправления:", error);
+        })
+        .finally(() => {
+            // Теперь, когда редирект обработан, устанавливаем слушатель
+            const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+                // ... (остальной код из вашего второго useEffect остается здесь)
+                if (firebaseUser) {
+                    setUser(firebaseUser);
+                    // ... (и так далее)
+                } else {
+                    await signInAnonymously(auth);
+                }
+                setIsLoading(false); 
+            });
+
+            // Не забудьте вернуть функцию отписки
+            return () => unsubAuth();
+        });
+}, []); // Пустой массив зависимостей остается
 
   const updateUserDoc = useCallback(async (dataToUpdate) => {
     if (userId) { 

@@ -20,12 +20,14 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
     const provider = new GoogleAuthProvider();
 
     const handleSignIn = async () => {
+        console.log("Попытка входа через Google..."); // <-- Строка для отладки
         try {
             if (auth.currentUser && auth.currentUser.isAnonymous) {
                 await linkWithPopup(auth.currentUser, provider);
             } else {
                 await signInWithPopup(auth, provider);
             }
+            console.log("Вход выполнен успешно!"); // <-- Строка для отладки
         } catch (error) {
             console.error("Ошибка входа или привязки:", error);
         }

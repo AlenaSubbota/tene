@@ -5,12 +5,11 @@ import {
     collection, onSnapshot, query, orderBy, addDoc,
     serverTimestamp, runTransaction
 } from "firebase/firestore";
-// 👇 ИСПРАВЛЕННЫЕ ИМПОРТЫ
-import {
-    initializeAuth, // <--- ИМПОРТИРУЕМ ЭТО
-    onAuthStateChanged,
+import { 
+    initializeAuth, 
+    onAuthStateChanged, 
     signInAnonymously,
-    browserLocalPersistence // <--- И ЭТО
+    browserLocalPersistence
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
 
@@ -26,8 +25,6 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-
-// 👇 Инициализируем Auth с явным указанием хранилища
 const auth = initializeAuth(app, {
   persistence: browserLocalPersistence
 });
@@ -635,6 +632,7 @@ const BookmarksPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) =
     </div>
 )
 
+// 👇 ВОТ ИСПРАВЛЕНИЕ: Принимаем 'auth' и передаём его в <Auth />
 const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth }) => {
     const handleCopyId = () => {
         if (userId) {
@@ -647,9 +645,7 @@ const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth 
     return (
         <div>
             <Header title="Профиль" />
-            {/* 👇 И вот здесь он передаётся дальше в компонент Auth */}
             <Auth user={user} subscription={subscription} onGetSubscriptionClick={onGetSubscriptionClick} auth={auth} />
-            
             <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4">
                 <h3 className="font-bold mb-2">Ваш ID для администрирования</h3>
                 <p className="text-sm opacity-70 mb-3">
@@ -785,11 +781,10 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // --- ИСПРАВЛЕННАЯ И УПРОЩЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
+  // --- УПРОЩЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
   useEffect(() => {
     setIsLoading(true);
     
-    // Загружаем статические данные сразу
     fetch(`/tene/data/novels.json`)
       .then(res => res.json())
       .then(data => setNovels(data.novels))
@@ -797,9 +792,8 @@ export default function App() {
 
     let unsubUserFromFirestore = () => {};
 
-    // Устанавливаем слушатель состояния аутентификации.
     const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      unsubUserFromFirestore(); // Отписываемся от данных старого пользователя
+      unsubUserFromFirestore();
 
       if (firebaseUser) {
         setUser(firebaseUser);
@@ -818,7 +812,6 @@ export default function App() {
               setFontClass(data.settings.fontClass || 'font-sans');
             }
           } else {
-            // Если документа нет, сбрасываем состояние
             setSubscription(null);
             setLastReadData(null);
             setBookmarks([]);
@@ -833,7 +826,6 @@ export default function App() {
             }
         }
       } else {
-        // Если пользователя нет, входим анонимно
         setUser(null);
         await signInAnonymously(auth);
       }
@@ -1037,7 +1029,8 @@ export default function App() {
       case 'bookmarks':
         return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'profile':
-         return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} auth={auth} />
+        // 👇 ВОТ ГЛАВНОЕ ИСПРАВЛЕНИЕ: ПЕРЕДАЁМ auth В ProfilePage
+        return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} auth={auth} />
       default:
         return <Header title="Библиотека" />
     }

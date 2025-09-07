@@ -163,8 +163,14 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingText, setEditingText] = useState("");
+  const [replyingTo, setReplyingTo] = useState(null); // ID комментария, на который отвечаем
+  const [replyText, setReplyText] = useState("");   // Текст ответа
+
   const [likeCount, setLikeCount] = useState(0);
   const [userHasLiked, setUserHasLiked] = useState(false);
+  
+  const [commentLikes, setCommentLikes] = useState({}); // { commentId: true/false }
+
   const [showChapterList, setShowChapterList] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
@@ -175,6 +181,13 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
   const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
 
+  // Функция для форматирования даты
+  const formatDate = (timestamp) => {
+    if (!timestamp?.toDate) return '';
+    const date = timestamp.toDate();
+    return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
   useEffect(() => {
     const unsubMeta = onSnapshot(chapterMetaRef, (docSnap) => {
       setLikeCount(docSnap.data()?.likeCount || 0);
@@ -184,6 +197,16 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     const unsubComments = onSnapshot(commentsQuery, (querySnapshot) => {
       const commentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setComments(commentsData);
+
+      // После загрузки комментариев, проверяем лайки для каждого
+      if (userId) {
+        commentsData.forEach(comment => {
+          const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${comment.id}/likes`, userId);
+          getDoc(likeRef).then(likeSnap => {
+            setCommentLikes(prev => ({ ...prev, [comment.id]: likeSnap.exists() }));
+          });
+        });
+      }
     });
 
     let unsubLike = () => {};
@@ -201,17 +224,16 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     };
   }, [chapterMetaRef, novel.id, chapter.id, userId]);
 
+  // Загрузка контента главы (без изменений)
   useEffect(() => {
     const fetchContent = async () => {
         setIsLoadingContent(true);
-        setChapterContent(''); 
-        
+        setChapterContent('');
         if (chapter.isPaid && !hasActiveSubscription) {
             setIsLoadingContent(false);
             setChapterContent('### 🔒 Для доступа к этой главе необходима подписка.\n\nПожалуйста, оформите подписку в разделе "Профиль", чтобы продолжить чтение.');
             return;
         }
-
         try {
             const chapterDocRef = doc(db, 'chapter_content', `${novel.id}-${chapter.id}`);
             const docSnap = await getDoc(chapterDocRef);
@@ -227,26 +249,63 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
             setIsLoadingContent(false);
         }
     };
-
     fetchContent();
   }, [novel.id, chapter.id, hasActiveSubscription]);
 
-  const handleCommentSubmit = async (e) => {
+  const handleCommentSubmit = async (e, parentId = null) => {
     e.preventDefault();
-    if (!newComment.trim() || !userId) return;
+    const text = parentId ? replyText : newComment;
+    if (!text.trim() || !userId) return;
 
     try {
-        await setDoc(chapterMetaRef, {}, { merge: true });
+        await setDoc(chapterMetaRef, {}, { merge: true }); // Убедимся, что документ-родитель существует
         const commentsColRef = collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`);
-        await addDoc(commentsColRef, {
+        const commentData = {
           userId,
           userName: userName || "Аноним",
-          text: newComment,
-          timestamp: serverTimestamp()
-        });
-        setNewComment("");
+          text,
+          timestamp: serverTimestamp(),
+          likeCount: 0,
+        };
+        if (parentId) {
+            commentData.replyTo = parentId;
+        }
+        await addDoc(commentsColRef, commentData);
+        if (parentId) {
+            setReplyingTo(null);
+            setReplyText("");
+        } else {
+            setNewComment("");
+        }
     } catch (error) {
         console.error("Ошибка добавления комментария:", error);
+    }
+  };
+
+  const handleCommentLike = async (commentId) => {
+    if (!userId) return;
+    const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
+    const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${commentId}/likes`, userId);
+
+    try {
+        await runTransaction(db, async (transaction) => {
+            const likeDoc = await transaction.get(likeRef);
+            const commentDoc = await transaction.get(commentRef);
+            if (!commentDoc.exists()) return;
+            const currentLikes = commentDoc.data().likeCount || 0;
+
+            if (likeDoc.exists()) {
+                transaction.delete(likeRef);
+                transaction.update(commentRef, { likeCount: Math.max(0, currentLikes - 1) });
+                setCommentLikes(prev => ({...prev, [commentId]: false}));
+            } else {
+                transaction.set(likeRef, { timestamp: serverTimestamp() });
+                transaction.update(commentRef, { likeCount: currentLikes + 1 });
+                setCommentLikes(prev => ({...prev, [commentId]: true}));
+            }
+        });
+    } catch (error) {
+        console.error("Ошибка при обновлении лайка комментария:", error);
     }
   };
 
@@ -337,6 +396,70 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     return markdownText;
   };
 
+  // Функция для группировки комментариев в древовидную структуру
+  const groupComments = (commentsList) => {
+      const commentMap = {};
+      const topLevelComments = [];
+
+      commentsList.forEach(comment => {
+          commentMap[comment.id] = { ...comment, replies: [] };
+      });
+
+      commentsList.forEach(comment => {
+          if (comment.replyTo && commentMap[comment.replyTo]) {
+              commentMap[comment.replyTo].replies.push(commentMap[comment.id]);
+          } else {
+              topLevelComments.push(commentMap[comment.id]);
+          }
+      });
+      return topLevelComments;
+  };
+
+  // Компонент для рекурсивного отображения комментария и его ответов
+  const Comment = ({ comment, level = 0 }) => (
+    <div style={{ marginLeft: `${level * 16}px` }} className="flex flex-col">
+        <div className="p-3 rounded-lg bg-component-bg border border-border-color">
+            <div className="flex justify-between items-center text-xs opacity-70 mb-1">
+                <p className="font-bold text-sm text-text-main opacity-100">{comment.userName}</p>
+                <span>{formatDate(comment.timestamp)}</span>
+            </div>
+             {editingCommentId === comment.id ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input type="text" value={editingText} onChange={(e) => setEditingText(e.target.value)} className="w-full bg-background border border-border-color rounded-lg py-1 px-2 text-text-main text-sm" />
+                <button onClick={() => handleUpdateComment(comment.id)} className="p-1 rounded-full bg-green-500 text-white">✓</button>
+                <button onClick={() => setEditingCommentId(null)} className="p-1 rounded-full bg-gray-500 text-white">✕</button>
+              </div>
+            ) : ( <p className="text-sm mt-1 opacity-90">{comment.text}</p> )}
+
+            <div className="flex items-center gap-4 mt-2">
+                <button onClick={() => handleCommentLike(comment.id)} className="flex items-center gap-1 text-xs text-gray-500">
+                    <HeartIcon filled={commentLikes[comment.id]} className={`w-4 h-4 ${commentLikes[comment.id] ? 'text-accent' : ''}`} />
+                    <span>{comment.likeCount || 0}</span>
+                </button>
+                <button onClick={() => { setReplyingTo(comment.id); setReplyText(''); }} className="text-xs text-gray-500">Ответить</button>
+                 {(userId === comment.userId || isUserAdmin) && (
+                    <>
+                        <button onClick={() => handleEdit(comment)} className="text-xs text-gray-500">Редактировать</button>
+                        <button onClick={() => handleDelete(comment.id)} className="text-xs text-red-500">Удалить</button>
+                    </>
+                 )}
+            </div>
+        </div>
+
+        {replyingTo === comment.id && (
+            <form onSubmit={(e) => handleCommentSubmit(e, comment.id)} className="flex items-center gap-2 mt-2">
+                <input type="text" value={replyText} onChange={(e) => setReplyText(e.target.value)} placeholder={`Ответ для ${comment.userName}...`} className="w-full bg-background border border-border-color rounded-lg py-1 px-3 text-sm" />
+                <button type="submit" className="p-1.5 rounded-full bg-accent text-white"><SendIcon className="w-4 h-4" /></button>
+            </form>
+        )}
+
+        {comment.replies && comment.replies.length > 0 && (
+            <div className="mt-2 space-y-2 border-l-2 border-border-color pl-2">
+                {comment.replies.map(reply => <Comment key={reply.id} comment={reply} level={0} />)}
+            </div>
+        )}
+    </div>
+  );
 
   return (
     <div className="min-h-screen transition-colors duration-300 bg-background text-text-main">
@@ -364,35 +487,13 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
 
           <h3 className="text-xl font-bold mb-4">Комментарии</h3>
           <div className="space-y-4 mb-6">
-            {comments.map(comment => (
-              <div key={comment.id} className="p-3 rounded-lg bg-component-bg border border-border-color">
-                <p className="font-bold text-sm">{comment.userName}</p>
-                {editingCommentId === comment.id ? (
-                  <div className="flex items-center gap-2 mt-1">
-                    <input
-                      type="text"
-                      value={editingText}
-                      onChange={(e) => setEditingText(e.target.value)}
-                      className="w-full bg-background border border-border-color rounded-lg py-1 px-2 text-text-main text-sm"
-                    />
-                    <button onClick={() => handleUpdateComment(comment.id)} className="p-1 rounded-full bg-green-500 text-white">✓</button>
-                    <button onClick={() => setEditingCommentId(null)} className="p-1 rounded-full bg-gray-500 text-white">✕</button>
-                  </div>
-                ) : (
-                  <p className="text-sm mt-1 opacity-90">{comment.text}</p>
-                )}
-                 {(userId === comment.userId || isUserAdmin) && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <button onClick={() => handleEdit(comment)} className="text-xs text-gray-500">Редактировать</button>
-                    <button onClick={() => handleDelete(comment.id)} className="text-xs text-red-500">Удалить</button>
-                  </div>
-                )}
-              </div>
-            ))}
-            {comments.length === 0 && <p className="opacity-70 text-sm">Комментариев пока нет. Будьте первым!</p>}
+            {comments.length > 0
+                ? groupComments(comments).map(comment => <Comment key={comment.id} comment={comment} />)
+                : <p className="opacity-70 text-sm">Комментариев пока нет. Будьте первым!</p>
+            }
           </div>
 
-          <form onSubmit={handleCommentSubmit} className="flex items-center gap-2">
+          <form onSubmit={(e) => handleCommentSubmit(e, null)} className="flex items-center gap-2">
             <input
               type="text"
               value={newComment}

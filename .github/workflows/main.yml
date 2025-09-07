@@ -1,0 +1,63 @@
+# Простой воркфлоу для сборки и публикации Vite-приложения на GitHub Pages
+name: Deploy Vite site to Pages
+
+on:
+  # Запускается при пуше в 'main' ветку
+  push:
+    branches: [ "main" ]
+  # Позволяет запускать этот воркфлоу вручную со страницы Actions
+  workflow_dispatch:
+
+# Устанавливаем права для GITHUB_TOKEN, чтобы разрешить публикацию на GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Разрешаем только одну одновременную публикацию, отменяя предыдущие
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  # Задача сборки
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+        env: # <-- ВОТ ВАЖНАЯ ЧАСТЬ ДЛЯ ВАШИХ КЛЮЧЕЙ
+          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
+          VITE_AUTH_DOMAIN: ${{ secrets.VITE_AUTH_DOMAIN }}
+          VITE_PROJECT_ID: ${{ secrets.VITE_PROJECT_ID }}
+          VITE_STORAGE_BUCKET: ${{ secrets.VITE_STORAGE_BUCKET }}
+          VITE_MESSAGING_SENDER_ID: ${{ secrets.VITE_MESSAGING_SENDER_ID }}
+          VITE_APP_ID: ${{ secrets.VITE_APP_ID }}
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Загружаем из папки 'docs', как указано в вашем vite.config.js
+          path: './docs'
+      
+  # Задача публикации
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

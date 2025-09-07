@@ -10,7 +10,7 @@ import {
     onAuthStateChanged, 
     signInAnonymously,
     browserLocalPersistence,
-    getRedirectResult // <-- ИЗМЕНЕНИЕ: Добавлен импорт
+    getRedirectResult // <-- ИЗМЕНЕНИЕ: Убраны лишние импорты и добавлен этот
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
 
@@ -762,6 +762,7 @@ export default function App() {
   
   const userId = user?.uid;
 
+  // ИЗМЕНЕНИЕ: Добавляем этот useEffect для обработки результата перенаправления
   useEffect(() => {
     getRedirectResult(auth)
       .then((result) => {

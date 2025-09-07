@@ -1,6 +1,6 @@
 // src/Auth.jsx
 import React from 'react';
-// Добавляем signInWithRedirect в импорты
+// ИЗМЕНЕНИЕ: Импортируем signInWithRedirect и linkWithRedirect вместо signInWithPopup
 import { GoogleAuthProvider, signInWithRedirect, linkWithRedirect, signOut } from "firebase/auth";
 
 // --- Иконки (остаются без изменений) ---
@@ -13,20 +13,20 @@ const GoogleIcon = () => (
         <path fill="none" d="M0 0h48v48H0z"></path>
     </svg>
 );
-// ...остальные иконки без изменений...
+const CrownIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>);
+
 
 // --- Компонент Auth ---
 export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
     const provider = new GoogleAuthProvider();
 
     const handleSignIn = async () => {
-        console.log("Попытка входа через Google (перенаправление)...");
         try {
             if (auth.currentUser && auth.currentUser.isAnonymous) {
-                // Заменяем linkWithPopup на linkWithRedirect
+                // ИЗМЕНЕНИЕ: Используем linkWithRedirect
                 await linkWithRedirect(auth.currentUser, provider);
             } else {
-                // Заменяем signInWithPopup на signInWithRedirect
+                // ИЗМЕНЕНИЕ: Используем signInWithRedirect
                 await signInWithRedirect(auth, provider);
             }
         } catch (error) {
@@ -43,7 +43,7 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
     return (
         <div className="p-4 space-y-4">
             {user && !user.isAnonymous ? (
-                 <div className="p-4 rounded-lg bg-component-bg border border-border-color">
+                <div className="p-4 rounded-lg bg-component-bg border border-border-color">
                     <div className="flex items-center space-x-4 mb-4">
                         <img src={user.photoURL || undefined} alt="Avatar" className="w-16 h-16 rounded-full" />
                         <div>
@@ -65,8 +65,8 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
                     </button>
                 </div>
             )}
-            {/* ...остальная часть компонента без изменений... */}
-             <div className="p-4 rounded-lg bg-component-bg border border-border-color">
+
+            <div className="p-4 rounded-lg bg-component-bg border border-border-color">
                 <h3 className="font-bold mb-2">Подписка</h3>
                  {hasActiveSubscription ? (
                     <div>

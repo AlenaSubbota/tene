@@ -1053,7 +1053,7 @@ export default function App() {
       case 'search':
         return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
       case 'bookmarks':
-        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={onSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
+        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
       case 'profile':
         return <ProfilePage subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} />
       default:

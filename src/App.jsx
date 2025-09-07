@@ -6,13 +6,15 @@ import {
     serverTimestamp, runTransaction
 } from "firebase/firestore";
 import { 
-    initializeAuth, 
+    getAuth, // <--- ИЗМЕНЕНИЕ
     onAuthStateChanged, 
     signInAnonymously,
     browserLocalPersistence,
-    getRedirectResult
+    getRedirectResult,
+    setPersistence // <--- ДОБАВЛЕНО
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
+
 
 // --- Firebase Config ---
 // ИЗМЕНЕНИЕ: Ключи вставлены прямо сюда для 100% гарантии
@@ -27,9 +29,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = initializeAuth(app, {
-  persistence: browserLocalPersistence
-});
+const auth = getAuth(app); // <--- ИЗМЕНЕНИЕ
+setPersistence(auth, browserLocalPersistence); // <--- ИЗМЕНЕНИЕ
 
 // --- Иконки (остаются без изменений) ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);

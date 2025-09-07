@@ -19,8 +19,9 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
 
     const handleSignIn = async () => {
         try {
-            if (auth.currentUser && auth.currentUser.isAnonymous) {
-                await linkWithRedirect(auth.currentUser, provider);
+            // Заменяем 'auth.currentUser' на 'user' из пропсов
+            if (user && user.isAnonymous) {
+                await linkWithRedirect(user, provider); // <-- ИЗМЕНЕНИЕ
             } else {
                 await signInWithRedirect(auth, provider);
             }

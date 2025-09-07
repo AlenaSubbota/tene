@@ -345,7 +345,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
     const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${commentId}/likes`, userId);
     
-    // Optimistic UI update
     setComments(prevComments => prevComments.map(c => {
         if (c.id === commentId) {
             const newLikeCount = c.userHasLiked ? (c.likeCount || 1) - 1 : (c.likeCount || 0) + 1;
@@ -370,7 +369,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         });
     } catch (error) {
         console.error("Ошибка при обновлении лайка комментария:", error);
-        // Revert UI on error if needed
     }
   }, [userId, novel.id, chapter.id]);
   
@@ -396,6 +394,11 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
         await deleteDoc(commentRef);
     }, [novel.id, chapter.id]);
+
+    const handleReply = useCallback((commentId) => {
+        setReplyingTo(prev => prev === commentId ? null : commentId);
+        setReplyText('');
+    }, []);
 
   const handleLike = async () => {
     if (!userId) return;
@@ -512,7 +515,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
                     <Comment 
                         key={comment.id} 
                         comment={comment}
-                        onReply={useCallback((commentId) => { setReplyingTo(commentId === replyingTo ? null : commentId); setReplyText(''); }, [replyingTo])}
+                        onReply={handleReply}
                         onLike={handleCommentLike}
                         onEdit={handleEdit}
                         onDelete={handleDelete}
@@ -612,7 +615,7 @@ const SearchPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => {
             <Header title="Поиск" />
             <div className="p-4">
                 <div className="relative mb-6">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2">
+                    <div className="absolute left-3 top-1-2 -translate-y-1/2">
                         <SearchIcon className="text-text-main opacity-50" />
                     </div>
                     <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-component-bg border-border-color border rounded-lg py-2 pl-10 pr-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent transition-shadow duration-300" />
@@ -1050,7 +1053,7 @@ export default function App() {
       case 'search':
         return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
       case 'bookmarks':
-        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
+        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={onSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
       case 'profile':
         return <ProfilePage subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} />
       default:
@@ -1072,3 +1075,4 @@ export default function App() {
     </main>
   );
 }
+

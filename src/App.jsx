@@ -29,7 +29,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// --- ICONS (остаются без изменений) ---
+// --- Иконки (остаются без изменений) ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
 const BackIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>);
 const SearchIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
@@ -780,84 +780,84 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-// --- ИСПРАВЛЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
+  // --- ИСПРАВЛЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
   useEffect(() => {
     let unsubUserFromFirestore = () => {};
 
-    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-        // Отписываемся от данных предыдущего пользователя
-        unsubUserFromFirestore();
-
-        if (firebaseUser) {
-            setUser(firebaseUser);
-            const idTokenResult = await firebaseUser.getIdTokenResult();
-            setIsUserAdmin(!!idTokenResult.claims.admin);
-
-            // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ---
-            // Подписываемся на данные НОВОГО пользователя из Firestore
-            const userDocRef = doc(db, "users", firebaseUser.uid);
-            unsubUserFromFirestore = onSnapshot(userDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    setSubscription(data.subscription || null);
-                    setLastReadData(data.lastRead || null);
-                    setBookmarks(data.bookmarks || []);
-                    if (data.settings) {
-                        setFontSize(data.settings.fontSize || 16);
-                        setFontClass(data.settings.fontClass || 'font-sans');
-                    }
-                }
-            });
-
-            // Привязка Telegram ID (только для неанонимных пользователей)
-            const tg = window.Telegram?.WebApp;
-            if (tg && !firebaseUser.isAnonymous) {
-                const telegramId = tg.initDataUnsafe?.user?.id?.toString();
-                if (telegramId) {
-                   await setDoc(doc(db, "users", firebaseUser.uid), { telegramId: telegramId }, { merge: true });
-                }
-            }
-        } else {
-            // Если пользователя нет, создаем анонимного
-            setUser(null);
-            signInAnonymously(auth).catch(error => {
-                console.error("Ошибка анонимного входа:", error);
-            });
-        }
-    });
-
+    // Эта функция будет вызываться один раз при старте приложения
     const init = async () => {
+        setIsLoading(true);
         try {
-            // Загружаем новеллы
-            const response = await fetch(`/tene/data/novels.json`);
-            if (!response.ok) throw new Error('Failed to fetch novels');
-            setNovels((await response.json()).novels);
-            
-            // Обрабатываем результат редиректа
-            await getRedirectResult(auth);
-
+            // 1. Сначала обрабатываем результат редиректа. Это нужно сделать до onAuthStateChanged.
+            const result = await getRedirectResult(auth);
+            if (result) {
+                console.log("Результат редиректа получен:", result.user);
+            }
         } catch (error) {
-            // Обрабатываем ошибку, если аккаунт уже существует
             if (error.code === 'auth/account-exists-with-different-credential' && auth.currentUser?.isAnonymous) {
                 const credential = GoogleAuthProvider.credentialFromError(error);
-                if (credential) {
-                    await linkWithCredential(auth.currentUser, credential);
+                if (credential) await linkWithCredential(auth.currentUser, credential);
+            } else {
+                console.error("Ошибка обработки результата редиректа:", error);
+            }
+        }
+
+        // 2. Загружаем статические данные
+        fetch(`/tene/data/novels.json`)
+            .then(res => res.json())
+            .then(data => setNovels(data.novels))
+            .catch(err => console.error("Ошибка загрузки новелл:", err));
+
+        // 3. Устанавливаем слушатель состояния аутентификации. Он сработает СЕЙЧАС с текущим 
+        // пользователем (который мог измениться после getRedirectResult) и будет обновлять его в будущем.
+        const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+            unsubUserFromFirestore(); // Отписываемся от данных старого пользователя
+
+            if (firebaseUser) {
+                setUser(firebaseUser);
+                const idTokenResult = await firebaseUser.getIdTokenResult();
+                setIsUserAdmin(!!idTokenResult.claims.admin);
+
+                const userDocRef = doc(db, "users", firebaseUser.uid);
+                unsubUserFromFirestore = onSnapshot(userDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        setSubscription(data.subscription || null);
+                        setLastReadData(data.lastRead || null);
+                        setBookmarks(data.bookmarks || []);
+                        if (data.settings) {
+                            setFontSize(data.settings.fontSize || 16);
+                            setFontClass(data.settings.fontClass || 'font-sans');
+                        }
+                    } else {
+                         // Если документа нет, сбрасываем состояние
+                         setSubscription(null);
+                         setLastReadData(null);
+                         setBookmarks([]);
+                    }
+                });
+
+                const tg = window.Telegram?.WebApp;
+                if (tg && !firebaseUser.isAnonymous) {
+                    const telegramId = tg.initDataUnsafe?.user?.id?.toString();
+                    if (telegramId) {
+                       await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
+                    }
                 }
             } else {
-                console.error("Критическая ошибка инициализации:", error);
+                setUser(null);
+                await signInAnonymously(auth);
             }
-        } finally {
-            // В любом случае завершаем загрузку
-            setIsLoading(false);
-        }
+            setIsLoading(false); // Завершаем загрузку только после того, как пользователь определен
+        });
+
+        return () => {
+            unsubAuth();
+            unsubUserFromFirestore();
+        };
     };
 
     init();
-
-    return () => {
-        unsubAuth();
-        unsubUserFromFirestore();
-    };
   }, []);
 
 

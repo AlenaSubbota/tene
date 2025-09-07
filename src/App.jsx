@@ -9,7 +9,11 @@ import {
     initializeAuth, 
     onAuthStateChanged, 
     signInAnonymously,
-    browserLocalPersistence
+    browserLocalPersistence,
+    GoogleAuthProvider,
+    signInWithPopup,
+    linkWithPopup,
+    signOut
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
 
@@ -456,7 +460,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         setSelectedPlan(plan);
         setIsSubModalOpen(false);
     };
-
+  
     const handlePaymentMethodSelect = async (method) => {
       const tg = window.Telegram?.WebApp;
       if (tg && userId && selectedPlan) {
@@ -632,7 +636,6 @@ const BookmarksPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) =
     </div>
 )
 
-// 👇 ВОТ ИСПРАВЛЕНИЕ: Принимаем 'auth' и передаём его в <Auth />
 const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth }) => {
     const handleCopyId = () => {
         if (userId) {
@@ -1029,7 +1032,6 @@ export default function App() {
       case 'bookmarks':
         return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'profile':
-        // 👇 ВОТ ГЛАВНОЕ ИСПРАВЛЕНИЕ: ПЕРЕДАЁМ auth В ProfilePage
         return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} auth={auth} />
       default:
         return <Header title="Библиотека" />

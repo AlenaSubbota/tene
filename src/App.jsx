@@ -5,7 +5,8 @@ import {
     collection, onSnapshot, query, orderBy, addDoc,
     serverTimestamp, runTransaction
 } from "firebase/firestore";
-import { getAuth, signInAnonymously } from "firebase/auth";
+import { getAuth, onAuthStateChanged, signInAnonymously } from "firebase/auth";
+import { Auth } from './Auth.jsx'; // Импортируем новый компонент
 
 // --- Firebase Config ---
 const firebaseConfig = {
@@ -21,7 +22,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// --- ICONS ---
+// --- ICONS (остаются без изменений) ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
 const BackIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>);
 const SearchIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
@@ -36,7 +37,7 @@ const ChevronLeftIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/20
 const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>;
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 
-// --- Components ---
+// --- Компоненты (остаются без изменений, кроме ProfilePage) ---
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
     <HeartIcon className="animate-pulse-heart text-accent" filled />
@@ -624,66 +625,38 @@ const BookmarksPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) =
     </div>
 )
 
-const ProfilePage = ({ subscription, onGetSubscriptionClick, userId }) => {
-    const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
-
+const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId }) => {
     const handleCopyId = () => {
         if (userId) {
             navigator.clipboard.writeText(userId)
-                .then(() => {
-                    console.log("Firebase UID скопирован в буфер обмена");
-                })
-                .catch(err => {
-                    console.error('Не удалось скопировать UID: ', err);
-                });
+                .then(() => console.log("Firebase UID скопирован в буфер обмена"))
+                .catch(err => console.error('Не удалось скопировать UID: ', err));
         }
     };
 
     return (
         <div>
             <Header title="Профиль" />
-            <div className="p-4 space-y-4">
-                 <div className="p-4 rounded-lg bg-component-bg border border-border-color">
-                    <h3 className="font-bold mb-2">Подписка</h3>
-                    {hasActiveSubscription ? (
-                        <div>
-                            <p className="text-green-500">Активна</p>
-                            <p className="text-sm opacity-70">
-                                Заканчивается: {new Date(subscription.expires_at).toLocaleDateString()}
-                            </p>
-                        </div>
-                    ) : (
-                        <div>
-                            <p className="text-red-500">Неактивна</p>
-                             <p className="text-sm opacity-70 mb-3">
-                                Оформите подписку, чтобы получить доступ ко всем платным главам.
-                            </p>
-                            <button onClick={onGetSubscriptionClick} className="w-full py-2 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105">
-                                Оформить подписку
-                            </button>
-                        </div>
-                    )}
+            <Auth user={user} subscription={subscription} onGetSubscriptionClick={onGetSubscriptionClick} />
+            <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4">
+                <h3 className="font-bold mb-2">Ваш ID для администрирования</h3>
+                <p className="text-sm opacity-70 mb-3">
+                    Этот ID нужен для назначения прав администратора через Telegram-бота.
+                </p>
+                <div className="bg-background p-2 rounded-md text-xs break-all mb-3">
+                    <code>{userId || "Загрузка..."}</code>
                 </div>
-                <div className="p-4 rounded-lg bg-component-bg border border-border-color">
-                    <h3 className="font-bold mb-2">Ваш ID для администрирования</h3>
-                    <p className="text-sm opacity-70 mb-3">
-                        Этот ID нужен для назначения прав администратора через Telegram-бота.
-                    </p>
-                    <div className="bg-background p-2 rounded-md text-xs break-all mb-3">
-                        <code>{userId || "Загрузка..."}</code>
-                    </div>
-                    <button 
-                        onClick={handleCopyId} 
-                        disabled={!userId}
-                        className="w-full py-2 rounded-lg bg-gray-200 text-gray-800 font-bold transition-all hover:scale-105 disabled:opacity-50"
-                    >
-                        Копировать ID
-                    </button>
-                </div>
+                <button 
+                    onClick={handleCopyId} 
+                    disabled={!userId}
+                    className="w-full py-2 rounded-lg bg-gray-200 text-gray-800 font-bold transition-all hover:scale-105 disabled:opacity-50"
+                >
+                    Копировать ID
+                </button>
             </div>
         </div>
-    )
-}
+    );
+};
 
 const BottomNav = ({ activeTab, setActiveTab }) => {
     const navItems = [
@@ -764,8 +737,7 @@ export default function App() {
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
   const [subscription, setSubscription] = useState(null);
-  const [userId, setUserId] = useState(null);
-  const [userName, setUserName] = useState(null);
+  const [user, setUser] = useState(null); // <-- Заменяем userId и userName
   const [isLoading, setIsLoading] = useState(true);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
   
@@ -779,6 +751,8 @@ export default function App() {
   const [selectedNews, setSelectedNews] = useState(null);
 
   const BOT_USERNAME = "tenebrisverbot";
+  
+  const userId = user?.uid; // <-- Получаем userId из объекта user
 
   const updateUserDoc = useCallback(async (dataToUpdate) => {
     if (userId) { 
@@ -799,6 +773,7 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
+  // --- Новая логика аутентификации ---
   useEffect(() => {
     const init = async () => {
       try {
@@ -809,50 +784,47 @@ export default function App() {
         }
         const data = await response.json();
         setNovels(data.novels);
+        
+        onAuthStateChanged(auth, async (firebaseUser) => {
+            if (firebaseUser) {
+                // Пользователь вошел (или это существующий аноним)
+                setUser(firebaseUser);
+                const idTokenResult = await firebaseUser.getIdTokenResult();
+                setIsUserAdmin(!!idTokenResult.claims.admin);
 
-        const userCredential = await signInAnonymously(auth);
-        const firebaseUser = userCredential.user;
+                const userDocRef = doc(db, "users", firebaseUser.uid);
+                onSnapshot(userDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        setSubscription(data.subscription || null);
+                        setLastReadData(data.lastRead || null);
+                        setBookmarks(data.bookmarks || []);
+                        if (data.settings) {
+                            setFontSize(data.settings.fontSize || 16);
+                            setFontClass(data.settings.fontClass || 'font-sans');
+                        }
+                    }
+                });
 
-        const tg = window.Telegram?.WebApp;
-        let telegramId = null;
-        if (tg) {
-          tg.ready();
-          tg.expand();
-          setUserName(tg.initDataUnsafe?.user?.first_name || "Аноним");
-          telegramId = tg.initDataUnsafe?.user?.id?.toString();
-        } else {
-          setUserName("Аноним");
-        }
-
-        setUserId(firebaseUser.uid);
-        const idTokenResult = await firebaseUser.getIdTokenResult();
-        setIsUserAdmin(!!idTokenResult.claims.admin);
-
-        if (firebaseUser.uid) {
-            const userDocRef = doc(db, "users", firebaseUser.uid);
-            
-            if (telegramId) {
-                await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
-            }
-
-            onSnapshot(userDocRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    setSubscription(data.subscription || null);
-                    setLastReadData(data.lastRead || null);
-                    setBookmarks(data.bookmarks || []);
-                    if (data.settings) {
-                        setFontSize(data.settings.fontSize || 16);
-                        setFontClass(data.settings.fontClass || 'font-sans');
+                // Привязка Telegram ID, если он есть
+                const tg = window.Telegram?.WebApp;
+                if (tg && !firebaseUser.isAnonymous) {
+                    const telegramId = tg.initDataUnsafe?.user?.id?.toString();
+                    if (telegramId) {
+                       await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
                     }
                 }
-            });
-        }
-        
+            } else {
+                // Пользователь не вошел, создаем анонимного
+                signInAnonymously(auth).catch(error => {
+                    console.error("Ошибка анонимного входа:", error);
+                });
+            }
+            setIsLoading(false);
+        });
+
       } catch (error) {
         console.error("Критическая ошибка инициализации:", error);
-      } finally {
-        setIsLoading(false);
       }
     };
     init();
@@ -1015,7 +987,7 @@ export default function App() {
                 fontSize={fontSize} 
                 onFontSizeChange={handleTextSizeChange} 
                 userId={userId} 
-                userName={userName} 
+                userName={user?.displayName || 'Аноним'} 
                 currentFontClass={fontClass} 
                 onSelectChapter={handleSelectChapter} 
                 allChapters={chapters} 
@@ -1038,7 +1010,7 @@ export default function App() {
                     <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
                 </div>
             )}
-            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(genreFilter))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(n))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
           </>
         )
       case 'search':
@@ -1046,7 +1018,7 @@ export default function App() {
       case 'bookmarks':
         return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
       case 'profile':
-        return <ProfilePage subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} />
+        return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} />
       default:
         return <Header title="Библиотека" />
     }

@@ -10,10 +10,7 @@ import {
     onAuthStateChanged, 
     signInAnonymously,
     browserLocalPersistence,
-    GoogleAuthProvider,
-    signInWithPopup,
-    linkWithPopup,
-    signOut
+    getRedirectResult // <-- ИЗМЕНЕНИЕ: Добавлен импорт
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
 
@@ -764,6 +761,18 @@ export default function App() {
   const BOT_USERNAME = "tenebrisverbot";
   
   const userId = user?.uid;
+
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          console.log("Результат перенаправления получен:", result.user);
+        }
+      })
+      .catch((error) => {
+        console.error("Ошибка при получении результата перенаправления:", error);
+      });
+  }, []);
 
   const updateUserDoc = useCallback(async (dataToUpdate) => {
     if (userId) { 

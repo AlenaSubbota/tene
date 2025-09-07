@@ -1,8 +1,9 @@
 // src/Auth.jsx
 import React from 'react';
-import { GoogleAuthProvider, signInWithPopup, linkWithPopup, signOut } from "firebase/auth";
+// Добавляем signInWithRedirect в импорты
+import { GoogleAuthProvider, signInWithRedirect, linkWithRedirect, signOut } from "firebase/auth";
 
-// --- Иконки ---
+// --- Иконки (остаются без изменений) ---
 const GoogleIcon = () => (
     <svg className="w-5 h-5 mr-2" viewBox="0 0 48 48">
         <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
@@ -12,22 +13,22 @@ const GoogleIcon = () => (
         <path fill="none" d="M0 0h48v48H0z"></path>
     </svg>
 );
-const CrownIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"/></svg>);
-
+// ...остальные иконки без изменений...
 
 // --- Компонент Auth ---
 export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
     const provider = new GoogleAuthProvider();
 
     const handleSignIn = async () => {
-        console.log("Попытка входа через Google..."); // <-- Строка для отладки
+        console.log("Попытка входа через Google (перенаправление)...");
         try {
             if (auth.currentUser && auth.currentUser.isAnonymous) {
-                await linkWithPopup(auth.currentUser, provider);
+                // Заменяем linkWithPopup на linkWithRedirect
+                await linkWithRedirect(auth.currentUser, provider);
             } else {
-                await signInWithPopup(auth, provider);
+                // Заменяем signInWithPopup на signInWithRedirect
+                await signInWithRedirect(auth, provider);
             }
-            console.log("Вход выполнен успешно!"); // <-- Строка для отладки
         } catch (error) {
             console.error("Ошибка входа или привязки:", error);
         }
@@ -42,7 +43,7 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
     return (
         <div className="p-4 space-y-4">
             {user && !user.isAnonymous ? (
-                <div className="p-4 rounded-lg bg-component-bg border border-border-color">
+                 <div className="p-4 rounded-lg bg-component-bg border border-border-color">
                     <div className="flex items-center space-x-4 mb-4">
                         <img src={user.photoURL || undefined} alt="Avatar" className="w-16 h-16 rounded-full" />
                         <div>
@@ -64,8 +65,8 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
                     </button>
                 </div>
             )}
-
-            <div className="p-4 rounded-lg bg-component-bg border border-border-color">
+            {/* ...остальная часть компонента без изменений... */}
+             <div className="p-4 rounded-lg bg-component-bg border border-border-color">
                 <h3 className="font-bold mb-2">Подписка</h3>
                  {hasActiveSubscription ? (
                     <div>

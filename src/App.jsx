@@ -6,9 +6,10 @@ import {
     serverTimestamp, runTransaction
 } from "firebase/firestore";
 import { 
-     getAuth, 
+    getAuth, 
     onAuthStateChanged, 
     signInAnonymously,
+    GoogleAuthProvider 
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
 
@@ -24,7 +25,11 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app);
+
+// 👇 Инициализируем Auth с явным указанием хранилища
+const auth = initializeAuth(app, {
+  persistence: browserLocalPersistence
+});
 
 // --- Иконки (остаются без изменений) ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
@@ -308,96 +313,63 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   }, [chapterMetaRef, novel.id, chapter.id, userId]);
 
   useEffect(() => {
-    const fetchContent = async () => {
-        setIsLoadingContent(true);
-        setChapterContent(''); 
-        if (chapter.isPaid && !hasActiveSubscription) {
-            setIsLoadingContent(false);
-            setChapterContent('### 🔒 Для доступа к этой главе необходима подписка.\n\nПожалуйста, оформите подписку в разделе "Профиль", чтобы продолжить чтение.');
-            return;
-        }
-        try {
-            const chapterDocRef = doc(db, 'chapter_content', `${novel.id}-${chapter.id}`);
-            const docSnap = await getDoc(chapterDocRef);
-            if (docSnap.exists()) {
-                setChapterContent(docSnap.data().content);
-            } else {
-                setChapterContent('## Ошибка\n\nНе удалось загрузить текст главы. Пожалуйста, попробуйте позже.');
-            }
-        } catch (error) {
-            console.error("Ошибка загрузки главы:", error);
-            setChapterContent('## Ошибка\n\nПроизошла ошибка при загрузке. Проверьте ваше интернет-соединение.');
-        } finally {
-            setIsLoadingContent(false);
-        }
-    };
-    fetchContent();
-  }, [novel.id, chapter.id, hasActiveSubscription]);
-
-  const handleCommentSubmit = useCallback(async (e, parentId = null) => {
-    e.preventDefault();
-    const text = parentId ? replyText : newComment;
-    if (!text.trim() || !userId) return;
-    try {
-        await setDoc(chapterMetaRef, {}, { merge: true });
-        const commentsColRef = collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`);
-        const commentData = { userId, userName: userName || "Аноним", text, timestamp: serverTimestamp(), likeCount: 0 };
-        if (parentId) {
-            commentData.replyTo = parentId;
-        }
-        await addDoc(commentsColRef, commentData);
-        if (parentId) {
-            setReplyingTo(null);
-            setReplyText("");
-        } else {
-            setNewComment("");
-        }
-    } catch (error) {
-        console.error("Ошибка добавления комментария:", error);
-    }
-  }, [userId, userName, newComment, replyText, chapterMetaRef, novel.id, chapter.id]);
-
-  const handleCommentLike = useCallback(async (commentId) => {
-    if (!userId) return;
-    const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
-    const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${commentId}/likes`, userId);
+    setIsLoading(true);
     
-    setComments(prevComments => prevComments.map(c => {
-        if (c.id === commentId) {
-            const newLikeCount = c.userHasLiked ? (c.likeCount || 1) - 1 : (c.likeCount || 0) + 1;
-            return { ...c, userHasLiked: !c.userHasLiked, likeCount: newLikeCount };
-        }
-        return c;
-    }));
+    // Загружаем статические данные сразу
+    fetch(`/tene/data/novels.json`)
+      .then(res => res.json())
+      .then(data => setNovels(data.novels))
+      .catch(err => console.error("Ошибка загрузки новелл:", err));
 
-    try {
-        await runTransaction(db, async (transaction) => {
-            const likeDoc = await transaction.get(likeRef);
-            const commentDoc = await transaction.get(commentRef);
-            if (!commentDoc.exists()) return;
-            const currentLikes = commentDoc.data().likeCount || 0;
-            if (likeDoc.exists()) {
-                transaction.delete(likeRef);
-                transaction.update(commentRef, { likeCount: Math.max(0, currentLikes - 1) });
-            } else {
-                transaction.set(likeRef, { timestamp: serverTimestamp() });
-                transaction.update(commentRef, { likeCount: currentLikes + 1 });
+    let unsubUserFromFirestore = () => {};
+
+    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      unsubUserFromFirestore(); // Отписываемся от данных старого пользователя
+
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        const idTokenResult = await firebaseUser.getIdTokenResult();
+        setIsUserAdmin(!!idTokenResult.claims.admin);
+
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        unsubUserFromFirestore = onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setSubscription(data.subscription || null);
+            setLastReadData(data.lastRead || null);
+            setBookmarks(data.bookmarks || []);
+            if (data.settings) {
+              setFontSize(data.settings.fontSize || 16);
+              setFontClass(data.settings.fontClass || 'font-sans');
             }
+          } else {
+            setSubscription(null);
+            setLastReadData(null);
+            setBookmarks([]);
+          }
         });
-    } catch (error) {
-        console.error("Ошибка при обновлении лайка комментария:", error);
-    }
-  }, [userId, novel.id, chapter.id]);
-  
-    const handleEdit = useCallback((comment) => {
-        if (comment) {
-            setEditingCommentId(comment.id);
-            setEditingText(comment.text);
-        } else {
-            setEditingCommentId(null);
-            setEditingText("");
+
+        const tg = window.Telegram?.WebApp;
+        if (tg && !firebaseUser.isAnonymous) {
+            const telegramId = tg.initDataUnsafe?.user?.id?.toString();
+            if (telegramId) {
+               await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
+            }
         }
-    }, []);
+
+      } else {
+        // Если пользователя нет, входим анонимно
+        setUser(null);
+        await signInAnonymously(auth);
+      }
+      setIsLoading(false); 
+    });
+
+    return () => {
+      unsubAuth();
+      unsubUserFromFirestore();
+    };
+  }, []); // Пустой массив
 
     const handleUpdateComment = useCallback(async (commentId) => {
         if (!editingText.trim()) return;

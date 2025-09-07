@@ -11,7 +11,8 @@ import {
     signInAnonymously,
     browserLocalPersistence,
     getRedirectResult,
-    setPersistence
+    setPersistence,
+    updateProfile
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
 
@@ -818,9 +819,24 @@ export default function App() {
         
         const tg = window.Telegram?.WebApp;
         if (tg && !firebaseUser.isAnonymous) {
-            const telegramId = tg.initDataUnsafe?.user?.id?.toString();
-            if (telegramId) {
-               await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
+            const telegramUser = tg.initDataUnsafe?.user;
+            if (telegramUser?.id) {
+               await setDoc(userDocRef, { telegramId: telegramUser.id.toString() }, { merge: true });
+
+               // --- НАЧАЛО ИЗМЕНЕНИЙ ---
+               // Если у пользователя Firebase нет displayName, а в Telegram есть имя,
+               // то установим его.
+               if (!firebaseUser.displayName && telegramUser.first_name) {
+                    const telegramDisplayName = `${telegramUser.first_name} ${telegramUser.last_name || ''}`.trim();
+                    try {
+                        await updateProfile(firebaseUser, { displayName: telegramDisplayName });
+                        // Обновляем локальное состояние пользователя, чтобы имя сразу отобразилось
+                        setUser(auth.currentUser); 
+                    } catch (error) {
+                        console.error("Ошибка обновления профиля:", error);
+                    }
+               }
+               // --- КОНЕЦ ИЗМЕНЕНИЙ ---
             }
         }
         setIsLoading(false);

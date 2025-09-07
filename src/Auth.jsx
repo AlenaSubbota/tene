@@ -33,8 +33,12 @@ export const Auth = ({ user, subscription, onGetSubscriptionClick, auth }) => {
             const result = await signInWithPhoneNumber(auth, phoneNumber, appVerifier);
             setConfirmationResult(result);
         } catch (error) {
-            console.error("Ошибка при отправке кода:", error);
-            setError("Не удалось отправить код. Попробуйте перезагрузить страницу.");
+            // --- ИЗМЕНЕНИЯ ЗДЕСЬ ---
+            console.error("Детальная ошибка при отправке кода:", error);
+            // Показываем более информативную ошибку
+            setError(`Ошибка: ${error.code}. Попробуйте снова.`); 
+            // --- КОНЕЦ ИЗМЕНЕНИЙ ---
+            
             // В случае ошибки, возможно, потребуется сбросить reCAPTCHA
             window.recaptchaVerifier.render().then(widgetId => {
                 window.grecaptcha.reset(widgetId);

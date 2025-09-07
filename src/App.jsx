@@ -36,6 +36,60 @@ const ChevronLeftIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/20
 const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>;
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 
+// Этот компонент нужно вставить ВНЕ компонента App, но в том же файле.
+// Например, сразу после всех иконок.
+const Comment = React.memo(({ comment, level = 0, onReply, onLike, onEdit, onDelete, onUpdate, isUserAdmin, currentUserId, editingCommentId, editingText, setEditingText, replyingTo, replyText, setReplyText, onCommentSubmit }) => {
+    const formatDate = (timestamp) => {
+        if (!timestamp?.toDate) return '';
+        const date = timestamp.toDate();
+        return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    };
+
+    return (
+        <div style={{ marginLeft: `${level * 16}px` }} className="flex flex-col">
+            <div className="p-3 rounded-lg bg-component-bg border border-border-color">
+                <div className="flex justify-between items-center text-xs opacity-70 mb-1">
+                    <p className="font-bold text-sm text-text-main opacity-100">{comment.userName}</p>
+                    <span>{formatDate(comment.timestamp)}</span>
+                </div>
+                {editingCommentId === comment.id ? (
+                    <div className="flex items-center gap-2 mt-1">
+                        <input type="text" value={editingText} autoFocus onChange={(e) => setEditingText(e.target.value)} className="w-full bg-background border border-border-color rounded-lg py-1 px-2 text-text-main text-sm" />
+                        <button onClick={() => onUpdate(comment.id)} className="p-1 rounded-full bg-green-500 text-white">✓</button>
+                        <button onClick={() => onEdit(null)} className="p-1 rounded-full bg-gray-500 text-white">✕</button>
+                    </div>
+                ) : (<p className="text-sm mt-1 opacity-90">{comment.text}</p>)}
+
+                <div className="flex items-center gap-4 mt-2">
+                    <button onClick={() => onLike(comment.id)} className="flex items-center gap-1 text-xs text-gray-500">
+                        <HeartIcon filled={comment.userHasLiked} className={`w-4 h-4 ${comment.userHasLiked ? 'text-accent' : ''}`} />
+                        <span>{comment.likeCount || 0}</span>
+                    </button>
+                    <button onClick={() => onReply(comment.id)} className="text-xs text-gray-500">Ответить</button>
+                    {(currentUserId === comment.userId || isUserAdmin) && (
+                        <>
+                            <button onClick={() => onEdit(comment)} className="text-xs text-gray-500">Редактировать</button>
+                            <button onClick={() => onDelete(comment.id)} className="text-xs text-red-500">Удалить</button>
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {replyingTo === comment.id && (
+                <form onSubmit={(e) => onCommentSubmit(e, comment.id)} className="flex items-center gap-2 mt-2">
+                    <input type="text" value={replyText} autoFocus onChange={(e) => setReplyText(e.target.value)} placeholder={`Ответ для ${comment.userName}...`} className="w-full bg-background border border-border-color rounded-lg py-1 px-3 text-sm" />
+                    <button type="submit" className="p-1.5 rounded-full bg-accent text-white"><SendIcon className="w-4 h-4" /></button>
+                </form>
+            )}
+
+            {comment.replies && comment.replies.length > 0 && (
+                <div className="mt-2 space-y-2 border-l-2 border-border-color pl-2">
+                    {comment.replies.map(reply => <Comment key={reply.id} comment={reply} onReply={onReply} onLike={onLike} onEdit={onEdit} onDelete={onDelete} onUpdate={onUpdate} isUserAdmin={isUserAdmin} currentUserId={currentUserId} editingCommentId={editingCommentId} editingText={editingText} setEditingText={setEditingText} replyingTo={replyingTo} replyText={replyText} setReplyText={setReplyText} onCommentSubmit={onCommentSubmit} />)}
+                </div>
+            )}
+        </div>
+    );
+});
 
 // --- Components ---
 const LoadingSpinner = () => (
@@ -157,62 +211,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
     </div></div>)
 };
-
-// Этот компонент нужно вставить ВНЕ компонента App, но в том же файле.
-// Например, сразу после всех иконок.
-const Comment = React.memo(({ comment, level = 0, onReply, onLike, onEdit, onDelete, onUpdate, isUserAdmin, currentUserId, editingCommentId, editingText, setEditingText, replyingTo, replyText, setReplyText, onCommentSubmit }) => {
-    const formatDate = (timestamp) => {
-        if (!timestamp?.toDate) return '';
-        const date = timestamp.toDate();
-        return date.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    };
-
-    return (
-        <div style={{ marginLeft: `${level * 16}px` }} className="flex flex-col">
-            <div className="p-3 rounded-lg bg-component-bg border border-border-color">
-                <div className="flex justify-between items-center text-xs opacity-70 mb-1">
-                    <p className="font-bold text-sm text-text-main opacity-100">{comment.userName}</p>
-                    <span>{formatDate(comment.timestamp)}</span>
-                </div>
-                {editingCommentId === comment.id ? (
-                    <div className="flex items-center gap-2 mt-1">
-                        <input type="text" value={editingText} autoFocus onChange={(e) => setEditingText(e.target.value)} className="w-full bg-background border border-border-color rounded-lg py-1 px-2 text-text-main text-sm" />
-                        <button onClick={() => onUpdate(comment.id)} className="p-1 rounded-full bg-green-500 text-white">✓</button>
-                        <button onClick={() => onEdit(null)} className="p-1 rounded-full bg-gray-500 text-white">✕</button>
-                    </div>
-                ) : (<p className="text-sm mt-1 opacity-90">{comment.text}</p>)}
-
-                <div className="flex items-center gap-4 mt-2">
-                    <button onClick={() => onLike(comment.id)} className="flex items-center gap-1 text-xs text-gray-500">
-                        <HeartIcon filled={comment.userHasLiked} className={`w-4 h-4 ${comment.userHasLiked ? 'text-accent' : ''}`} />
-                        <span>{comment.likeCount || 0}</span>
-                    </button>
-                    <button onClick={() => onReply(comment.id)} className="text-xs text-gray-500">Ответить</button>
-                    {(currentUserId === comment.userId || isUserAdmin) && (
-                        <>
-                            <button onClick={() => onEdit(comment)} className="text-xs text-gray-500">Редактировать</button>
-                            <button onClick={() => onDelete(comment.id)} className="text-xs text-red-500">Удалить</button>
-                        </>
-                    )}
-                </div>
-            </div>
-
-            {replyingTo === comment.id && (
-                <form onSubmit={(e) => onCommentSubmit(e, comment.id)} className="flex items-center gap-2 mt-2">
-                    <input type="text" value={replyText} autoFocus onChange={(e) => setReplyText(e.target.value)} placeholder={`Ответ для ${comment.userName}...`} className="w-full bg-background border border-border-color rounded-lg py-1 px-3 text-sm" />
-                    <button type="submit" className="p-1.5 rounded-full bg-accent text-white"><SendIcon className="w-4 h-4" /></button>
-                </form>
-            )}
-
-            {comment.replies && comment.replies.length > 0 && (
-                <div className="mt-2 space-y-2 border-l-2 border-border-color pl-2">
-                    {comment.replies.map(reply => <Comment key={reply.id} comment={reply} onReply={onReply} onLike={onLike} onEdit={onEdit} onDelete={onDelete} onUpdate={onUpdate} isUserAdmin={isUserAdmin} currentUserId={currentUserId} editingCommentId={editingCommentId} editingText={editingText} setEditingText={setEditingText} replyingTo={replyingTo} replyText={replyText} setReplyText={setReplyText} onCommentSubmit={onCommentSubmit} />)}
-                </div>
-            )}
-        </div>
-    );
-});
-
 
 const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack, isUserAdmin }) => {
   const [comments, setComments] = useState([]);

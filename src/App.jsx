@@ -5,15 +5,15 @@ import {
     collection, onSnapshot, query, orderBy, addDoc,
     serverTimestamp, runTransaction
 } from "firebase/firestore";
-import { 
-    getAuth, 
-    onAuthStateChanged, 
-    signInAnonymously, 
-    getRedirectResult, 
-    linkWithCredential, 
-    GoogleAuthProvider 
+import {
+    getAuth,
+    onAuthStateChanged,
+    signInAnonymously,
+    getRedirectResult,
+    linkWithCredential,
+    GoogleAuthProvider
 } from "firebase/auth";
-import { Auth } from './Auth.jsx';
+import { Auth } from './Auth.jsx'; // Убедитесь, что этот импорт есть
 
 // --- Firebase Config ---
 const firebaseConfig = {
@@ -781,85 +781,84 @@ export default function App() {
   }, [fontClass, updateUserDoc]);
 
   // --- Новая логика аутентификации ---
-useEffect(() => {
-    const init = async () => {
-      try {
-        const response = await fetch(`/tene/data/novels.json`);
-        if (!response.ok) {
-            console.error("Ошибка загрузки novels.json. Статус:", response.status);
-            throw new Error('Failed to fetch novels');
+ useEffect(() => {
+    // Этот слушатель будет нашим единственным источником правды о пользователе.
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        setIsLoading(true); // Начинаем загрузку при смене пользователя
+        if (firebaseUser) {
+            // Пользователь вошел (или это существующий аноним)
+            setUser(firebaseUser);
+            const idTokenResult = await firebaseUser.getIdTokenResult();
+            setIsUserAdmin(!!idTokenResult.claims.admin);
+
+            const userDocRef = doc(db, "users", firebaseUser.uid);
+            onSnapshot(userDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    setSubscription(data.subscription || null);
+                    setLastReadData(data.lastRead || null);
+                    setBookmarks(data.bookmarks || []);
+                    if (data.settings) {
+                        setFontSize(data.settings.fontSize || 16);
+                        setFontClass(data.settings.fontClass || 'font-sans');
+                    }
+                }
+            });
+
+             // Привязка Telegram ID, если он есть и пользователь не анонимный
+            const tg = window.Telegram?.WebApp;
+            if (tg && !firebaseUser.isAnonymous) {
+                const telegramId = tg.initDataUnsafe?.user?.id?.toString();
+                if (telegramId) {
+                   await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
+                }
+            }
+        } else {
+            // Пользователь не вошел, создаем анонимного
+            signInAnonymously(auth).catch(error => {
+                console.error("Ошибка анонимного входа:", error);
+            });
         }
-        const data = await response.json();
-        setNovels(data.novels);
-        
-        // --- ОБРАБОТКА РЕДИРЕКТА ---
+        setIsLoading(false); // Завершаем загрузку, когда есть окончательный статус пользователя
+    });
+
+    // Эта функция выполняется один раз при загрузке, чтобы обработать редирект
+    const handleInitialAuth = async () => {
         try {
             const result = await getRedirectResult(auth);
             if (result) {
-                // Пользователь успешно вернулся после редиректа
-                console.log("Результат редиректа:", result.user);
+                // Пользователь только что вошел через редирект.
+                // Слушатель onAuthStateChanged выше скоро получит этого пользователя.
+                console.log("Результат редиректа успешный:", result.user);
             }
         } catch (error) {
-            console.error("Ошибка после редиректа:", error);
-            // Обработка ошибки, если email уже занят другим аккаунтом
-            if (error.code === 'auth/account-exists-with-different-credential' && auth.currentUser) {
+            // Обработка ошибок редиректа, особенно для привязки анонимного аккаунта
+            if (error.code === 'auth/account-exists-with-different-credential' && auth.currentUser?.isAnonymous) {
                 const credential = GoogleAuthProvider.credentialFromError(error);
                 if (credential) {
                     try {
-                        // Пытаемся связать анонимный аккаунт с Google
                         await linkWithCredential(auth.currentUser, credential);
-                        console.log("Анонимный аккаунт успешно связан!");
+                        // После привязки onAuthStateChanged сработает с обновленным пользователем
                     } catch (linkError) {
-                        console.error("Ошибка привязки аккаунтов после редиректа:", linkError);
-                    }
-                }
-            }
-        }
-        // --- КОНЕЦ ОБРАБОТКИ РЕДИРЕКТА ---
-
-        onAuthStateChanged(auth, async (firebaseUser) => {
-            if (firebaseUser) {
-                // Пользователь вошел (или это существующий аноним)
-                setUser(firebaseUser);
-                const idTokenResult = await firebaseUser.getIdTokenResult();
-                setIsUserAdmin(!!idTokenResult.claims.admin);
-
-                const userDocRef = doc(db, "users", firebaseUser.uid);
-                onSnapshot(userDocRef, (docSnap) => {
-                    if (docSnap.exists()) {
-                        const data = docSnap.data();
-                        setSubscription(data.subscription || null);
-                        setLastReadData(data.lastRead || null);
-                        setBookmarks(data.bookmarks || []);
-                        if (data.settings) {
-                            setFontSize(data.settings.fontSize || 16);
-                            setFontClass(data.settings.fontClass || 'font-sans');
-                        }
-                    }
-                });
-
-                // Привязка Telegram ID
-                const tg = window.Telegram?.WebApp;
-                if (tg && !firebaseUser.isAnonymous) {
-                    const telegramId = tg.initDataUnsafe?.user?.id?.toString();
-                    if (telegramId) {
-                       await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
+                        console.error("Ошибка привязки аккаунта после редиректа:", linkError);
                     }
                 }
             } else {
-                // Пользователь не вошел, создаем анонимного
-                signInAnonymously(auth).catch(error => {
-                    console.error("Ошибка анонимного входа:", error);
-                });
+                console.error("Ошибка обработки результата редиректа:", error);
             }
-            setIsLoading(false);
-        });
-
-      } catch (error) {
-        console.error("Критическая ошибка инициализации:", error);
-      }
+        }
     };
-    init();
+
+    // Запускаем все процессы инициализации
+    Promise.all([
+        handleInitialAuth(),
+        fetch(`/tene/data/novels.json`).then(res => res.json()).then(setNovels)
+    ]).catch(error => {
+        console.error("Критическая ошибка инициализации:", error);
+        setIsLoading(false);
+    });
+
+    return () => unsubscribe(); // Отключаем слушатель при размонтировании компонента
   }, []);
 
   useEffect(() => {

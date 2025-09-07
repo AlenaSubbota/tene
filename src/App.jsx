@@ -780,76 +780,84 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // --- ИСПРАВЛЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
+// --- ИСПРАВЛЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
   useEffect(() => {
-    let unsubUser = () => {};
+    let unsubUserFromFirestore = () => {};
+
+    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+        // Отписываемся от данных предыдущего пользователя
+        unsubUserFromFirestore();
+
+        if (firebaseUser) {
+            setUser(firebaseUser);
+            const idTokenResult = await firebaseUser.getIdTokenResult();
+            setIsUserAdmin(!!idTokenResult.claims.admin);
+
+            // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ---
+            // Подписываемся на данные НОВОГО пользователя из Firestore
+            const userDocRef = doc(db, "users", firebaseUser.uid);
+            unsubUserFromFirestore = onSnapshot(userDocRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    setSubscription(data.subscription || null);
+                    setLastReadData(data.lastRead || null);
+                    setBookmarks(data.bookmarks || []);
+                    if (data.settings) {
+                        setFontSize(data.settings.fontSize || 16);
+                        setFontClass(data.settings.fontClass || 'font-sans');
+                    }
+                }
+            });
+
+            // Привязка Telegram ID (только для неанонимных пользователей)
+            const tg = window.Telegram?.WebApp;
+            if (tg && !firebaseUser.isAnonymous) {
+                const telegramId = tg.initDataUnsafe?.user?.id?.toString();
+                if (telegramId) {
+                   await setDoc(doc(db, "users", firebaseUser.uid), { telegramId: telegramId }, { merge: true });
+                }
+            }
+        } else {
+            // Если пользователя нет, создаем анонимного
+            setUser(null);
+            signInAnonymously(auth).catch(error => {
+                console.error("Ошибка анонимного входа:", error);
+            });
+        }
+    });
 
     const init = async () => {
         try {
-            // Сначала обрабатываем результат редиректа
-            try {
-                const result = await getRedirectResult(auth);
-                if (result) {
-                    console.log("Результат редиректа успешный:", result.user);
-                }
-            } catch (error) {
-                if (error.code === 'auth/account-exists-with-different-credential' && auth.currentUser?.isAnonymous) {
-                    const credential = GoogleAuthProvider.credentialFromError(error);
-                    if (credential) {
-                        await linkWithCredential(auth.currentUser, credential);
-                    }
-                } else {
-                    console.error("Ошибка обработки результата редиректа:", error);
-                }
-            }
-
-            // Загружаем статические данные
+            // Загружаем новеллы
             const response = await fetch(`/tene/data/novels.json`);
             if (!response.ok) throw new Error('Failed to fetch novels');
-            const data = await response.json();
-            setNovels(data.novels);
+            setNovels((await response.json()).novels);
+            
+            // Обрабатываем результат редиректа
+            await getRedirectResult(auth);
 
-            // Устанавливаем слушатель состояния аутентификации
-            unsubUser = onAuthStateChanged(auth, async (firebaseUser) => {
-                if (firebaseUser) {
-                    setUser(firebaseUser);
-                    const idTokenResult = await firebaseUser.getIdTokenResult();
-                    setIsUserAdmin(!!idTokenResult.claims.admin);
-
-                    const userDocRef = doc(db, "users", firebaseUser.uid);
-                    onSnapshot(userDocRef, (docSnap) => {
-                        if (docSnap.exists()) {
-                            const data = docSnap.data();
-                            setSubscription(data.subscription || null);
-                            setLastReadData(data.lastRead || null);
-                            setBookmarks(data.bookmarks || []);
-                            if (data.settings) {
-                                setFontSize(data.settings.fontSize || 16);
-                                setFontClass(data.settings.fontClass || 'font-sans');
-                            }
-                        }
-                    });
-
-                    const tg = window.Telegram?.WebApp;
-                    if (tg && !firebaseUser.isAnonymous) {
-                        const telegramId = tg.initDataUnsafe?.user?.id?.toString();
-                        if (telegramId) {
-                           await setDoc(userDocRef, { telegramId: telegramId }, { merge: true });
-                        }
-                    }
-                } else {
-                    await signInAnonymously(auth);
-                }
-                setIsLoading(false);
-            });
         } catch (error) {
-            console.error("Критическая ошибка инициализации:", error);
+            // Обрабатываем ошибку, если аккаунт уже существует
+            if (error.code === 'auth/account-exists-with-different-credential' && auth.currentUser?.isAnonymous) {
+                const credential = GoogleAuthProvider.credentialFromError(error);
+                if (credential) {
+                    await linkWithCredential(auth.currentUser, credential);
+                }
+            } else {
+                console.error("Критическая ошибка инициализации:", error);
+            }
+        } finally {
+            // В любом случае завершаем загрузку
             setIsLoading(false);
         }
     };
 
     init();
-    return () => unsubUser();
+
+    return () => {
+        unsubAuth();
+        unsubUserFromFirestore();
+    };
   }, []);
 
 

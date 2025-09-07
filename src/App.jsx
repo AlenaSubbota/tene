@@ -15,7 +15,6 @@ import {
 } from "firebase/auth";
 import { Auth } from './Auth.jsx';
 
-
 // --- Firebase Config ---
 const firebaseConfig = {
   apiKey: "AIzaSyDfDGFXGFGkzmgYFAHI1q6AZiLy7esuPrw",
@@ -53,7 +52,6 @@ const LoadingSpinner = () => (
     <p className="mt-4 text-lg opacity-70">Загрузка...</p>
   </div>
 );
-
 const SubscriptionModal = ({ onClose, onSelectPlan }) => {
     const subscriptionPlans = [{ duration: 1, name: '1 месяц', price: 199 },{ duration: 3, name: '3 месяца', price: 539, popular: true },{ duration: 12, name: '1 год', price: 1899 }];
     return (<div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className="w-full max-w-sm rounded-2xl p-6 shadow-lg bg-component-bg text-text-main"><CrownIcon className="mx-auto mb-4 text-accent" /><h3 className="text-xl text-center font-bold">Получите доступ ко всем главам</h3><p className="mt-2 mb-6 text-sm text-center opacity-70">Выберите подходящий тариф подписки:</p><div className="space-y-3">{subscriptionPlans.map(plan => (<button key={plan.duration} onClick={() => onSelectPlan(plan)} className="relative w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 border-border-color bg-background hover:border-accent-hover"><p className="font-bold">{plan.name}</p><p className="text-sm">{plan.price} ₽</p></button>))}</div><button onClick={onClose} className="w-full py-3 mt-4 rounded-lg border border-border-color">Не сейчас</button></div></div>);
@@ -763,9 +761,26 @@ export default function App() {
   
   const userId = user?.uid;
 
-  // --- УДАЛИТЕ СТАРЫЕ useEffect, КОТОРЫЕ БЫЛИ ЗДЕСЬ ---
+  const updateUserDoc = useCallback(async (dataToUpdate) => {
+    if (userId) { 
+        const userDocRef = doc(db, "users", userId);
+        try {
+            await setDoc(userDocRef, dataToUpdate, { merge: true });
+        } catch(e) {
+            console.error("Не удалось обновить данные пользователя:", e);
+        }
+    }
+  }, [userId]);
 
-  // --- НОВЫЙ ЕДИНЫЙ useEffect ДЛЯ ВСЕЙ ЛОГИКИ АУТЕНТИФИКАЦИИ ---
+  const handleTextSizeChange = useCallback((amount) => {
+    setFontSize(prevSize => {
+        const newSize = Math.max(12, Math.min(32, prevSize + amount));
+        updateUserDoc({ settings: { fontSize: newSize, fontClass } });
+        return newSize;
+    });
+  }, [fontClass, updateUserDoc]);
+  
+  // --- ИСПРАВЛЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
   useEffect(() => {
     setIsLoading(true);
     fetch(`/tene/data/novels.json`)
@@ -811,6 +826,7 @@ export default function App() {
         setIsLoading(false);
 
       } else {
+        // Пользователя нет. Входим анонимно. onAuthStateChanged сработает снова.
         signInAnonymously(auth).catch(error => {
           console.error("Anonymous sign-in failed:", error);
           setUser(null);
@@ -819,7 +835,9 @@ export default function App() {
         });
       }
     });
-
+    
+    // Вызываем getRedirectResult. Если он успешен, он вызовет onAuthStateChanged выше
+    // с новым пользователем, перезаписав анонимного.
     getRedirectResult(auth).catch((error) => {
       console.error("Ошибка при получении результата перенаправления:", error);
     });
@@ -884,25 +902,6 @@ export default function App() {
     }
     return () => tg.offEvent('backButtonClicked', handleBack);
   }, [page, handleBack]);
-
-  const updateUserDoc = useCallback(async (dataToUpdate) => {
-    if (userId) { 
-        const userDocRef = doc(db, "users", userId);
-        try {
-            await setDoc(userDocRef, dataToUpdate, { merge: true });
-        } catch(e) {
-            console.error("Не удалось обновить данные пользователя:", e);
-        }
-    }
-  }, [userId]);
-
-  const handleTextSizeChange = useCallback((amount) => {
-    setFontSize(prevSize => {
-        const newSize = Math.max(12, Math.min(32, prevSize + amount));
-        updateUserDoc({ settings: { fontSize: newSize, fontClass } });
-        return newSize;
-    });
-  }, [fontClass, updateUserDoc]);
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;

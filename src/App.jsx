@@ -5,10 +5,9 @@ import {
     collection, onSnapshot, query, orderBy, addDoc,
     serverTimestamp, runTransaction
 } from "firebase/firestore";
-import { 
+import {
     getAuth,
-    onAuthStateChanged, 
-    signInAnonymously,
+    onAuthStateChanged,
     browserLocalPersistence,
     getRedirectResult,
     setPersistence,
@@ -18,13 +17,14 @@ import { Auth } from './Auth.jsx';
 import { AuthScreen } from './AuthScreen.jsx';
 
 // --- Firebase Config ---
+// ВАЖНО: Используем переменные окружения для безопасности
 const firebaseConfig = {
-  apiKey: "AIzaSyDfDGFXGFGkzmgYFAHI1q6AZiLy7esuPrw",
-  authDomain: "tenebris-verbum.firebaseapp.com",
-  projectId: "tenebris-verbum",
-  storageBucket: "tenebris-verbum.firebasestorage.app",
-  messagingSenderId: "637080257821",
-  appId: "1:637080257821:web:7f7440e0bcef2ce7178df4"
+  apiKey: import.meta.env.VITE_API_KEY,
+  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
@@ -1049,9 +1049,9 @@ export default function App() {
     return <LoadingSpinner />;
   }
 
-  if (!user || user.isAnonymous) {
-  return <AuthScreen user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} auth={auth} />;
-}
+  if (!user) { // --- ИЗМЕНЕНИЕ: Убрана проверка на isAnonymous ---
+    return <AuthScreen auth={auth} />;
+  }
   
   const renderContent = () => {
     if (page === 'details') {

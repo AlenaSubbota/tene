@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import {
     getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
     collection, onSnapshot, query, orderBy, addDoc,
-    serverTimestamp, runTransaction, collectionGroup
+    serverTimestamp, runTransaction
 } from "firebase/firestore";
 import { 
     getAuth,
@@ -19,12 +19,12 @@ import { AuthScreen } from './AuthScreen.jsx';
 
 // --- Firebase Config ---
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_API_KEY,
-  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_APP_ID
+  apiKey: "AIzaSyDfDGFXGFGkzmgYFAHI1q6AZiLy7esuPrw",
+  authDomain: "tenebris-verbum.firebaseapp.com",
+  projectId: "tenebris-verbum",
+  storageBucket: "tenebris-verbum.firebasestorage.app",
+  messagingSenderId: "637080257821",
+  appId: "1:637080257821:web:7f7440e0bcef2ce7178df4"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -354,8 +354,8 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
             text, 
             timestamp: serverTimestamp(), 
             likeCount: 0,
-            novelTitle: novel.title,      // <-- Добавлено
-            chapterTitle: chapter.title   // <-- Добавлено
+            novelTitle: novel.title,
+            chapterTitle: chapter.title
         };
 
         let replyToUid = null;
@@ -367,13 +367,13 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
             }
         }
         
-        const newCommentRef = await addDoc(commentsColRef, commentData);
+        await addDoc(commentsColRef, commentData);
 
         // Создаем "запрос на уведомление" в новой коллекции
         const notificationColRef = collection(db, "notifications");
         await addDoc(notificationColRef, {
             ...commentData,
-            processed: false, // Флаг для бота, что уведомление не обработано
+            processed: false, 
             createdAt: serverTimestamp(),
             replyToUid: replyToUid
         });
@@ -832,6 +832,7 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
   
+  // --- ИСПРАВЛЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
   useEffect(() => {
     setIsLoading(true);
     fetch(`/tene/data/novels.json`)
@@ -873,15 +874,20 @@ export default function App() {
             if (telegramUser?.id) {
                await setDoc(userDocRef, { telegramId: telegramUser.id.toString() }, { merge: true });
 
+               // --- НАЧАЛО ИЗМЕНЕНИЙ ---
+               // Если у пользователя Firebase нет displayName, а в Telegram есть имя,
+               // то установим его.
                if (!firebaseUser.displayName && telegramUser.first_name) {
                     const telegramDisplayName = `${telegramUser.first_name} ${telegramUser.last_name || ''}`.trim();
                     try {
                         await updateProfile(firebaseUser, { displayName: telegramDisplayName });
+                        // Обновляем локальное состояние пользователя, чтобы имя сразу отобразилось
                         setUser(auth.currentUser); 
                     } catch (error) {
                         console.error("Ошибка обновления профиля:", error);
                     }
                }
+               // --- КОНЕЦ ИЗМЕНЕНИЙ ---
             }
         }
         setIsLoading(false);
@@ -894,6 +900,8 @@ export default function App() {
       }
     });
     
+    // Вызываем getRedirectResult. Если он успешен, он вызовет onAuthStateChanged выше
+    // с новым пользователем, перезаписав анонимного.
     getRedirectResult(auth).catch((error) => {
       console.error("Ошибка при получении результата перенаправления:", error);
     });
@@ -1037,15 +1045,14 @@ export default function App() {
         );
     };
 
-
-  if (isLoading) {
+ if (isLoading) {
     return <LoadingSpinner />;
   }
-  
-  if (!user) {
-    return <AuthScreen auth={auth} />;
-  }
 
+  if (!user || user.isAnonymous) {
+  return <AuthScreen user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} auth={auth} />;
+}
+  
   const renderContent = () => {
     if (page === 'details') {
       return <NovelDetails 
@@ -1119,3 +1126,4 @@ export default function App() {
     </main>
   );
 }
+

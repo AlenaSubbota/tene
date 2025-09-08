@@ -1038,11 +1038,15 @@ export default function App() {
 
   if (isLoading) {
     return <LoadingSpinner />;
-  }
-  
-  if (!user) {
+}
+
+// Если пользователя нет, показываем экран входа.
+if (!user) {
+    // Мы передаем auth, чтобы компонент мог работать с Firebase.
     return <AuthScreen auth={auth} />;
-  }
+}
+
+// Если пользователь есть, показываем основной интерфейс приложения.
   
   const renderContent = () => {
     if (page === 'details') {

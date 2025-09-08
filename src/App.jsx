@@ -3,7 +3,7 @@ import { initializeApp } from "firebase/app";
 import {
     getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc,
     collection, onSnapshot, query, orderBy, addDoc,
-    serverTimestamp, runTransaction
+    serverTimestamp, runTransaction, collectionGroup
 } from "firebase/firestore";
 import { 
     getAuth,
@@ -19,12 +19,12 @@ import { AuthScreen } from './AuthScreen.jsx';
 
 // --- Firebase Config ---
 const firebaseConfig = {
-  apiKey: "AIzaSyDfDGFXGFGkzmgYFAHI1q6AZiLy7esuPrw",
-  authDomain: "tenebris-verbum.firebaseapp.com",
-  projectId: "tenebris-verbum",
-  storageBucket: "tenebris-verbum.firebasestorage.app",
-  messagingSenderId: "637080257821",
-  appId: "1:637080257821:web:7f7440e0bcef2ce7178df4"
+  apiKey: import.meta.env.VITE_API_KEY,
+  authDomain: import.meta.env.VITE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_APP_ID
 };
 
 const app = initializeApp(firebaseConfig);
@@ -343,14 +343,41 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     e.preventDefault();
     const text = parentId ? replyText : newComment;
     if (!text.trim() || !userId) return;
+    
     try {
         await setDoc(chapterMetaRef, {}, { merge: true });
+        
         const commentsColRef = collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`);
-        const commentData = { userId, userName: userName || "Аноним", text, timestamp: serverTimestamp(), likeCount: 0 };
+        const commentData = { 
+            userId, 
+            userName: userName || "Аноним", 
+            text, 
+            timestamp: serverTimestamp(), 
+            likeCount: 0,
+            novelTitle: novel.title,      // <-- Добавлено
+            chapterTitle: chapter.title   // <-- Добавлено
+        };
+
+        let replyToUid = null;
         if (parentId) {
             commentData.replyTo = parentId;
+            const parentCommentDoc = await getDoc(doc(commentsColRef, parentId));
+            if (parentCommentDoc.exists()) {
+                replyToUid = parentCommentDoc.data().userId;
+            }
         }
-        await addDoc(commentsColRef, commentData);
+        
+        const newCommentRef = await addDoc(commentsColRef, commentData);
+
+        // Создаем "запрос на уведомление" в новой коллекции
+        const notificationColRef = collection(db, "notifications");
+        await addDoc(notificationColRef, {
+            ...commentData,
+            processed: false, // Флаг для бота, что уведомление не обработано
+            createdAt: serverTimestamp(),
+            replyToUid: replyToUid
+        });
+
         if (parentId) {
             setReplyingTo(null);
             setReplyText("");
@@ -360,7 +387,8 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     } catch (error) {
         console.error("Ошибка добавления комментария:", error);
     }
-  }, [userId, userName, newComment, replyText, chapterMetaRef, novel.id, chapter.id]);
+  }, [userId, userName, newComment, replyText, chapterMetaRef, novel.id, chapter.id, novel.title, chapter.title]);
+
 
   const handleCommentLike = useCallback(async (commentId) => {
     if (!userId) return;
@@ -643,10 +671,32 @@ const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth 
         }
     };
 
+    const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
+
     return (
         <div>
             <Header title="Профиль" />
-            <Auth user={user} subscription={subscription} onGetSubscriptionClick={onGetSubscriptionClick} auth={auth} />
+            <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4 mb-4">
+                 <h3 className="font-bold mb-2">Подписка</h3>
+                 {hasActiveSubscription ? (
+                    <div>
+                        <p className="text-green-500">Активна</p>
+                        <p className="text-sm opacity-70">
+                            Заканчивается: {new Date(subscription.expires_at).toLocaleDateString()}
+                        </p>
+                    </div>
+                ) : (
+                    <div>
+                        <p className="text-red-500">Неактивна</p>
+                         <p className="text-sm opacity-70 mb-3">
+                            Оформите подписку, чтобы получить доступ ко всем платным главам.
+                        </p>
+                        <button onClick={onGetSubscriptionClick} className="w-full py-2 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105">
+                            Оформить подписку
+                        </button>
+                    </div>
+                )}
+            </div>
             <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4">
                 <h3 className="font-bold mb-2">Ваш ID для администрирования</h3>
                 <p className="text-sm opacity-70 mb-3">
@@ -782,7 +832,6 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
   
-  // --- ИСПРАВЛЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
   useEffect(() => {
     setIsLoading(true);
     fetch(`/tene/data/novels.json`)
@@ -824,20 +873,15 @@ export default function App() {
             if (telegramUser?.id) {
                await setDoc(userDocRef, { telegramId: telegramUser.id.toString() }, { merge: true });
 
-               // --- НАЧАЛО ИЗМЕНЕНИЙ ---
-               // Если у пользователя Firebase нет displayName, а в Telegram есть имя,
-               // то установим его.
                if (!firebaseUser.displayName && telegramUser.first_name) {
                     const telegramDisplayName = `${telegramUser.first_name} ${telegramUser.last_name || ''}`.trim();
                     try {
                         await updateProfile(firebaseUser, { displayName: telegramDisplayName });
-                        // Обновляем локальное состояние пользователя, чтобы имя сразу отобразилось
                         setUser(auth.currentUser); 
                     } catch (error) {
                         console.error("Ошибка обновления профиля:", error);
                     }
                }
-               // --- КОНЕЦ ИЗМЕНЕНИЙ ---
             }
         }
         setIsLoading(false);
@@ -850,8 +894,6 @@ export default function App() {
       }
     });
     
-    // Вызываем getRedirectResult. Если он успешен, он вызовет onAuthStateChanged выше
-    // с новым пользователем, перезаписав анонимного.
     getRedirectResult(auth).catch((error) => {
       console.error("Ошибка при получении результата перенаправления:", error);
     });
@@ -996,10 +1038,14 @@ export default function App() {
     };
 
 
-  if (!user || user.isAnonymous) {
-  return <AuthScreen user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} auth={auth} />;
-}
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
   
+  if (!user) {
+    return <AuthScreen auth={auth} />;
+  }
+
   const renderContent = () => {
     if (page === 'details') {
       return <NovelDetails 

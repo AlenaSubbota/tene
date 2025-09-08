@@ -5,9 +5,9 @@ import {
     collection, onSnapshot, query, orderBy, addDoc,
     serverTimestamp, runTransaction
 } from "firebase/firestore";
-import {
+import { 
     getAuth,
-    onAuthStateChanged,
+    onAuthStateChanged, 
     browserLocalPersistence,
     getRedirectResult,
     setPersistence,
@@ -17,7 +17,6 @@ import { Auth } from './Auth.jsx';
 import { AuthScreen } from './AuthScreen.jsx';
 
 // --- Firebase Config ---
-// ВАЖНО: Используем переменные окружения для безопасности
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
   authDomain: import.meta.env.VITE_AUTH_DOMAIN,
@@ -832,7 +831,6 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
   
-  // --- ИСПРАВЛЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
   useEffect(() => {
     setIsLoading(true);
     fetch(`/tene/data/novels.json`)
@@ -869,25 +867,20 @@ export default function App() {
         });
         
         const tg = window.Telegram?.WebApp;
-        if (tg && !firebaseUser.isAnonymous) {
+        if (tg) { // Убрана проверка на isAnonymous, так как ее больше нет
             const telegramUser = tg.initDataUnsafe?.user;
             if (telegramUser?.id) {
                await setDoc(userDocRef, { telegramId: telegramUser.id.toString() }, { merge: true });
 
-               // --- НАЧАЛО ИЗМЕНЕНИЙ ---
-               // Если у пользователя Firebase нет displayName, а в Telegram есть имя,
-               // то установим его.
                if (!firebaseUser.displayName && telegramUser.first_name) {
                     const telegramDisplayName = `${telegramUser.first_name} ${telegramUser.last_name || ''}`.trim();
                     try {
                         await updateProfile(firebaseUser, { displayName: telegramDisplayName });
-                        // Обновляем локальное состояние пользователя, чтобы имя сразу отобразилось
                         setUser(auth.currentUser); 
                     } catch (error) {
                         console.error("Ошибка обновления профиля:", error);
                     }
                }
-               // --- КОНЕЦ ИЗМЕНЕНИЙ ---
             }
         }
         setIsLoading(false);
@@ -900,8 +893,6 @@ export default function App() {
       }
     });
     
-    // Вызываем getRedirectResult. Если он успешен, он вызовет onAuthStateChanged выше
-    // с новым пользователем, перезаписав анонимного.
     getRedirectResult(auth).catch((error) => {
       console.error("Ошибка при получении результата перенаправления:", error);
     });
@@ -1045,11 +1036,11 @@ export default function App() {
         );
     };
 
- if (isLoading) {
+  if (isLoading) {
     return <LoadingSpinner />;
   }
-
-  if (!user) { // --- ИЗМЕНЕНИЕ: Убрана проверка на isAnonymous ---
+  
+  if (!user) {
     return <AuthScreen auth={auth} />;
   }
   
@@ -1102,7 +1093,7 @@ export default function App() {
           </>
         )
       case 'search':
-        return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+        return <SearchPage novels={novels} onSelectNovel={onSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'bookmarks':
         return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'profile':
@@ -1126,4 +1117,3 @@ export default function App() {
     </main>
   );
 }
-

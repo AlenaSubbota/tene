@@ -17,6 +17,7 @@ import { Auth } from './Auth.jsx';
 import { AuthScreen } from './AuthScreen.jsx';
 
 // --- Firebase Config ---
+// ВАЖНО: Используем переменные окружения для безопасности, как в вашем .env файле
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_API_KEY,
   authDomain: import.meta.env.VITE_AUTH_DOMAIN,
@@ -368,7 +369,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         
         await addDoc(commentsColRef, commentData);
 
-        // Создаем "запрос на уведомление" в новой коллекции
         const notificationColRef = collection(db, "notifications");
         await addDoc(notificationColRef, {
             ...commentData,
@@ -661,7 +661,7 @@ const BookmarksPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) =
     </div>
 )
 
-const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth }) => {
+const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId }) => { // Убран auth из пропсов, он не нужен
     const handleCopyId = () => {
         if (userId) {
             navigator.clipboard.writeText(userId)
@@ -867,7 +867,7 @@ export default function App() {
         });
         
         const tg = window.Telegram?.WebApp;
-        if (tg) { // Убрана проверка на isAnonymous, так как ее больше нет
+        if (tg) {
             const telegramUser = tg.initDataUnsafe?.user;
             if (telegramUser?.id) {
                await setDoc(userDocRef, { telegramId: telegramUser.id.toString() }, { merge: true });
@@ -886,7 +886,7 @@ export default function App() {
         setIsLoading(false);
 
       } else {
-        // Пользователя нет, прекращаем загрузку и показываем экран входа.
+        // --- ИСПРАВЛЕНИЕ: Убираем анонимный вход ---
         setUser(null);
         setIsUserAdmin(false);
         setIsLoading(false);
@@ -1038,15 +1038,12 @@ export default function App() {
 
   if (isLoading) {
     return <LoadingSpinner />;
-}
-
-// Если пользователя нет, показываем экран входа.
-if (!user) {
-    // Мы передаем auth, чтобы компонент мог работать с Firebase.
+  }
+  
+  // --- ИСПРАВЛЕНИЕ: Возвращаем проверку для AuthScreen ---
+  if (!user) {
     return <AuthScreen auth={auth} />;
-}
-
-// Если пользователь есть, показываем основной интерфейс приложения.
+  }
   
   const renderContent = () => {
     if (page === 'details') {
@@ -1099,9 +1096,9 @@ if (!user) {
       case 'search':
         return <SearchPage novels={novels} onSelectNovel={onSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'bookmarks':
-        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={onSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'profile':
-        return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} auth={auth} />
+        return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} />
       default:
         return <Header title="Библиотека" />
     }
@@ -1121,3 +1118,4 @@ if (!user) {
     </main>
   );
 }
+

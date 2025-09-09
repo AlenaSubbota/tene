@@ -5,16 +5,19 @@ import {
     collection, onSnapshot, query, orderBy, addDoc,
     serverTimestamp, runTransaction
 } from "firebase/firestore";
-import { 
+import {
     getAuth,
-    onAuthStateChanged, 
+    onAuthStateChanged,
     signOut,
     browserLocalPersistence,
     getRedirectResult,
     setPersistence,
     updateProfile
 } from "firebase/auth";
-import { Auth } from './Auth.jsx';
+// Auth и AuthScreen импортируются, но не используются в этом файле,
+// так как AuthScreen рендерится напрямую в App, а Auth - внутри AuthScreen.
+// Если они вам нужны для чего-то еще, оставьте импорты.
+// import { Auth } from './Auth.jsx';
 import { AuthScreen } from './AuthScreen.jsx';
 
 // --- Firebase Config ---
@@ -32,7 +35,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence);
 
-// --- Иконки (остаются без изменений) ---
+// --- Иконки ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
 const BackIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>);
 const SearchIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
@@ -48,7 +51,7 @@ const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 const LogOutIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>);
 
-// --- Компоненты (остаются без изменений) ---
+// --- Компоненты ---
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
     <HeartIcon className="animate-pulse-heart text-accent" filled />
@@ -135,7 +138,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
             "Вы будете перенаправлены в бот для завершения оплаты. Если бот не реагирует после того, как вы выбрали тариф, не волнуйтесь! Попробуйте отправить команду /start еще раз.",
             async (confirmed) => {
                 if (!confirmed) return;
-                
+
                 const userDocRef = doc(db, "users", userId);
                 try {
                     await setDoc(userDocRef, {
@@ -229,24 +232,24 @@ const Comment = React.memo(({ comment, onReply, onLike, onEdit, onDelete, onUpda
 
             {comment.replies && comment.replies.length > 0 && (
                 <div className="mt-2 space-y-2 border-l-2 border-border-color pl-2">
-                    {comment.replies.map(reply => 
-                        <Comment 
-                            key={reply.id} 
-                            comment={reply} 
-                            onReply={onReply} 
-                            onLike={onLike} 
-                            onEdit={onEdit} 
-                            onDelete={onDelete} 
-                            onUpdate={onUpdate} 
-                            isUserAdmin={isUserAdmin} 
-                            currentUserId={currentUserId} 
-                            editingCommentId={editingCommentId} 
-                            editingText={editingText} 
-                            setEditingText={setEditingText} 
-                            replyingTo={replyingTo} 
-                            replyText={replyText} 
-                            setReplyText={setReplyText} 
-                            onCommentSubmit={onCommentSubmit} 
+                    {comment.replies.map(reply =>
+                        <Comment
+                            key={reply.id}
+                            comment={reply}
+                            onReply={onReply}
+                            onLike={onLike}
+                            onEdit={onEdit}
+                            onDelete={onDelete}
+                            onUpdate={onUpdate}
+                            isUserAdmin={isUserAdmin}
+                            currentUserId={currentUserId}
+                            editingCommentId={editingCommentId}
+                            editingText={editingText}
+                            setEditingText={setEditingText}
+                            replyingTo={replyingTo}
+                            replyText={replyText}
+                            setReplyText={setReplyText}
+                            onCommentSubmit={onCommentSubmit}
                         />
                     )}
                 </div>
@@ -316,7 +319,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   useEffect(() => {
     const fetchContent = async () => {
         setIsLoadingContent(true);
-        setChapterContent(''); 
+        setChapterContent('');
         if (chapter.isPaid && !hasActiveSubscription) {
             setIsLoadingContent(false);
             setChapterContent('### 🔒 Для доступа к этой главе необходима подписка.\n\nПожалуйста, оформите подписку в разделе "Профиль", чтобы продолжить чтение.');
@@ -344,16 +347,16 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     e.preventDefault();
     const text = parentId ? replyText : newComment;
     if (!text.trim() || !userId) return;
-    
+
     try {
         await setDoc(chapterMetaRef, {}, { merge: true });
-        
+
         const commentsColRef = collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`);
-        const commentData = { 
-            userId, 
-            userName: userName || "Аноним", 
-            text, 
-            timestamp: serverTimestamp(), 
+        const commentData = {
+            userId,
+            userName: userName || "Аноним",
+            text,
+            timestamp: serverTimestamp(),
             likeCount: 0,
             novelTitle: novel.title,
             chapterTitle: chapter.title
@@ -367,14 +370,14 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
                 replyToUid = parentCommentDoc.data().userId;
             }
         }
-        
+
         await addDoc(commentsColRef, commentData);
 
         // Создаем "запрос на уведомление" в новой коллекции
         const notificationColRef = collection(db, "notifications");
         await addDoc(notificationColRef, {
             ...commentData,
-            processed: false, 
+            processed: false,
             createdAt: serverTimestamp(),
             replyToUid: replyToUid
         });
@@ -395,7 +398,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
     if (!userId) return;
     const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
     const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${commentId}/likes`, userId);
-    
+
     setComments(prevComments => prevComments.map(c => {
         if (c.id === commentId) {
             const newLikeCount = c.userHasLiked ? (c.likeCount || 1) - 1 : (c.likeCount || 0) + 1;
@@ -422,7 +425,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         console.error("Ошибка при обновлении лайка комментария:", error);
     }
   }, [userId, novel.id, chapter.id]);
-  
+
     const handleEdit = useCallback((comment) => {
         if (comment) {
             setEditingCommentId(comment.id);
@@ -487,7 +490,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         setSelectedPlan(plan);
         setIsSubModalOpen(false);
     };
-  
+
     const handlePaymentMethodSelect = async (method) => {
       const tg = window.Telegram?.WebApp;
       if (tg && userId && selectedPlan) {
@@ -506,7 +509,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         });
       }
     };
-    
+
   const currentChapterIndex = allChapters.findIndex(c => c.id === chapter.id);
   const prevChapter = allChapters[currentChapterIndex - 1];
   const nextChapter = allChapters[currentChapterIndex + 1];
@@ -524,12 +527,12 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
       <Header title={novel.title} onBack={onBack} />
       <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto pb-24">
         <h2 className="text-lg sm:text-xl mb-8 text-center opacity-80 font-sans">{chapter.title}</h2>
-        <div 
-          className={`whitespace-normal leading-relaxed ${currentFontClass}`} 
+        <div
+          className={`whitespace-normal leading-relaxed ${currentFontClass}`}
           style={{ fontSize: `${fontSize}px` }}
           dangerouslySetInnerHTML={{ __html: isLoadingContent ? '<p>Загрузка...</p>' : renderMarkdown(chapterContent) }}
         />
-        
+
         <div className="text-center my-8 text-accent font-bold text-2xl tracking-widest">
             ╚══ ≪ °❈° ≫ ══╝
         </div>
@@ -546,9 +549,9 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
           <h3 className="text-xl font-bold mb-4">Комментарии</h3>
           <div className="space-y-4 mb-6">
             {comments.length > 0
-                ? groupComments(comments).map(comment => 
-                    <Comment 
-                        key={comment.id} 
+                ? groupComments(comments).map(comment =>
+                    <Comment
+                        key={comment.id}
                         comment={comment}
                         onReply={handleReply}
                         onLike={handleCommentLike}
@@ -723,8 +726,8 @@ const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth 
                 <div className="bg-background p-2 rounded-md text-xs break-all mb-3">
                     <code>{userId || "Загрузка..."}</code>
                 </div>
-                <button 
-                    onClick={handleCopyId} 
+                <button
+                    onClick={handleCopyId}
                     disabled={!userId}
                     className="w-full py-2 rounded-lg bg-gray-200 text-gray-800 font-bold transition-all hover:scale-105 disabled:opacity-50"
                 >
@@ -817,7 +820,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
-  
+
   const [chapters, setChapters] = useState([]);
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
 
@@ -828,11 +831,11 @@ export default function App() {
   const [selectedNews, setSelectedNews] = useState(null);
 
   const BOT_USERNAME = "tenebrisverbot";
-  
+
   const userId = user?.uid;
 
   const updateUserDoc = useCallback(async (dataToUpdate) => {
-    if (userId) { 
+    if (userId) {
         const userDocRef = doc(db, "users", userId);
         try {
             await setDoc(userDocRef, dataToUpdate, { merge: true });
@@ -849,10 +852,9 @@ export default function App() {
         return newSize;
     });
   }, [fontClass, updateUserDoc]);
-  
-  // --- ИЗМЕНЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
+
+  // --- ИСПРАВЛЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
   useEffect(() => {
-    // Начальная загрузка статических данных
     fetch(`/tene/data/novels.json`)
       .then(res => res.json())
       .then(data => setNovels(data.novels))
@@ -860,64 +862,65 @@ export default function App() {
 
     let unsubUserFromFirestore = () => {};
 
-    // Слушатель состояния аутентификации
     const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      unsubUserFromFirestore(); // Отписываемся от предыдущего слушателя Firestore
+      unsubUserFromFirestore();
 
-      if (firebaseUser && !firebaseUser.isAnonymous) {
-        // --- Пользователь вошел в систему и он не анонимный ---
-        setUser(firebaseUser);
-        const idTokenResult = await firebaseUser.getIdTokenResult();
-        setIsUserAdmin(!!idTokenResult.claims.admin);
+      // **** НАЧАЛО ИСПРАВЛЕНИЯ ****
+      try {
+        if (firebaseUser && !firebaseUser.isAnonymous) {
+          setUser(firebaseUser);
+          const idTokenResult = await firebaseUser.getIdTokenResult();
+          setIsUserAdmin(!!idTokenResult.claims.admin);
 
-        const userDocRef = doc(db, "users", firebaseUser.uid);
-        
-        // Подписка на данные пользователя в Firestore
-        unsubUserFromFirestore = onSnapshot(userDocRef, (docSnap) => {
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            setSubscription(data.subscription || null);
-            setLastReadData(data.lastRead || null);
-            setBookmarks(data.bookmarks || []);
-            if (data.settings) {
-              setFontSize(data.settings.fontSize || 16);
-              setFontClass(data.settings.fontClass || 'font-sans');
+          const userDocRef = doc(db, "users", firebaseUser.uid);
+
+          unsubUserFromFirestore = onSnapshot(userDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              setSubscription(data.subscription || null);
+              setLastReadData(data.lastRead || null);
+              setBookmarks(data.bookmarks || []);
+              if (data.settings) {
+                setFontSize(data.settings.fontSize || 16);
+                setFontClass(data.settings.fontClass || 'font-sans');
+              }
+            } else {
+              setDoc(userDocRef, { bookmarks: [], lastRead: {} });
             }
-          } else {
-             // Если документа нет, можно его создать с базовыми значениями
-            setDoc(userDocRef, { bookmarks: [], lastRead: {} });
+          });
+
+          const tg = window.Telegram?.WebApp;
+          if (tg) {
+              const telegramUser = tg.initDataUnsafe?.user;
+              if (telegramUser?.id) {
+                 await setDoc(userDocRef, { telegramId: telegramUser.id.toString() }, { merge: true });
+                 if (!firebaseUser.displayName && telegramUser.first_name) {
+                      const telegramDisplayName = `${telegramUser.first_name} ${telegramUser.last_name || ''}`.trim();
+                      try {
+                          await updateProfile(firebaseUser, { displayName: telegramDisplayName });
+                          setUser(auth.currentUser);
+                      } catch (error) {
+                          console.error("Ошибка обновления профиля:", error);
+                      }
+                 }
+              }
           }
-        });
-        
-        // Интеграция с Telegram
-        const tg = window.Telegram?.WebApp;
-        if (tg) {
-            const telegramUser = tg.initDataUnsafe?.user;
-            if (telegramUser?.id) {
-               await setDoc(userDocRef, { telegramId: telegramUser.id.toString() }, { merge: true });
-               if (!firebaseUser.displayName && telegramUser.first_name) {
-                    const telegramDisplayName = `${telegramUser.first_name} ${telegramUser.last_name || ''}`.trim();
-                    try {
-                        await updateProfile(firebaseUser, { displayName: telegramDisplayName });
-                        setUser(auth.currentUser); 
-                    } catch (error) {
-                        console.error("Ошибка обновления профиля:", error);
-                    }
-               }
-            }
+        } else {
+          setUser(null);
+          setIsUserAdmin(false);
+          setSubscription(null);
+          setLastReadData(null);
+          setBookmarks([]);
         }
-      } else {
-        // --- Пользователя нет или он анонимный ---
-        // Сбрасываем все состояния, связанные с пользователем
-        setUser(null);
-        setIsUserAdmin(false);
-        setSubscription(null);
-        setLastReadData(null);
-        setBookmarks([]);
+      } catch (error) {
+          console.error("Произошла ошибка при аутентификации:", error);
+          // Сбрасываем пользователя в случае ошибки, чтобы не было "вечной" загрузки
+          setUser(null);
+      } finally {
+          // Этот блок выполнится в любом случае: и при успехе, и при ошибке
+          setIsLoading(false);
       }
-      
-      // В любом случае, проверка аутентификации завершена
-      setIsLoading(false);
+      // **** КОНЕЦ ИСПРАВЛЕНИЯ ****
     });
 
     return () => {
@@ -966,7 +969,7 @@ export default function App() {
       if (page === 'reader') setPage('details');
       else if (page === 'details') { setPage('list'); setGenreFilter(null); }
   }, [page]);
-  
+
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg) return;
@@ -1030,7 +1033,7 @@ export default function App() {
       setSelectedPlan(plan);
       setIsSubModalOpen(false);
   };
-  
+
     const handlePaymentMethodSelect = async (method) => {
         const tg = window.Telegram?.WebApp;
         if (!tg || !userId || !selectedPlan) {
@@ -1043,7 +1046,7 @@ export default function App() {
             "Вы будете перенаправлены в бот для завершения оплаты. Если бот не ответит, отправьте команду /start.",
             async (confirmed) => {
                 if (!confirmed) return;
-                
+
                 const userDocRef = doc(db, "users", userId);
                 try {
                     await setDoc(userDocRef, {
@@ -1064,42 +1067,40 @@ export default function App() {
     return <LoadingSpinner />;
   }
 
-  // Если загрузка завершена, и пользователя нет, показываем экран входа
   if (!user) {
     return <AuthScreen />;
   }
-  
-  // Если пользователь есть, показываем основное приложение
+
   const renderContent = () => {
     if (page === 'details') {
-      return <NovelDetails 
-                novel={selectedNovel} 
-                onSelectChapter={handleSelectChapter} 
-                onGenreSelect={handleGenreSelect} 
-                subscription={subscription} 
-                botUsername={BOT_USERNAME} 
-                userId={userId} 
-                chapters={chapters} 
+      return <NovelDetails
+                novel={selectedNovel}
+                onSelectChapter={handleSelectChapter}
+                onGenreSelect={handleGenreSelect}
+                subscription={subscription}
+                botUsername={BOT_USERNAME}
+                userId={userId}
+                chapters={chapters}
                 isLoadingChapters={isLoadingChapters}
-                lastReadData={lastReadData} 
+                lastReadData={lastReadData}
                 onBack={handleBack}
               />;
     }
     if (page === 'reader') {
-      return <ChapterReader 
-                chapter={selectedChapter} 
-                novel={selectedNovel} 
-                fontSize={fontSize} 
-                onFontSizeChange={handleTextSizeChange} 
-                userId={userId} 
-                userName={user?.displayName || 'Аноним'} 
-                currentFontClass={fontClass} 
-                onSelectChapter={handleSelectChapter} 
-                allChapters={chapters} 
-                subscription={subscription} 
-                botUsername={BOT_USERNAME} 
-                onBack={handleBack} 
-                isUserAdmin={isUserAdmin} 
+      return <ChapterReader
+                chapter={selectedChapter}
+                novel={selectedNovel}
+                fontSize={fontSize}
+                onFontSizeChange={handleTextSizeChange}
+                userId={userId}
+                userName={user?.displayName || 'Аноним'}
+                currentFontClass={fontClass}
+                onSelectChapter={handleSelectChapter}
+                allChapters={chapters}
+                subscription={subscription}
+                botUsername={BOT_USERNAME}
+                onBack={handleBack}
+                isUserAdmin={isUserAdmin}
               />;
     }
 

@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import {
-  OAuthProvider,
+  // Заменяем OAuthProvider на GoogleAuthProvider
+  GoogleAuthProvider,
   signInWithRedirect,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -18,23 +19,20 @@ export const Auth = ({ auth }) => {
 
   const handleAuthAction = async (e) => {
     e.preventDefault();
-    setError(''); // Сбрасываем ошибку перед новой попыткой
+    setError('');
 
     if (isRegistering) {
-      // --- РЕГИСТРАЦИЯ ---
       if (!displayName.trim()) {
         setError('Пожалуйста, введите имя.');
         return;
       }
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        // Сразу после регистрации обновляем профиль, добавляя имя
         await updateProfile(userCredential.user, { displayName: displayName });
       } catch (err) {
         setError(getFriendlyErrorMessage(err.code));
       }
     } else {
-      // --- ВХОД ---
       try {
         await signInWithEmailAndPassword(auth, email, password);
       } catch (err) {
@@ -43,15 +41,15 @@ export const Auth = ({ auth }) => {
     }
   };
 
-  const signInWithTelegram = () => {
-    const provider = new OAuthProvider('telegram.com');
+  // Новая функция для входа через Google
+  const signInWithGoogle = () => {
+    const provider = new GoogleAuthProvider();
     signInWithRedirect(auth, provider).catch((err) => {
-      setError("Не удалось начать вход через Telegram.");
+      setError("Не удалось начать вход через Google.");
       console.error(err);
     });
   };
 
-  // Функция для более понятных сообщений об ошибках
   const getFriendlyErrorMessage = (errorCode) => {
     switch (errorCode) {
       case 'auth/invalid-email':
@@ -68,9 +66,13 @@ export const Auth = ({ auth }) => {
     }
   };
 
-  const TelegramIcon = () => (
-    <svg viewBox="0 0 24 24" fill="currentColor" height="1.5em" width="1.5em">
-      <path d="M9.78 18.65l.28-4.23 7.68-6.92c.34-.31-.07-.46-.52-.19L7.74 13.3 3.62 12c-.88-.25-.89-1.39.2-1.61l15.35-5.83c.71-.27 1.33.17 1.13.91l-2.29 10.81c-.19.88-1.05 1.08-1.74.52l-4.55-3.35-2.14 2.05c-.21.21-.4.4-.69.4z" />
+  // Иконка Google
+  const GoogleIcon = () => (
+    <svg viewBox="0 0 48 48" width="1.25em" height="1.25em">
+      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C12.955 4 4 12.955 4 24s8.955 20 20 20s20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"></path>
+      <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4C16.318 4 9.656 8.337 6.306 14.691z"></path>
+      <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.223 0-9.657-3.657-11.303-8H6.306C9.656 39.663 16.318 44 24 44z"></path>
+      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571l6.19 5.238C44.572 33.931 48 27.461 48 20c0-1.341-.138-2.65-.389-3.917z"></path>
     </svg>
   );
 
@@ -78,36 +80,12 @@ export const Auth = ({ auth }) => {
     <div className="space-y-4">
       <form onSubmit={handleAuthAction} className="space-y-4">
         {isRegistering && (
-          <input
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Ваше имя"
-            className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
-            required
-          />
+          <input type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Ваше имя" className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent" required />
         )}
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
-          required
-        />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Пароль"
-          className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
-          required
-        />
+        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent" required />
+        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Пароль" className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent" required />
         {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-        <button
-          type="submit"
-          className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105"
-        >
+        <button type="submit" className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105">
           {isRegistering ? 'Зарегистрироваться' : 'Войти'}
         </button>
       </form>
@@ -125,11 +103,11 @@ export const Auth = ({ auth }) => {
       </div>
 
       <button
-        onClick={signInWithTelegram}
-        className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-lg bg-[#2AABEE] text-white font-bold transition-transform hover:scale-105"
+        onClick={signInWithGoogle}
+        className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-lg bg-white text-gray-800 font-bold transition-transform hover:scale-105 border border-border-color"
       >
-        <TelegramIcon />
-        Войти через Telegram
+        <GoogleIcon />
+        Войти через Google
       </button>
     </div>
   );

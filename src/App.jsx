@@ -80,7 +80,6 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const descriptionRef = useRef(null);
     const [isLongDescription, setIsLongDescription] = useState(false);
     
-    // **ИСПРАВЛЕНИЕ:** Если данных о новелле ещё нет, показываем загрузку, чтобы избежать ошибки.
     if (!novel) {
         return (
             <div>
@@ -90,8 +89,16 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
         );
     }
     
+    // **ИСПРАВЛЕНИЕ:** Добавлена проверка на наличие массива `genres`. Если его нет, используется пустой массив, чтобы избежать ошибки.
+    const novelGenres = Array.isArray(novel.genres) ? novel.genres : [];
+
     const hasActiveSubscription = subscription && subscription.expires_at && subscription.expires_at.toDate() > new Date();
-    const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
+    const lastReadChapterId = useMemo(() => {
+        if (lastReadData && novel && lastReadData[novel.id]) {
+            return lastReadData[novel.id].chapterId;
+        }
+        return null;
+    }, [lastReadData, novel]);
 
     useEffect(() => {
         if (descriptionRef.current) {
@@ -141,7 +148,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
         );
     };
 
-    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`/tene/${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>
+    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`/tene/${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novelGenres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>
     {hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {subscription.expires_at.toDate().toLocaleDateString()}</p>)}
     {isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
         const showLock = !hasActiveSubscription && chapter.isPaid;
@@ -675,16 +682,15 @@ const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth 
         }
     };
 
-    // **ИСПРАВЛЕНИЕ:** Более безопасная проверка даты подписки.
     const getSubscriptionEndDate = () => {
         if (subscription && subscription.expires_at && typeof subscription.expires_at.toDate === 'function') {
-            return subscription.expires_at.toDate().toLocaleDateString();
+            return subscription.expires_at.toDate();
         }
         return null;
     };
     
     const subscriptionEndDate = getSubscriptionEndDate();
-    const hasActiveSubscription = !!subscriptionEndDate && new Date(subscriptionEndDate) > new Date();
+    const hasActiveSubscription = subscriptionEndDate && subscriptionEndDate > new Date();
 
     return (
         <div>
@@ -706,7 +712,7 @@ const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth 
                     <div>
                         <p className="text-green-500">Активна</p>
                         <p className="text-sm opacity-70">
-                            Заканчивается: {subscriptionEndDate}
+                            Заканчивается: {subscriptionEndDate.toLocaleDateString()}
                         </p>
                     </div>
                 ) : (
@@ -940,7 +946,7 @@ export default function App() {
 
   const handleBack = useCallback(() => {
       if (page === 'reader') setPage('details');
-      else if (page === 'details') { setPage('list'); setGenreFilter(null); }
+      else if (page === 'details') { setPage('list'); setGenreFilter(null); setSelectedNovel(null); }
   }, [page]);
 
   useEffect(() => {
@@ -1088,13 +1094,13 @@ export default function App() {
                     <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
                 </div>
             )}
-            <NovelList novels={novels.filter(n => !genreFilter || n.genres.includes(genreFilter))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+            <NovelList novels={novels.filter(n => !genreFilter || (n.genres && n.genres.includes(genreFilter)))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
           </>
         )
       case 'search':
         return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'bookmarks':
-        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
       case 'profile':
         return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} auth={auth} />
       default:

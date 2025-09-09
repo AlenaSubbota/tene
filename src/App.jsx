@@ -816,77 +816,62 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ЗДЕСЬ ---
-useEffect(() => {
-    // Эта функция будет обрабатывать данные пользователя
-    const handleUser = async (firebaseUser) => {
-      if (firebaseUser && !firebaseUser.isAnonymous) {
+  // --- ПОЛНОСТЬЮ ПЕРЕРАБОТАННЫЙ useEffect ДЛЯ УСТРАНЕНИЯ ОШИБКИ ---
+  useEffect(() => {
+    let unsubUserFromFirestore = () => {};
+    
+    // Сначала устанавливаем постоянный слушатель, который будет реагировать на изменения
+    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      unsubUserFromFirestore(); // Отписываемся от данных старого пользователя
+      
+      if (firebaseUser) {
+        // Если пользователь есть, получаем его данные
         setUser(firebaseUser);
         const idTokenResult = await firebaseUser.getIdTokenResult();
         setIsUserAdmin(!!idTokenResult.claims.admin);
-        const userDocRef = doc(db, "users", firebaseUser.uid);
         
-        return onSnapshot(userDocRef, (docSnap) => {
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        unsubUserFromFirestore = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
             setSubscription(data.subscription || null);
             setLastReadData(data.lastRead || null);
             setBookmarks(data.bookmarks || []);
-            if (data.settings) {
-              setFontSize(data.settings.fontSize || 16);
-              setFontClass(data.settings.fontClass || 'font-sans');
-            }
           } else {
             setDoc(userDocRef, { bookmarks: [], lastRead: {} });
           }
         });
       } else {
+        // Если пользователя нет, сбрасываем все
         setUser(null);
         setIsUserAdmin(false);
         setSubscription(null);
         setLastReadData(null);
         setBookmarks([]);
-        return () => {};
       }
+      
+      // ВАЖНО: Убираем загрузчик только после того, как все обработали
+      setIsLoading(false);
+    });
+
+    // Отдельно обрабатываем результат редиректа при первой загрузке
+    getRedirectResult(auth).catch((error) => {
+      // Если при редиректе произошла ошибка, выводим ее
+      console.error("Ошибка при обработке входа через Telegram:", error);
+      alert("Не удалось войти через Telegram. Попробуйте другой способ.");
+    });
+
+    // Загрузка новелл
+    fetch(`/tene/data/novels.json`)
+      .then(res => res.json())
+      .then(data => setNovels(data.novels))
+      .catch(err => console.error("Ошибка загрузки новелл:", err));
+
+    // Функция для очистки при закрытии приложения
+    return () => {
+      unsubAuth();
+      unsubUserFromFirestore();
     };
-
-    // --- УЛУЧШЕННАЯ ЛОГИКА С ОБРАБОТКОЙ ОШИБОК ---
-    // 1. Сначала проверяем результат редиректа
-    getRedirectResult(auth)
-      .catch((error) => {
-        // !!! ЭТО ВАЖНО: Ловим ошибки, которые происходят ПОСЛЕ редиректа
-        console.error("Ошибка аутентификации после редиректа:", error);
-        // Здесь можно показать пользователю уведомление об ошибке
-        // Например: alert(`Не удалось войти через провайдера: ${error.message}`);
-      })
-      .finally(() => {
-        // 2. ПОСЛЕ проверки редиректа, устанавливаем постоянный слушатель
-        let unsubUserFromFirestore = () => {};
-        const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-          unsubUserFromFirestore();
-          try {
-            unsubUserFromFirestore = await handleUser(firebaseUser);
-          } catch (error) {
-            console.error("Ошибка при обработке данных пользователя:", error);
-            setUser(null);
-          } finally {
-            // Убираем экран загрузки только после того, как все проверки завершены
-            setIsLoading(false);
-          }
-        });
-
-        // Загрузка новелл
-        fetch(`/tene/data/novels.json`)
-          .then(res => res.json())
-          .then(data => setNovels(data.novels))
-          .catch(err => console.error("Ошибка загрузки новелл:", err));
-        
-        // Функция очистки
-        return () => {
-          unsubAuth();
-          unsubUserFromFirestore();
-        };
-      });
   }, []);
 
   // ... (остальной код App.jsx остается без изменений)

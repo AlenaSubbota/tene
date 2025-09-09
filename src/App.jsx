@@ -80,7 +80,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const descriptionRef = useRef(null);
     const [isLongDescription, setIsLongDescription] = useState(false);
     
-    // ВАЖНО: Конвертируем timestamp из Firestore в обычную дату JavaScript
+    // ИСПРАВЛЕНИЕ 1: Проверяем наличие expires_at и используем .toDate()
     const hasActiveSubscription = subscription && subscription.expires_at && subscription.expires_at.toDate() > new Date();
     const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
 
@@ -132,7 +132,10 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
         );
     };
 
-    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`/tene/${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>{hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {subscription.expires_at.toDate().toLocaleDateString()}</p>)}{isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
+    return (<div className="text-text-main"><Header title={novel.title} onBack={onBack} /><div className="relative h-64"><img src={`/tene/${novel.coverUrl}`} alt={novel.title} className="w-full h-full object-cover object-top absolute"/><div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div><div className="absolute bottom-4 left-4 right-4"><h1 className="text-3xl font-bold font-sans text-text-main drop-shadow-[0_2px_2px_rgba(255,255,255,0.7)]">{novel.title}</h1><p className="text-sm font-sans text-text-main opacity-90 drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">{novel.author}</p></div></div><div className="p-4"><div className="flex flex-wrap gap-2 mb-4">{novel.genres.map(genre => (<button key={genre} onClick={() => onGenreSelect(genre)} className="text-xs font-semibold px-3 py-1 rounded-full transition-colors duration-200 bg-component-bg text-text-main border border-border-color hover:bg-border-color">{genre}</button>))}</div><div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-500 ${isDescriptionExpanded ? 'max-h-full' : 'max-h-24'}`}><p className="text-sm mb-2 opacity-80 font-body">{novel.description}</p></div>{isLongDescription && <div className="text-right"><button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent mb-4">{isDescriptionExpanded ? 'Скрыть' : 'Читать полностью...'}</button></div>}{lastReadChapterId && <button onClick={handleContinueReading} className="w-full py-3 mb-4 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105 hover:shadow-xl">Продолжить чтение (Глава {lastReadChapterId})</button>}<div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold">Главы</h2><button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent">{sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}</button></div>
+    {/* ИСПРАВЛЕНИЕ 2: Используем .toDate() для отображения даты */}
+    {hasActiveSubscription && (<p className="text-sm text-green-500 mb-4">Подписка до {subscription.expires_at.toDate().toLocaleDateString()}</p>)}
+    {isLoadingChapters ? <p>Загрузка глав...</p> : (<div className="flex flex-col gap-3">{sortedChapters.map(chapter => {
         const showLock = !hasActiveSubscription && chapter.isPaid;
         const isLastRead = lastReadChapterId === chapter.id;
         return (<div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-4 bg-component-bg rounded-xl cursor-pointer transition-all duration-200 hover:border-accent-hover hover:bg-accent/10 border border-border-color flex items-center justify-between shadow-sm hover:shadow-md ${showLock ? 'opacity-70' : ''}`}>
@@ -254,6 +257,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   const [chapterContent, setChapterContent] = useState('');
   const [isLoadingContent, setIsLoadingContent] = useState(true);
 
+  // ИСПРАВЛЕНИЕ 3: Проверяем наличие expires_at и используем .toDate()
   const hasActiveSubscription = subscription && subscription.expires_at && subscription.expires_at.toDate() > new Date();
   const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
 
@@ -660,6 +664,7 @@ const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth 
         }
     };
 
+    // ИСПРАВЛЕНИЕ 4: Проверяем наличие expires_at и используем .toDate()
     const hasActiveSubscription = subscription && subscription.expires_at && subscription.expires_at.toDate() > new Date();
 
     return (
@@ -682,6 +687,7 @@ const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth 
                     <div>
                         <p className="text-green-500">Активна</p>
                         <p className="text-sm opacity-70">
+                            {/* ИСПРАВЛЕНИЕ 5: Используем .toDate() для отображения даты */}
                             Заканчивается: {subscription.expires_at.toDate().toLocaleDateString()}
                         </p>
                     </div>
@@ -827,12 +833,12 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+  // ГЛАВНОЕ ИСПРАВЛЕНИЕ: Правильный порядок загрузки данных
   useEffect(() => {
     let unsubUserFromFirestore = () => {};
     
     const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      unsubUserFromFirestore();
+      unsubUserFromFirestore(); // Отписываемся от предыдущего слушателя
       
       if (firebaseUser) {
         setUser(firebaseUser);
@@ -840,7 +846,6 @@ export default function App() {
         setIsUserAdmin(!!idTokenResult.claims.admin);
         
         const userDocRef = doc(db, "users", firebaseUser.uid);
-        // Запускаем слушатель данных пользователя
         unsubUserFromFirestore = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
@@ -848,33 +853,33 @@ export default function App() {
             setLastReadData(data.lastRead || null);
             setBookmarks(data.bookmarks || []);
           } else {
-            // Если документа нет, создаем его
+            // Если документ пользователя не существует, создаем его
             setDoc(userDocRef, { bookmarks: [], lastRead: {} });
             setSubscription(null);
             setLastReadData(null);
             setBookmarks([]);
           }
-          // Убираем загрузчик ТОЛЬКО ПОСЛЕ получения данных из Firestore
+          // Убираем главный загрузчик только ПОСЛЕ того,
+          // как получили данные пользователя из Firestore
           setIsLoading(false); 
         });
       } else {
-        // Если пользователя нет, сбрасываем все и убираем загрузчик
+        // Если пользователь не авторизован, сбрасываем все данные
         setUser(null);
         setIsUserAdmin(false);
         setSubscription(null);
         setLastReadData(null);
         setBookmarks([]);
+        // И тоже убираем загрузчик
         setIsLoading(false);
       }
     });
 
-    // Отдельно обрабатываем результат редиректа
     getRedirectResult(auth).catch((error) => {
       console.error("Ошибка при обработке входа через Telegram:", error);
       alert("Не удалось войти через Telegram. Попробуйте другой способ.");
     });
 
-    // Загрузка новелл
     fetch(`/tene/data/novels.json`)
       .then(res => res.json())
       .then(data => setNovels(data.novels))
@@ -885,7 +890,6 @@ export default function App() {
       unsubUserFromFirestore();
     };
   }, []);
-  // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
   useEffect(() => {
       if (!selectedNovel) {
@@ -1097,6 +1101,6 @@ export default function App() {
         {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
         {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
         {selectedNews && <NewsModal newsItem={selectedNews} onClose={() => setSelectedNews(null)} />}
-    </main>
+       </main>
   );
 }

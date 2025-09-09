@@ -614,15 +614,29 @@ const SearchPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => {
     return (
         <div>
             <Header title="Поиск" />
+            {/* Контейнер для поисковой строки с правильными отступами */}
             <div className="p-4">
-                <div className="relative mb-6">
-                    <div className="absolute left-3 top-1-2 -translate-y-1/2">
+                <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none">
                         <SearchIcon className="text-text-main opacity-50" />
                     </div>
-                    <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-component-bg border-border-color border rounded-lg py-2 pl-10 pr-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent transition-shadow duration-300" />
+                    <input
+                        type="text"
+                        placeholder="Поиск по названию..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-component-bg border-border-color border rounded-lg py-2 pl-10 pr-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                    />
                 </div>
-                <NovelList novels={filteredNovels} onSelectNovel={onSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
             </div>
+
+            {/* Компонент NovelList теперь не имеет лишних отступов */}
+            <NovelList
+                novels={filteredNovels}
+                onSelectNovel={onSelectNovel}
+                bookmarks={bookmarks}
+                onToggleBookmark={onToggleBookmark}
+            />
         </div>
     );
 }

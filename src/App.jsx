@@ -32,7 +32,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence);
 
-// --- Иконки ---
+// --- Иконки (остаются без изменений) ---
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
 const BackIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>);
 const SearchIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
@@ -48,7 +48,7 @@ const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 const LogOutIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>);
 
-// --- Компоненты ---
+// --- Компоненты (остаются без изменений) ---
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
     <HeartIcon className="animate-pulse-heart text-accent" filled />
@@ -850,9 +850,9 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
   
-  // --- ИСПРАВЛЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
+  // --- ИЗМЕНЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
   useEffect(() => {
-    setIsLoading(true);
+    // Начальная загрузка статических данных
     fetch(`/tene/data/novels.json`)
       .then(res => res.json())
       .then(data => setNovels(data.novels))
@@ -860,15 +860,19 @@ export default function App() {
 
     let unsubUserFromFirestore = () => {};
 
+    // Слушатель состояния аутентификации
     const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      unsubUserFromFirestore();
+      unsubUserFromFirestore(); // Отписываемся от предыдущего слушателя Firestore
 
-      if (firebaseUser) {
+      if (firebaseUser && !firebaseUser.isAnonymous) {
+        // --- Пользователь вошел в систему и он не анонимный ---
         setUser(firebaseUser);
         const idTokenResult = await firebaseUser.getIdTokenResult();
         setIsUserAdmin(!!idTokenResult.claims.admin);
 
         const userDocRef = doc(db, "users", firebaseUser.uid);
+        
+        // Подписка на данные пользователя в Firestore
         unsubUserFromFirestore = onSnapshot(userDocRef, (docSnap) => {
           if (docSnap.exists()) {
             const data = docSnap.data();
@@ -880,48 +884,40 @@ export default function App() {
               setFontClass(data.settings.fontClass || 'font-sans');
             }
           } else {
-            setSubscription(null);
-            setLastReadData(null);
-            setBookmarks([]);
+             // Если документа нет, можно его создать с базовыми значениями
+            setDoc(userDocRef, { bookmarks: [], lastRead: {} });
           }
         });
         
+        // Интеграция с Telegram
         const tg = window.Telegram?.WebApp;
-        if (tg && !firebaseUser.isAnonymous) {
+        if (tg) {
             const telegramUser = tg.initDataUnsafe?.user;
             if (telegramUser?.id) {
                await setDoc(userDocRef, { telegramId: telegramUser.id.toString() }, { merge: true });
-
-               // --- НАЧАЛО ИЗМЕНЕНИЙ ---
-               // Если у пользователя Firebase нет displayName, а в Telegram есть имя,
-               // то установим его.
                if (!firebaseUser.displayName && telegramUser.first_name) {
                     const telegramDisplayName = `${telegramUser.first_name} ${telegramUser.last_name || ''}`.trim();
                     try {
                         await updateProfile(firebaseUser, { displayName: telegramDisplayName });
-                        // Обновляем локальное состояние пользователя, чтобы имя сразу отобразилось
                         setUser(auth.currentUser); 
                     } catch (error) {
                         console.error("Ошибка обновления профиля:", error);
                     }
                }
-               // --- КОНЕЦ ИЗМЕНЕНИЙ ---
             }
         }
-        setIsLoading(false);
-
       } else {
-        // Пользователя нет, прекращаем загрузку и показываем экран входа.
+        // --- Пользователя нет или он анонимный ---
+        // Сбрасываем все состояния, связанные с пользователем
         setUser(null);
         setIsUserAdmin(false);
-        setIsLoading(false);
+        setSubscription(null);
+        setLastReadData(null);
+        setBookmarks([]);
       }
-    });
-    
-    // Вызываем getRedirectResult. Если он успешен, он вызовет onAuthStateChanged выше
-    // с новым пользователем, перезаписав анонимного.
-    getRedirectResult(auth).catch((error) => {
-      console.error("Ошибка при получении результата перенаправления:", error);
+      
+      // В любом случае, проверка аутентификации завершена
+      setIsLoading(false);
     });
 
     return () => {
@@ -1063,14 +1059,17 @@ export default function App() {
         );
     };
 
+ // --- УПРАВЛЕНИЕ ОТОБРАЖЕНИЕМ ---
  if (isLoading) {
     return <LoadingSpinner />;
   }
 
-  if (!user || user.isAnonymous) {
-  return <AuthScreen user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} auth={auth} />;
-}
+  // Если загрузка завершена, и пользователя нет, показываем экран входа
+  if (!user) {
+    return <AuthScreen />;
+  }
   
+  // Если пользователь есть, показываем основное приложение
   const renderContent = () => {
     if (page === 'details') {
       return <NovelDetails 

@@ -817,7 +817,7 @@ export default function App() {
   }, [fontClass, updateUserDoc]);
 
   // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ЗДЕСЬ ---
-  useEffect(() => {
+useEffect(() => {
     // Эта функция будет обрабатывать данные пользователя
     const handleUser = async (firebaseUser) => {
       if (firebaseUser && !firebaseUser.isAnonymous) {
@@ -846,33 +846,32 @@ export default function App() {
         setSubscription(null);
         setLastReadData(null);
         setBookmarks([]);
-        return () => {}; // Возвращаем пустую функцию отписки
+        return () => {};
       }
     };
 
-    // 1. Проверяем результат редиректа от Telegram
+    // --- УЛУЧШЕННАЯ ЛОГИКА С ОБРАБОТКОЙ ОШИБОК ---
+    // 1. Сначала проверяем результат редиректа
     getRedirectResult(auth)
-      .then((result) => {
-        if (result) {
-          // Если есть результат, значит пользователь только что вошел через Telegram
-          // handleUser обработает его данные, а onAuthStateChanged сделает все остальное
-        }
-      })
       .catch((error) => {
-        console.error("Ошибка при получении результата редиректа:", error);
+        // !!! ЭТО ВАЖНО: Ловим ошибки, которые происходят ПОСЛЕ редиректа
+        console.error("Ошибка аутентификации после редиректа:", error);
+        // Здесь можно показать пользователю уведомление об ошибке
+        // Например: alert(`Не удалось войти через провайдера: ${error.message}`);
       })
       .finally(() => {
-        // 2. Устанавливаем постоянный слушатель состояния аутентификации
+        // 2. ПОСЛЕ проверки редиректа, устанавливаем постоянный слушатель
         let unsubUserFromFirestore = () => {};
         const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-          unsubUserFromFirestore(); // Отписываемся от старого слушателя данных
+          unsubUserFromFirestore();
           try {
             unsubUserFromFirestore = await handleUser(firebaseUser);
           } catch (error) {
-            console.error("Ошибка при обработке пользователя:", error);
+            console.error("Ошибка при обработке данных пользователя:", error);
             setUser(null);
           } finally {
-            setIsLoading(false); // Убираем загрузку только после всех проверок
+            // Убираем экран загрузки только после того, как все проверки завершены
+            setIsLoading(false);
           }
         });
 
@@ -881,8 +880,8 @@ export default function App() {
           .then(res => res.json())
           .then(data => setNovels(data.novels))
           .catch(err => console.error("Ошибка загрузки новелл:", err));
-
-        // Функция для очистки при размонтировании компонента
+        
+        // Функция очистки
         return () => {
           unsubAuth();
           unsubUserFromFirestore();

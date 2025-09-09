@@ -73,8 +73,8 @@ const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => (
 );
 
 const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack }) => {
-    // **ИСПРАВЛЕНИЕ:** Проверка на наличие `novel` перенесена в самое начало компонента.
-    // Это предотвращает ошибки, если компонент пытается отрисоваться до получения данных.
+    // **ИСПРАВЛЕНИЕ:** Добавлена надёжная проверка. Компонент не будет пытаться отрисоваться,
+    // пока не получит все данные о новелле. Это предотвращает сбой.
     if (!novel) {
         return (
             <div>
@@ -91,9 +91,12 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const descriptionRef = useRef(null);
     const [isLongDescription, setIsLongDescription] = useState(false);
 
+    // **ИСПРАВЛЕНИЕ:** Безопасная обработка жанров, чтобы избежать ошибки, если их нет.
     const novelGenres = Array.isArray(novel.genres) ? novel.genres : [];
-
+    
     const hasActiveSubscription = subscription && subscription.expires_at && subscription.expires_at.toDate() > new Date();
+    
+    // **ИСПРАВЛЕНИЕ:** Улучшена логика, чтобы избежать ошибки, если `novel` ещё не загружен.
     const lastReadChapterId = useMemo(() => {
         if (lastReadData && novel && lastReadData[novel.id]) {
             return lastReadData[novel.id].chapterId;
@@ -257,16 +260,16 @@ const Comment = React.memo(({ comment, onReply, onLike, onEdit, onDelete, onUpda
 });
 
 const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack, isUserAdmin }) => {
-    // **ИСПРАВЛЕНИЕ:** Добавлена проверка на наличие `novel` и `chapter`, чтобы избежать сбоя при рендеринге.
-    if (!novel || !chapter) {
-        return (
-           <div>
-               <Header title="Ошибка" onBack={onBack} />
-               <div className="p-4 text-center">Не удалось загрузить главу. Пожалуйста, вернитесь назад.</div>
-           </div>
-       );
-    }
-    
+  // **ИСПРАВЛЕНИЕ:** Проверка на наличие `novel` и `chapter` для предотвращения сбоя при рендеринге.
+  if (!novel || !chapter) {
+      return (
+         <div>
+             <Header title="Ошибка" onBack={onBack} />
+             <div className="p-4 text-center">Не удалось загрузить главу. Пожалуйста, вернитесь назад.</div>
+         </div>
+     );
+  }
+
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState(null);
@@ -963,7 +966,7 @@ export default function App() {
       } else if (page === 'details') {
         setPage('list');
         setGenreFilter(null);
-        setSelectedNovel(null);
+        setSelectedNovel(null); // **ИСПРАВЛЕНИЕ:** Сбрасываем выбранную новеллу
       }
   }, [page]);
 

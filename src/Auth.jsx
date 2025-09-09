@@ -28,7 +28,7 @@ export const Auth = ({ user, auth }) => {
                 await createUserWithEmailAndPassword(auth, email, password);
             }
         } catch (err) {
-            console.error("Ошибка аутентификации:", err);
+            console.error("Ошибка аутентификации:", err.code);
             // Преобразуем коды ошибок Firebase в понятные сообщения
             switch (err.code) {
                 case 'auth/invalid-email':
@@ -45,8 +45,11 @@ export const Auth = ({ user, auth }) => {
                 case 'auth/weak-password':
                     setError('Пароль слишком слабый (должен быть не менее 6 символов).');
                     break;
+                case 'auth/too-many-requests':
+                    setError('Слишком много попыток входа. Попробуйте позже.');
+                    break;
                 default:
-                    setError('Произошла ошибка. Попробуйте снова.');
+                    setError('Произошла непредвиденная ошибка. Попробуйте снова.');
             }
         }
     };
@@ -70,7 +73,7 @@ export const Auth = ({ user, auth }) => {
                     <button onClick={handleSignOut} className="w-full py-2 rounded-lg bg-gray-200 text-gray-800 font-bold">Выйти</button>
                 </div>
             ) : (
-                // --- ИНТЕРФЕЙС ДЛЯ АНОНИМНОГО ПОЛЬЗОВАТЕЛЯ ---
+                // --- ИНТЕРФЕЙС ДЛЯ ВХОДА/РЕГИСТРАЦИИ ---
                 <div className="p-4 rounded-lg bg-component-bg border border-border-color">
                     <h3 className="font-bold mb-2">{isLoginView ? 'Войдите в аккаунт' : 'Создайте аккаунт'}</h3>
                     <p className="text-sm opacity-70 mb-3">

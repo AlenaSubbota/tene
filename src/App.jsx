@@ -633,6 +633,176 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   );
 };
 
+const SearchPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => {
+    const [searchQuery, setSearchQuery] = useState('');
+    const filteredNovels = useMemo(() => {
+        if (!searchQuery) return [];
+        return novels.filter(novel => novel.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    }, [novels, searchQuery]);
+
+    return (
+        <div>
+            <Header title="Поиск" />
+            <div className="p-4">
+                <div className="relative mb-6">
+                    <div className="absolute left-3 top-1-2 -translate-y-1/2">
+                        <SearchIcon className="text-text-main opacity-50" />
+                    </div>
+                    <input type="text" placeholder="Поиск по названию..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full bg-component-bg border-border-color border rounded-lg py-2 pl-10 pr-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent transition-shadow duration-300" />
+                </div>
+                <NovelList novels={filteredNovels} onSelectNovel={onSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
+            </div>
+        </div>
+    );
+}
+
+const BookmarksPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => (
+    <div>
+        <Header title="Закладки" />
+        <NovelList novels={novels} onSelectNovel={onSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
+    </div>
+)
+
+const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth }) => {
+    const handleLogout = () => {
+        signOut(auth).catch((error) => {
+            console.error("Ошибка выхода:", error);
+        });
+    };
+
+    const handleCopyId = () => {
+        if (userId) {
+            navigator.clipboard.writeText(userId)
+                .then(() => console.log("Firebase UID скопирован в буфер обмена"))
+                .catch(err => console.error('Не удалось скопировать UID: ', err));
+        }
+    };
+
+    const hasActiveSubscription = subscription && new Date(subscription.expires_at) > new Date();
+
+    return (
+        <div>
+            <Header title="Профиль" />
+            <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4 mb-4">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <p className="font-bold text-lg">{user?.displayName || 'Аноним'}</p>
+                        <p className="text-sm text-text-main/70">{user?.email}</p>
+                    </div>
+                    <button onClick={handleLogout} className="p-2 rounded-full hover:bg-background transition-colors">
+                        <LogOutIcon />
+                    </button>
+                </div>
+            </div>
+            <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4 mb-4">
+                 <h3 className="font-bold mb-2">Подписка</h3>
+                 {hasActiveSubscription ? (
+                    <div>
+                        <p className="text-green-500">Активна</p>
+                        <p className="text-sm opacity-70">
+                            Заканчивается: {new Date(subscription.expires_at).toLocaleDateString()}
+                        </p>
+                    </div>
+                ) : (
+                    <div>
+                        <p className="text-red-500">Неактивна</p>
+                         <p className="text-sm opacity-70 mb-3">
+                            Оформите подписку, чтобы получить доступ ко всем платным главам.
+                        </p>
+                        <button onClick={onGetSubscriptionClick} className="w-full py-2 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-all hover:scale-105">
+                            Оформить подписку
+                        </button>
+                    </div>
+                )}
+            </div>
+            <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4">
+                <h3 className="font-bold mb-2">Ваш ID для администрирования</h3>
+                <p className="text-sm opacity-70 mb-3">
+                    Этот ID нужен для назначения прав администратора через Telegram-бота.
+                </p>
+                <div className="bg-background p-2 rounded-md text-xs break-all mb-3">
+                    <code>{userId || "Загрузка..."}</code>
+                </div>
+                <button 
+                    onClick={handleCopyId} 
+                    disabled={!userId}
+                    className="w-full py-2 rounded-lg bg-gray-200 text-gray-800 font-bold transition-all hover:scale-105 disabled:opacity-50"
+                >
+                    Копировать ID
+                </button>
+            </div>
+        </div>
+    );
+};
+
+const BottomNav = ({ activeTab, setActiveTab }) => {
+    const navItems = [
+        { id: 'library', label: 'Библиотека', icon: LibraryIcon },
+        { id: 'search', label: 'Поиск', icon: SearchIcon },
+        { id: 'bookmarks', label: 'Закладки', icon: BookmarkIcon },
+        { id: 'profile', label: 'Профиль', icon: UserIcon },
+    ];
+    return (
+        <div className="fixed bottom-0 left-0 right-0 border-t border-border-color bg-component-bg z-30 shadow-[0_-2px_5px_rgba(0,0,0,0.05)]">
+            <div className="flex justify-around items-center h-16">
+                {navItems.map(item => (
+                    <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center justify-center w-full h-full transition-colors duration-200 ${activeTab === item.id ? "text-accent" : "text-text-main opacity-60"}`}>
+                        <item.icon filled={activeTab === item.id} />
+                        <span className="text-xs mt-1">{item.label}</span>
+                    </button>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+const NewsSlider = ({ onReadMore }) => {
+    const [news, setNews] = useState([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+
+    useEffect(() => {
+    fetch(`/tene/data/news.json`)
+        .then(res => res.json())
+            .then(setNews)
+            .catch(err => console.error("Failed to fetch news", err));
+    }, []);
+
+    const nextNews = () => setCurrentIndex((prev) => (prev + 1) % news.length);
+    const prevNews = () => setCurrentIndex((prev) => (prev - 1 + news.length) % news.length);
+
+    if (news.length === 0) return null;
+
+    const currentNewsItem = news[currentIndex];
+
+    return (
+        <div className="p-4">
+            <div className="bg-component-bg p-4 rounded-2xl shadow-md border border-border-color flex items-center gap-4">
+                <img src={currentNewsItem.imageUrl} alt="News" className="w-16 h-16 rounded-full object-cover border-2 border-border-color" />
+                <div className="flex-1">
+                    <h3 className="font-bold text-text-main">{currentNewsItem.title}</h3>
+                    <p className="text-sm text-text-main opacity-70">{currentNewsItem.shortDescription}</p>
+                    <button onClick={() => onReadMore(currentNewsItem)} className="text-sm font-bold text-accent mt-1">Читать далее</button>
+                </div>
+                <div className="flex flex-col">
+                     <button onClick={prevNews} className="p-1 rounded-full hover:bg-background"><ChevronLeftIcon className="w-5 h-5" /></button>
+                     <button onClick={nextNews} className="p-1 rounded-full hover:bg-background"><ChevronRightIcon className="w-5 h-5" /></button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const NewsModal = ({ newsItem, onClose }) => (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+        <div className="w-full max-w-md p-6 rounded-2xl shadow-lg bg-component-bg text-text-main" onClick={e => e.stopPropagation()}>
+            <h2 className="text-2xl font-bold mb-4">{newsItem.title}</h2>
+            <p className="whitespace-pre-wrap opacity-80">{newsItem.fullText}</p>
+            <button onClick={onClose} className="w-full py-2 mt-6 rounded-lg bg-accent text-white font-bold">Закрыть</button>
+        </div>
+    </div>
+);
+
+
 // --- Главный компонент приложения ---
 export default function App() {
   const [fontSize, setFontSize] = useState(16);
@@ -896,7 +1066,7 @@ export default function App() {
 
   // Если загрузка завершена, и пользователя нет, показываем экран входа
   if (!user) {
-    return <AuthScreen auth={auth} />;
+    return <AuthScreen />;
   }
   
   // Если пользователь есть, показываем основное приложение

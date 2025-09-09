@@ -896,7 +896,7 @@ export default function App() {
           try {
               const docRef = doc(db, 'chapter_info', selectedNovel.id.toString());
               const docSnap = await getDoc(docRef);
-              if (docSnap.exists()) {
+              if (docSnap.exists() && docSnap.data()) {
                   const data = docSnap.data();
                   const chaptersData = data.chapters || {};
                   const chaptersArray = Object.keys(chaptersData).map(key => ({

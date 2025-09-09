@@ -73,13 +73,8 @@ const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => (
 );
 
 const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack }) => {
-    const [isSubModalOpen, setIsSubModalOpen] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState(null);
-    const [sortOrder, setSortOrder] = useState('newest');
-    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
-    const descriptionRef = useRef(null);
-    const [isLongDescription, setIsLongDescription] = useState(false);
-    
+    // **ИСПРАВЛЕНИЕ:** Проверка на наличие `novel` перенесена в самое начало компонента.
+    // Это предотвращает ошибки, если компонент пытается отрисоваться до получения данных.
     if (!novel) {
         return (
             <div>
@@ -88,8 +83,14 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
             </div>
         );
     }
-    
-    // **ИСПРАВЛЕНИЕ:** Добавлена проверка на наличие массива `genres`. Если его нет, используется пустой массив, чтобы избежать ошибки.
+
+    const [isSubModalOpen, setIsSubModalOpen] = useState(false);
+    const [selectedPlan, setSelectedPlan] = useState(null);
+    const [sortOrder, setSortOrder] = useState('newest');
+    const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+    const descriptionRef = useRef(null);
+    const [isLongDescription, setIsLongDescription] = useState(false);
+
     const novelGenres = Array.isArray(novel.genres) ? novel.genres : [];
 
     const hasActiveSubscription = subscription && subscription.expires_at && subscription.expires_at.toDate() > new Date();
@@ -112,6 +113,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
 
 
     const sortedChapters = useMemo(() => {
+        if (!Array.isArray(chapters)) return [];
         const chaptersCopy = [...chapters];
         if (sortOrder === 'newest') return chaptersCopy.reverse();
         return chapters;
@@ -255,6 +257,16 @@ const Comment = React.memo(({ comment, onReply, onLike, onEdit, onDelete, onUpda
 });
 
 const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack, isUserAdmin }) => {
+    // **ИСПРАВЛЕНИЕ:** Добавлена проверка на наличие `novel` и `chapter`, чтобы избежать сбоя при рендеринге.
+    if (!novel || !chapter) {
+        return (
+           <div>
+               <Header title="Ошибка" onBack={onBack} />
+               <div className="p-4 text-center">Не удалось загрузить главу. Пожалуйста, вернитесь назад.</div>
+           </div>
+       );
+    }
+    
   const [comments, setComments] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState(null);
@@ -945,8 +957,14 @@ export default function App() {
 
 
   const handleBack = useCallback(() => {
-      if (page === 'reader') setPage('details');
-      else if (page === 'details') { setPage('list'); setGenreFilter(null); setSelectedNovel(null); }
+      if (page === 'reader') {
+        setPage('details');
+        setSelectedChapter(null); // **ИСПРАВЛЕНИЕ:** Сбрасываем выбранную главу при возврате
+      } else if (page === 'details') {
+        setPage('list');
+        setGenreFilter(null);
+        setSelectedNovel(null);
+      }
   }, [page]);
 
   useEffect(() => {
@@ -1001,6 +1019,7 @@ export default function App() {
   }, [bookmarks, updateUserDoc]);
 
   const bookmarkedNovels = useMemo(() => {
+    if (!novels || novels.length === 0 || !bookmarks) return [];
     return novels.filter(novel => bookmarks.includes(novel.id));
   }, [novels, bookmarks]);
 
@@ -1100,7 +1119,7 @@ export default function App() {
       case 'search':
         return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'bookmarks':
-        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={onToggleBookmark} />
+        return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'profile':
         return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} auth={auth} />
       default:

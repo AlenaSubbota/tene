@@ -94,7 +94,7 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     // Дополнительная "защита" на случай, если у какой-то новеллы не будет жанров
     const novelGenres = Array.isArray(novel.genres) ? novel.genres : [];
     
-    const hasActiveSubscription = subscription && subscription.expires_at && subscription.expires_at.toDate() > new Date();
+    const hasActiveSubscription = subscription && subscription.expires_at && typeof subscription.expires_at.toDate === 'function' && subscription.expires_at.toDate() > new Date();
     
     const lastReadChapterId = useMemo(() => {
         if (lastReadData && novel && lastReadData[novel.id]) {
@@ -259,6 +259,7 @@ const Comment = React.memo(({ comment, onReply, onLike, onEdit, onDelete, onUpda
 });
 
 const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack, isUserAdmin }) => {
+  
   if (!novel || !chapter) {
       return (
          <div>
@@ -285,7 +286,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
   const [chapterContent, setChapterContent] = useState('');
   const [isLoadingContent, setIsLoadingContent] = useState(true);
 
-  const hasActiveSubscription = subscription && subscription.expires_at && subscription.expires_at.toDate() > new Date();
+  const hasActiveSubscription = subscription && subscription.expires_at && typeof subscription.expires_at.toDate === 'function' && subscription.expires_at.toDate() > new Date();
   const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
 
   useEffect(() => {

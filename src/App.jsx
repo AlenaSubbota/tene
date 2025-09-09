@@ -80,6 +80,16 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const descriptionRef = useRef(null);
     const [isLongDescription, setIsLongDescription] = useState(false);
     
+    // **ИСПРАВЛЕНИЕ:** Если данных о новелле ещё нет, показываем загрузку, чтобы избежать ошибки.
+    if (!novel) {
+        return (
+            <div>
+                <Header title="Загрузка..." onBack={onBack} />
+                <div className="p-4 text-center">Загрузка данных о новелле...</div>
+            </div>
+        );
+    }
+    
     const hasActiveSubscription = subscription && subscription.expires_at && subscription.expires_at.toDate() > new Date();
     const lastReadChapterId = useMemo(() => lastReadData && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null, [lastReadData, novel.id]);
 
@@ -608,7 +618,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
 const SearchPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => {
     const [searchQuery, setSearchQuery] = useState('');
     
-    // ИСПРАВЛЕНО: Убрана ошибочная строка, которая возвращала пустой массив
     const filteredNovels = useMemo(() => {
         return novels.filter(novel => novel.title.toLowerCase().includes(searchQuery.toLowerCase()))
     }, [novels, searchQuery]);
@@ -630,7 +639,6 @@ const SearchPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => {
                     />
                 </div>
             </div>
-            {/* ИСПРАВЛЕНО: Добавлено сообщение, если ничего не найдено */}
             {searchQuery && filteredNovels.length === 0 ? (
                 <p className="text-center text-text-main opacity-70 mt-8">Ничего не найдено</p>
             ) : (
@@ -667,7 +675,16 @@ const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth 
         }
     };
 
-    const hasActiveSubscription = subscription && subscription.expires_at && subscription.expires_at.toDate() > new Date();
+    // **ИСПРАВЛЕНИЕ:** Более безопасная проверка даты подписки.
+    const getSubscriptionEndDate = () => {
+        if (subscription && subscription.expires_at && typeof subscription.expires_at.toDate === 'function') {
+            return subscription.expires_at.toDate().toLocaleDateString();
+        }
+        return null;
+    };
+    
+    const subscriptionEndDate = getSubscriptionEndDate();
+    const hasActiveSubscription = !!subscriptionEndDate && new Date(subscriptionEndDate) > new Date();
 
     return (
         <div>
@@ -689,7 +706,7 @@ const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth 
                     <div>
                         <p className="text-green-500">Активна</p>
                         <p className="text-sm opacity-70">
-                            Заканчивается: {subscription.expires_at.toDate().toLocaleDateString()}
+                            Заканчивается: {subscriptionEndDate}
                         </p>
                     </div>
                 ) : (

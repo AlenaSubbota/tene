@@ -1,5 +1,3 @@
-// src/App.jsx
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
     doc, getDoc, setDoc, updateDoc, deleteDoc,
@@ -9,13 +7,14 @@ import {
 import {
     onAuthStateChanged,
     signOut,
-    updateProfile
+    updateProfile,
+    getRedirectResult // <--- ДОБАВЛЯЕМ ЭТОТ ИМПОРТ
 } from "firebase/auth";
-import { db, auth } from './firebase-config'; // <--- ИМПОРТИРУЕМ ОТСЮДА
+import { db, auth } from './firebase-config';
 import { AuthScreen } from './AuthScreen.jsx';
 
-
-// --- Иконки (без изменений) ---
+// --- Иконки и другие компоненты остаются без изменений ---
+// (Весь ваш код с иконками и UI-компонентами здесь)
 const ArrowRightIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`opacity-50 ${className}`}><path d="m9 18 6-6-6-6"/></svg>);
 const BackIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>);
 const SearchIcon = ({ className = '', filled = false }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>);
@@ -31,7 +30,6 @@ const ChevronRightIcon = ({ className = '' }) => <svg xmlns="http://www.w3.org/2
 const SettingsIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 0 2l-.15.08a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l-.22-.38a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1 0-2l.15-.08a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg>);
 const LogOutIcon = ({ className = '' }) => (<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>);
 
-// --- Компоненты (без изменений) ---
 const LoadingSpinner = () => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main">
     <HeartIcon className="animate-pulse-heart text-accent" filled />
@@ -353,7 +351,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
 
         await addDoc(commentsColRef, commentData);
 
-        // Создаем "запрос на уведомление" в новой коллекции
         const notificationColRef = collection(db, "notifications");
         await addDoc(notificationColRef, {
             ...commentData,
@@ -512,12 +509,7 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
           style={{ fontSize: `${fontSize}px` }}
           dangerouslySetInnerHTML={{ __html: isLoadingContent ? '<p>Загрузка...</p>' : renderMarkdown(chapterContent) }}
         />
-
-        <div className="text-center my-8 text-accent font-bold text-2xl tracking-widest">
-            ╚══ ≪ °❈° ≫ ══╝
-        </div>
-
-
+        <div className="text-center my-8 text-accent font-bold text-2xl tracking-widest">╚══ ≪ °❈° ≫ ══╝</div>
         <div className="border-t border-border-color pt-8">
           <div className="flex items-center gap-4 mb-8">
             <button onClick={handleLike} className="flex items-center gap-2 text-accent-hover transition-transform hover:scale-110">
@@ -525,7 +517,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
               <span className="font-bold text-lg">{likeCount}</span>
             </button>
           </div>
-
           <h3 className="text-xl font-bold mb-4">Комментарии</h3>
           <div className="space-y-4 mb-6">
             {comments.length > 0
@@ -551,7 +542,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
                 : <p className="opacity-70 text-sm">Комментариев пока нет. Будьте первым!</p>
             }
           </div>
-
           <form onSubmit={(e) => handleCommentSubmit(e, null)} className="flex items-center gap-2">
             <input
               type="text"
@@ -566,7 +556,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
           </form>
         </div>
       </div>
-      {/* Chapter Navigation */}
       <div className="fixed bottom-0 left-0 right-0 p-2 border-t border-border-color bg-component-bg flex justify-between items-center z-10 text-text-main">
         <button onClick={() => handleChapterClick(prevChapter)} disabled={!prevChapter} className="p-2 disabled:opacity-50"><BackIcon/></button>
         <div className="flex gap-2">
@@ -575,7 +564,6 @@ const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, use
         </div>
         <button onClick={() => handleChapterClick(nextChapter)} disabled={!nextChapter} className="p-2 disabled:opacity-50"><ArrowRightIcon className="opacity-100"/></button>
       </div>
-
       {showChapterList && (
         <div className="fixed inset-0 bg-black/50 z-20" onClick={() => setShowChapterList(false)}>
           <div className="absolute bottom-0 left-0 right-0 max-h-[45vh] p-4 rounded-t-2xl bg-component-bg flex flex-col" onClick={e => e.stopPropagation()}>
@@ -786,7 +774,6 @@ const NewsModal = ({ newsItem, onClose }) => (
 );
 
 
-// --- Главный компонент приложения ---
 export default function App() {
   const [fontSize, setFontSize] = useState(16);
   const [fontClass, setFontClass] = useState('font-sans');
@@ -800,18 +787,14 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
-
   const [chapters, setChapters] = useState([]);
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
-
   const [lastReadData, setLastReadData] = useState(null);
   const [bookmarks, setBookmarks] = useState([]);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [selectedNews, setSelectedNews] = useState(null);
-
   const BOT_USERNAME = "tenebrisverbot";
-
   const userId = user?.uid;
 
   const updateUserDoc = useCallback(async (dataToUpdate) => {
@@ -833,80 +816,81 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // --- ИЗМЕНЕННАЯ ЛОГИКА АУТЕНТИФИКАЦИИ ---
+  // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ЗДЕСЬ ---
   useEffect(() => {
-    // Начальная загрузка статических данных
-    fetch(`/tene/data/novels.json`)
-      .then(res => res.json())
-      .then(data => setNovels(data.novels))
-      .catch(err => console.error("Ошибка загрузки новелл:", err));
-
-    let unsubUserFromFirestore = () => {};
-
-    // Слушатель состояния аутентификации
-    const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      unsubUserFromFirestore();
-
-      try {
-        if (firebaseUser && !firebaseUser.isAnonymous) {
-          setUser(firebaseUser);
-          const idTokenResult = await firebaseUser.getIdTokenResult();
-          setIsUserAdmin(!!idTokenResult.claims.admin);
-
-          const userDocRef = doc(db, "users", firebaseUser.uid);
-
-          unsubUserFromFirestore = onSnapshot(userDocRef, (docSnap) => {
-            if (docSnap.exists()) {
-              const data = docSnap.data();
-              setSubscription(data.subscription || null);
-              setLastReadData(data.lastRead || null);
-              setBookmarks(data.bookmarks || []);
-              if (data.settings) {
-                setFontSize(data.settings.fontSize || 16);
-                setFontClass(data.settings.fontClass || 'font-sans');
-              }
-            } else {
-              setDoc(userDocRef, { bookmarks: [], lastRead: {} });
+    // Эта функция будет обрабатывать данные пользователя
+    const handleUser = async (firebaseUser) => {
+      if (firebaseUser && !firebaseUser.isAnonymous) {
+        setUser(firebaseUser);
+        const idTokenResult = await firebaseUser.getIdTokenResult();
+        setIsUserAdmin(!!idTokenResult.claims.admin);
+        const userDocRef = doc(db, "users", firebaseUser.uid);
+        
+        return onSnapshot(userDocRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setSubscription(data.subscription || null);
+            setLastReadData(data.lastRead || null);
+            setBookmarks(data.bookmarks || []);
+            if (data.settings) {
+              setFontSize(data.settings.fontSize || 16);
+              setFontClass(data.settings.fontClass || 'font-sans');
             }
-          });
-
-          const tg = window.Telegram?.WebApp;
-          if (tg) {
-              const telegramUser = tg.initDataUnsafe?.user;
-              if (telegramUser?.id) {
-                 await setDoc(userDocRef, { telegramId: telegramUser.id.toString() }, { merge: true });
-                 if (!firebaseUser.displayName && telegramUser.first_name) {
-                      const telegramDisplayName = `${telegramUser.first_name} ${telegramUser.last_name || ''}`.trim();
-                      try {
-                          await updateProfile(firebaseUser, { displayName: telegramDisplayName });
-                          setUser(auth.currentUser);
-                      } catch (error) {
-                          console.error("Ошибка обновления профиля:", error);
-                      }
-                 }
-              }
+          } else {
+            setDoc(userDocRef, { bookmarks: [], lastRead: {} });
           }
-        } else {
-          setUser(null);
-          setIsUserAdmin(false);
-          setSubscription(null);
-          setLastReadData(null);
-          setBookmarks([]);
-        }
-      } catch (error) {
-          console.error("Произошла ошибка при аутентификации:", error);
-          setUser(null);
-      } finally {
-          setIsLoading(false);
+        });
+      } else {
+        setUser(null);
+        setIsUserAdmin(false);
+        setSubscription(null);
+        setLastReadData(null);
+        setBookmarks([]);
+        return () => {}; // Возвращаем пустую функцию отписки
       }
-    });
-
-    return () => {
-      unsubAuth();
-      unsubUserFromFirestore();
     };
+
+    // 1. Проверяем результат редиректа от Telegram
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          // Если есть результат, значит пользователь только что вошел через Telegram
+          // handleUser обработает его данные, а onAuthStateChanged сделает все остальное
+        }
+      })
+      .catch((error) => {
+        console.error("Ошибка при получении результата редиректа:", error);
+      })
+      .finally(() => {
+        // 2. Устанавливаем постоянный слушатель состояния аутентификации
+        let unsubUserFromFirestore = () => {};
+        const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+          unsubUserFromFirestore(); // Отписываемся от старого слушателя данных
+          try {
+            unsubUserFromFirestore = await handleUser(firebaseUser);
+          } catch (error) {
+            console.error("Ошибка при обработке пользователя:", error);
+            setUser(null);
+          } finally {
+            setIsLoading(false); // Убираем загрузку только после всех проверок
+          }
+        });
+
+        // Загрузка новелл
+        fetch(`/tene/data/novels.json`)
+          .then(res => res.json())
+          .then(data => setNovels(data.novels))
+          .catch(err => console.error("Ошибка загрузки новелл:", err));
+
+        // Функция для очистки при размонтировании компонента
+        return () => {
+          unsubAuth();
+          unsubUserFromFirestore();
+        };
+      });
   }, []);
 
+  // ... (остальной код App.jsx остается без изменений)
 
   useEffect(() => {
       if (!selectedNovel) {
@@ -1040,13 +1024,11 @@ export default function App() {
         );
     };
 
- // --- УПРАВЛЕНИЕ ОТОБРАЖЕНИЕМ ---
  if (isLoading) {
     return <LoadingSpinner />;
   }
 
   if (!user) {
-    // Передаем auth в AuthScreen
     return <AuthScreen auth={auth} />;
   }
 

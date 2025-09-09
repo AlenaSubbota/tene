@@ -1,10 +1,72 @@
 // src/Auth.jsx
 
-import React from 'react';
-import { OAuthProvider, signInWithRedirect } from "firebase/auth";
+import React, { useState } from 'react';
+import {
+  OAuthProvider,
+  signInWithRedirect,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile
+} from "firebase/auth";
 
-// Получаем auth как пропс
 export const Auth = ({ auth }) => {
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [error, setError] = useState('');
+
+  const handleAuthAction = async (e) => {
+    e.preventDefault();
+    setError(''); // Сбрасываем ошибку перед новой попыткой
+
+    if (isRegistering) {
+      // --- РЕГИСТРАЦИЯ ---
+      if (!displayName.trim()) {
+        setError('Пожалуйста, введите имя.');
+        return;
+      }
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // Сразу после регистрации обновляем профиль, добавляя имя
+        await updateProfile(userCredential.user, { displayName: displayName });
+      } catch (err) {
+        setError(getFriendlyErrorMessage(err.code));
+      }
+    } else {
+      // --- ВХОД ---
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (err) {
+        setError(getFriendlyErrorMessage(err.code));
+      }
+    }
+  };
+
+  const signInWithTelegram = () => {
+    const provider = new OAuthProvider('telegram.com');
+    signInWithRedirect(auth, provider).catch((err) => {
+      setError("Не удалось начать вход через Telegram.");
+      console.error(err);
+    });
+  };
+
+  // Функция для более понятных сообщений об ошибках
+  const getFriendlyErrorMessage = (errorCode) => {
+    switch (errorCode) {
+      case 'auth/invalid-email':
+        return 'Неверный формат электронной почты.';
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+        return 'Неверный email или пароль.';
+      case 'auth/email-already-in-use':
+        return 'Этот email уже зарегистрирован.';
+      case 'auth/weak-password':
+        return 'Пароль слишком слабый. Используйте не менее 6 символов.';
+      default:
+        return 'Произошла ошибка. Пожалуйста, попробуйте еще раз.';
+    }
+  };
 
   const TelegramIcon = () => (
     <svg viewBox="0 0 24 24" fill="currentColor" height="1.5em" width="1.5em">
@@ -12,31 +74,56 @@ export const Auth = ({ auth }) => {
     </svg>
   );
 
-  const signInWithTelegram = () => {
-    // Создаем экземпляр OAuthProvider с ID 'telegram.com'
-    const provider = new OAuthProvider('telegram.com');
-    
-    // Этот блок для передачи данных из Telegram Web App остается, но он может
-    // и не понадобиться, если провайдер сам их подхватит.
-    // Оставим его для совместимости.
-    const tg = window.Telegram?.WebApp;
-    if (tg && tg.initData) {
-        provider.setCustomParameters({
-            'tg_login_params': tg.initData,
-        });
-    }
-
-    signInWithRedirect(auth, provider)
-      .catch((error) => {
-        // Улучшенная обработка ошибок
-        console.error("Ошибка при входе через Telegram:", error);
-        // Можно показать пользователю уведомление
-        alert(`Не удалось войти: ${error.message}`);
-      });
-  };
-
   return (
-    <div>
+    <div className="space-y-4">
+      <form onSubmit={handleAuthAction} className="space-y-4">
+        {isRegistering && (
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="Ваше имя"
+            className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
+            required
+          />
+        )}
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="Email"
+          className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
+          required
+        />
+        <input
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          placeholder="Пароль"
+          className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
+          required
+        />
+        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+        <button
+          type="submit"
+          className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105"
+        >
+          {isRegistering ? 'Зарегистрироваться' : 'Войти'}
+        </button>
+      </form>
+
+      <div className="flex items-center justify-center">
+        <button onClick={() => { setIsRegistering(!isRegistering); setError(''); }} className="text-sm text-accent hover:underline">
+          {isRegistering ? 'У меня уже есть аккаунт' : 'Создать новый аккаунт'}
+        </button>
+      </div>
+
+      <div className="relative flex py-2 items-center">
+        <div className="flex-grow border-t border-border-color"></div>
+        <span className="flex-shrink mx-4 text-text-main/50 text-xs">ИЛИ</span>
+        <div className="flex-grow border-t border-border-color"></div>
+      </div>
+
       <button
         onClick={signInWithTelegram}
         className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-lg bg-[#2AABEE] text-white font-bold transition-transform hover:scale-105"

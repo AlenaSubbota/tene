@@ -1,7 +1,7 @@
 // src/Auth.jsx
 
 import React from 'react';
-import { GoogleAuthProvider, signInWithRedirect, TelegramAuthProvider } from "firebase/auth";
+import { OAuthProvider, signInWithRedirect } from "firebase/auth";
 
 // Получаем auth как пропс
 export const Auth = ({ auth }) => {
@@ -13,12 +13,26 @@ export const Auth = ({ auth }) => {
   );
 
   const signInWithTelegram = () => {
-    const provider = new TelegramAuthProvider();
-    const tg = window.Telegram.WebApp;
-    provider.setCustomParameters({
-      'tg_login_params': tg.initData,
-    });
-    signInWithRedirect(auth, provider);
+    // Создаем экземпляр OAuthProvider с ID 'telegram.com'
+    const provider = new OAuthProvider('telegram.com');
+    
+    // Этот блок для передачи данных из Telegram Web App остается, но он может
+    // и не понадобиться, если провайдер сам их подхватит.
+    // Оставим его для совместимости.
+    const tg = window.Telegram?.WebApp;
+    if (tg && tg.initData) {
+        provider.setCustomParameters({
+            'tg_login_params': tg.initData,
+        });
+    }
+
+    signInWithRedirect(auth, provider)
+      .catch((error) => {
+        // Улучшенная обработка ошибок
+        console.error("Ошибка при входе через Telegram:", error);
+        // Можно показать пользователю уведомление
+        alert(`Не удалось войти: ${error.message}`);
+      });
   };
 
   return (

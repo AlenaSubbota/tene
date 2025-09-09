@@ -73,8 +73,8 @@ const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => (
 );
 
 const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack }) => {
-    // **ИСПРАВЛЕНИЕ:** Добавлена надёжная проверка. Компонент не будет пытаться отрисоваться,
-    // пока не получит все данные о новелле. Это предотвращает сбой.
+    // **ИСПРАВЛЕНИЕ:** Эта проверка - ключ ко всему. Она гарантирует, что компонент не "упадет",
+    // если попытается отрисоваться до того, как данные о новелле будут готовы.
     if (!novel) {
         return (
             <div>
@@ -91,12 +91,11 @@ const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, bot
     const descriptionRef = useRef(null);
     const [isLongDescription, setIsLongDescription] = useState(false);
 
-    // **ИСПРАВЛЕНИЕ:** Безопасная обработка жанров, чтобы избежать ошибки, если их нет.
+    // Дополнительная "защита" на случай, если у какой-то новеллы не будет жанров
     const novelGenres = Array.isArray(novel.genres) ? novel.genres : [];
     
     const hasActiveSubscription = subscription && subscription.expires_at && subscription.expires_at.toDate() > new Date();
     
-    // **ИСПРАВЛЕНИЕ:** Улучшена логика, чтобы избежать ошибки, если `novel` ещё не загружен.
     const lastReadChapterId = useMemo(() => {
         if (lastReadData && novel && lastReadData[novel.id]) {
             return lastReadData[novel.id].chapterId;
@@ -260,7 +259,6 @@ const Comment = React.memo(({ comment, onReply, onLike, onEdit, onDelete, onUpda
 });
 
 const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack, isUserAdmin }) => {
-  // **ИСПРАВЛЕНИЕ:** Проверка на наличие `novel` и `chapter` для предотвращения сбоя при рендеринге.
   if (!novel || !chapter) {
       return (
          <div>
@@ -962,11 +960,11 @@ export default function App() {
   const handleBack = useCallback(() => {
       if (page === 'reader') {
         setPage('details');
-        setSelectedChapter(null); // **ИСПРАВЛЕНИЕ:** Сбрасываем выбранную главу при возврате
+        setSelectedChapter(null);
       } else if (page === 'details') {
         setPage('list');
         setGenreFilter(null);
-        setSelectedNovel(null); // **ИСПРАВЛЕНИЕ:** Сбрасываем выбранную новеллу
+        setSelectedNovel(null);
       }
   }, [page]);
 

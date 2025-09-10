@@ -6,7 +6,7 @@ import { Comment } from './Comment';
 import { SubscriptionModal, PaymentMethodModal } from './Modals';
 import { BackIcon, ArrowRightIcon, SettingsIcon, HeartIcon, SendIcon } from './icons';
 
-// Функция для группировки комментариев (можно вынести в отдельный файл утилит)
+// Функция для группировки комментариев
 const groupComments = (commentsList) => {
     const commentMap = {};
     const topLevelComments = [];
@@ -37,7 +37,6 @@ export const ChapterReader = ({
        );
     }
 
-    // Состояния для контента, комментариев и UI
     const [chapterContent, setChapterContent] = useState('');
     const [isLoadingContent, setIsLoadingContent] = useState(true);
     const [comments, setComments] = useState([]);
@@ -56,7 +55,6 @@ export const ChapterReader = ({
     const hasActiveSubscription = subscription && subscription.expires_at && typeof subscription.expires_at.toDate === 'function' && subscription.expires_at.toDate() > new Date();
     const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
 
-    // Загрузка контента главы из Firestore
     useEffect(() => {
         const fetchContent = async () => {
             setIsLoadingContent(true);
@@ -84,7 +82,6 @@ export const ChapterReader = ({
         fetchContent();
     }, [novel.id, chapter.id, hasActiveSubscription]);
 
-    // Загрузка комментариев и лайков
     useEffect(() => {
         const unsubMeta = onSnapshot(chapterMetaRef, (docSnap) => {
           setLikeCount(docSnap.data()?.likeCount || 0);
@@ -93,7 +90,6 @@ export const ChapterReader = ({
         const commentsQuery = query(collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`), orderBy("timestamp", "asc"));
         const unsubComments = onSnapshot(commentsQuery, async (querySnapshot) => {
           const commentsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          // Проверяем, лайкнул ли пользователь комментарии
           if (userId) {
             const likedCommentsPromises = commentsData.map(async (comment) => {
               const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${comment.id}/likes`, userId);
@@ -122,7 +118,6 @@ export const ChapterReader = ({
         };
     }, [chapterMetaRef, novel.id, chapter.id, userId]);
 
-    // Функции для работы с комментариями
     const handleCommentSubmit = useCallback(async (e, parentId = null) => {
         e.preventDefault();
         const text = parentId ? replyText : newComment;
@@ -154,8 +149,36 @@ export const ChapterReader = ({
     }, [userId, userName, newComment, replyText, chapterMetaRef, novel.id, chapter.id]);
 
     const handleCommentLike = useCallback(async (commentId) => {
-        // ... (логика лайков комментариев, у вас она была правильной)
-    }, [userId, novel.id, chapter.id]);
+        if (!userId) return;
+        const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
+        const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${commentId}/likes`, userId);
+    
+        setComments(prevComments => prevComments.map(c => {
+            if (c.id === commentId) {
+                const newLikeCount = c.userHasLiked ? (c.likeCount || 1) - 1 : (c.likeCount || 0) + 1;
+                return { ...c, userHasLiked: !c.userHasLiked, likeCount: newLikeCount };
+            }
+            return c;
+        }));
+    
+        try {
+            await runTransaction(db, async (transaction) => {
+                const likeDoc = await transaction.get(likeRef);
+                const commentDoc = await transaction.get(commentRef);
+                if (!commentDoc.exists()) return;
+                const currentLikes = commentDoc.data().likeCount || 0;
+                if (likeDoc.exists()) {
+                    transaction.delete(likeRef);
+                    transaction.update(commentRef, { likeCount: Math.max(0, currentLikes - 1) });
+                } else {
+                    transaction.set(likeRef, { timestamp: serverTimestamp() });
+                    transaction.update(commentRef, { likeCount: currentLikes + 1 });
+                }
+            });
+        } catch (error) {
+            console.error("Ошибка при обновлении лайка комментария:", error);
+        }
+      }, [userId, novel.id, chapter.id]);
 
     const handleEdit = useCallback((comment) => {
         if (comment) {
@@ -185,9 +208,6 @@ export const ChapterReader = ({
         setReplyText('');
     }, []);
 
-    // ... (остальные функции-обработчики)
-
-    // Рендер компонента
     const renderMarkdown = (markdownText) => {
         if (window.marked) {
           const rawHtml = window.marked.parse(markdownText || '');
@@ -211,7 +231,6 @@ export const ChapterReader = ({
         }
     };
     
-
     return (
         <div className="min-h-screen bg-background text-text-main">
           <Header title={novel.title} onBack={onBack} />
@@ -261,8 +280,47 @@ export const ChapterReader = ({
               </form>
             </div>
           </div>
-          {/* Навигация по главам и настройки */}
           <div className="fixed bottom-0 left-0 right-0 p-2 border-t border-border-color bg-component-bg flex justify-between items-center z-10">
             <button onClick={() => handleChapterClick(prevChapter)} disabled={!prevChapter} className="p-2 disabled:opacity-50"><BackIcon/></button>
             <div className="flex gap-2">
-                <button onClick={() => setShowChapterList(true
+                {/* ЭТО МЕСТО БЫЛО С ОШИБКОЙ. ТЕПЕРЬ ИСПРАВЛЕНО. */}
+                <button onClick={() => setShowChapterList(true)} className="px-4 py-2 rounded-lg bg-background">Оглавление</button>
+                <button onClick={() => setShowSettings(true)} className="p-2 rounded-lg bg-background"><SettingsIcon /></button>
+            </div>
+            <button onClick={() => handleChapterClick(nextChapter)} disabled={!nextChapter} className="p-2 disabled:opacity-50"><ArrowRightIcon className="opacity-100"/></button>
+          </div>
+
+          {showChapterList && (
+            <div className="fixed inset-0 bg-black/50 z-20" onClick={() => setShowChapterList(false)}>
+              <div className="absolute bottom-0 left-0 right-0 max-h-[45vh] p-4 rounded-t-2xl bg-component-bg flex flex-col" onClick={e => e.stopPropagation()}>
+                <h3 className="font-bold text-lg mb-4">Главы</h3>
+                <div className="overflow-y-auto">
+                    {allChapters.map(chap => (
+                      <button key={chap.id} onClick={() => handleChapterClick(chap)} className={`w-full p-2 text-left rounded-md ${chap.id === chapter.id ? "bg-accent text-white" : "bg-background"}`}>
+                        {chap.title}
+                      </button>
+                    ))}
+                </div>
+              </div>
+            </div>
+          )}
+          {showSettings && (
+             <div className="fixed inset-0 bg-black/50 z-20" onClick={() => setShowSettings(false)}>
+                 <div className="absolute bottom-0 left-0 right-0 p-4 rounded-t-2xl bg-component-bg" onClick={e => e.stopPropagation()}>
+                    <h3 className="font-bold text-lg mb-4">Настройки</h3>
+                     <div className="flex items-center justify-between">
+                      <span>Размер текста</span>
+                      <div className="flex items-center gap-4">
+                        <button onClick={() => onFontSizeChange(-1)} className="text-2xl font-bold">-</button>
+                        <span>{fontSize}</span>
+                        <button onClick={() => onFontSizeChange(1)} className="text-2xl font-bold">+</button>
+                      </div>
+                    </div>
+                 </div>
+             </div>
+          )}
+          {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={() => {}} />}
+          {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={() => {}} plan={selectedPlan} />}
+        </div>
+    );
+};

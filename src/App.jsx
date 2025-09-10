@@ -65,7 +65,7 @@ export default function App() {
 
     useEffect(() => {
         // ИСПРАВЛЕННЫЙ ПУТЬ
-        fetch('/data/novels.json')
+        fetch('/tene/data/novels.json')
             .then(res => {
                  if (!res.ok) throw new Error("Could not fetch novels.json");
                  return res.json();
@@ -79,7 +79,7 @@ export default function App() {
         setPage('details');
         setIsLoadingChapters(true);
         // ИСПРАВЛЕННЫЙ ПУТЬ
-        fetch(`/data/${novel.id}.json`)
+        fetch('/tene/data/${novel.id}.json')
             .then(res => {
                 if (!res.ok) throw new Error(`Could not fetch ${novel.id}.json`);
                 return res.json();

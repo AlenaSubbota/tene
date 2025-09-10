@@ -7,7 +7,7 @@ export const NewsSlider = ({ onReadMore }) => {
 
     useEffect(() => {
         // ИСПРАВЛЕННЫЙ ПУТЬ
-        fetch('/data/news.json')
+        fetch('/tene/data/news.json')
             .then(res => {
                 if (!res.ok) {
                     throw new Error('Network response was not ok');

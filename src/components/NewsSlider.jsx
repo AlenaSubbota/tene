@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronLeftIcon, ChevronRightIcon } from './icons';
+import { ChevronLeftIcon, ChevronRightIcon } from './icons.jsx';
 
 export const NewsSlider = ({ onReadMore }) => {
     const [news, setNews] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
 
     useEffect(() => {
-        fetch('/tene/data/news.json')
-            .then(res => res.json())
+        // ИСПРАВЛЕННЫЙ ПУТЬ
+        fetch('/data/news.json')
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return res.json();
+            })
             .then(data => setNews(data))
             .catch(error => console.error("Failed to load news:", error));
     }, []);
@@ -21,7 +27,7 @@ export const NewsSlider = ({ onReadMore }) => {
     };
 
     if (news.length === 0) {
-        return null;
+        return null; // Не рендерим ничего, если новостей нет
     }
 
     return (

@@ -1,5 +1,3 @@
-// src/AuthScreen.jsx
-
 import React from 'react';
 import { Auth } from './Auth.jsx';
 

@@ -1,5 +1,3 @@
-// src/Auth.jsx
-
 import React, { useState } from 'react';
 import {
   createUserWithEmailAndPassword,

@@ -39,9 +39,6 @@ export default function App() {
     const userName = user?.displayName || "Аноним";
     
     useEffect(() => {
-        // Этот слушатель Firebase ОЧЕНЬ важен.
-        // Он определяет, вошел пользователь в систему или нет.
-        // Мы убираем setIsLoading(false) только после того, как он отработает.
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
             if (currentUser) {
@@ -57,29 +54,33 @@ export default function App() {
                     setLastReadData(doc.data()?.lastRead || {});
                 });
             }
-            // Устанавливаем isLoading в false здесь, чтобы убрать экран загрузки
+            // Убираем экран загрузки ПОСЛЕ того, как проверка пользователя завершена
             setIsLoading(false);
         });
         return unsubscribe;
     }, []);
 
+    // НОВЫЙ ХУК: Загружаем новеллы только после того, как пользователь определен
     useEffect(() => {
-        // ИСПРАВЛЕННЫЙ ПУТЬ
-        fetch('/tene/data/novels.json')
-            .then(res => {
-                 if (!res.ok) throw new Error("Could not fetch novels.json");
-                 return res.json();
-            })
-            .then(data => setNovels(data))
-            .catch(error => console.error("Failed to load novels:", error));
-    }, []);
-    
+        // Если пользователь вошел в систему (user не null), начинаем загрузку
+        if (user) {
+            fetch('/tene/data/novels.json')
+                .then(res => {
+                     if (!res.ok) throw new Error("Could not fetch novels.json");
+                     return res.json();
+                })
+                .then(data => setNovels(data))
+                .catch(error => console.error("Failed to load novels:", error));
+        }
+    }, [user]); // <-- Этот хук сработает, когда user изменится
+
+    // Остальной код (handleSelectNovel и т.д.) остается без изменений...
     const handleSelectNovel = useCallback((novel) => {
         setSelectedNovel(novel);
         setPage('details');
         setIsLoadingChapters(true);
-        // ИСПРАВЛЕННЫЙ ПУТЬ
-        fetch('/tene/data/${novel.id}.json')
+        // Этот путь правильный
+        fetch(`/tene/data/${novel.id}.json`)
             .then(res => {
                 if (!res.ok) throw new Error(`Could not fetch ${novel.id}.json`);
                 return res.json();
@@ -198,7 +199,7 @@ export default function App() {
         }
     };
 
-    if (isLoading) return <LoadingSpinner />;
+    if (isLoading) return <LoadingSpinner />; // <-- Теперь этот спиннер показывает ТОЛЬКО проверку пользователя
     if (!user) return <AuthScreen auth={auth} />;
 
     return (

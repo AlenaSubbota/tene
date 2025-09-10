@@ -6,8 +6,10 @@ export const NewsSlider = ({ onReadMore }) => {
     const [currentIndex, setCurrentIndex] = useState(0);
 
     useEffect(() => {
-        // ИСПРАВЛЕННЫЙ ПУТЬ
-        fetch('/tene/data/news.json')
+        // ИСПРАВЛЕННЫЙ УНИВЕРСАЛЬНЫЙ ПУТЬ
+        const newsUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/data/news.json`;
+        
+        fetch(newsUrl)
             .then(res => {
                 if (!res.ok) {
                     throw new Error('Network response was not ok');

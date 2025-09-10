@@ -37,7 +37,8 @@ export default function App() {
     const BOT_USERNAME = "tenebrisverbot";
     const userId = user?.uid;
     const userName = user?.displayName || "Аноним";
-    
+
+    // Шаг 1: Проверяем, вошел ли пользователь в систему
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
             setUser(currentUser);
@@ -54,55 +55,78 @@ export default function App() {
                     setLastReadData(doc.data()?.lastRead || {});
                 });
             }
-            // Убираем экран загрузки ПОСЛЕ того, как проверка пользователя завершена
-            setIsLoading(false);
+            setIsLoading(false); // Убираем загрузку ПОСЛЕ проверки
         });
         return unsubscribe;
     }, []);
 
-    // НОВЫЙ ХУК: Загружаем новеллы только после того, как пользователь определен
+    // Шаг 2: Загружаем список новелл из файла, когда пользователь определен
     useEffect(() => {
-        // Если пользователь вошел в систему (user не null), начинаем загрузку
         if (user) {
-            fetch('/tene/data/novels.json')
+            const novelsUrl = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/data/novels.json`;
+            fetch(novelsUrl)
                 .then(res => {
                      if (!res.ok) throw new Error("Could not fetch novels.json");
                      return res.json();
                 })
-                .then(data => setNovels(data))
+                .then(data => setNovels(data.novels || [])) // Используем data.novels, как в старом коде
                 .catch(error => console.error("Failed to load novels:", error));
         }
-    }, [user]); // <-- Этот хук сработает, когда user изменится
+    }, [user]);
 
-    // Остальной код (handleSelectNovel и т.д.) остается без изменений...
+    // Шаг 3: Загружаем главы для выбранной новеллы из Firestore (старая рабочая логика)
+    useEffect(() => {
+        if (!selectedNovel) {
+            setChapters([]);
+            return;
+        }
+
+        const fetchChaptersFromFirestore = async () => {
+            setIsLoadingChapters(true);
+            try {
+                const docRef = doc(db, 'chapter_info', selectedNovel.id.toString());
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists() && docSnap.data()) {
+                    const data = docSnap.data();
+                    const chaptersData = data.chapters || {};
+                    const chaptersArray = Object.keys(chaptersData).map(key => ({
+                        id: parseInt(key),
+                        title: `Глава ${key}`,
+                        isPaid: chaptersData[key].isPaid || false
+                    })).sort((a, b) => a.id - b.id);
+                    setChapters(chaptersArray);
+                } else {
+                    setChapters([]);
+                }
+            } catch (error) {
+                console.error("Ошибка загрузки глав из Firebase:", error);
+                setChapters([]);
+            } finally {
+                setIsLoadingChapters(false);
+            }
+        };
+
+        fetchChaptersFromFirestore();
+    }, [selectedNovel]);
+
     const handleSelectNovel = useCallback((novel) => {
         setSelectedNovel(novel);
         setPage('details');
-        setIsLoadingChapters(true);
-        // Этот путь правильный
-        fetch(`/tene/data/${novel.id}.json`)
-            .then(res => {
-                if (!res.ok) throw new Error(`Could not fetch ${novel.id}.json`);
-                return res.json();
-            })
-            .then(data => setChapters(data.chapters || []))
-            .catch(() => setChapters([]))
-            .finally(() => setIsLoadingChapters(false));
     }, []);
 
-    const handleSelectChapter = useCallback(async (novelId, chapterId) => {
-        const chapter = chapters.find(c => c.id === chapterId);
-        if (chapter) {
+    const handleSelectChapter = useCallback(async (chapter) => {
+        if (chapter && selectedNovel) {
             setSelectedChapter(chapter);
             setPage('reader');
             if (userId) {
                 const userRef = doc(db, "users", userId);
                 await setDoc(userRef, {
-                    lastRead: { ...lastReadData, [novelId]: { chapterId, chapterTitle: chapter.title } }
+                    lastRead: { ...lastReadData, [selectedNovel.id]: { chapterId: chapter.id, chapterTitle: chapter.title } }
                 }, { merge: true });
             }
         }
-    }, [chapters, userId, lastReadData]);
+    }, [userId, selectedNovel, lastReadData]);
+
 
     const handleToggleBookmark = useCallback(async (novelId) => {
         if (!userId) return;
@@ -113,9 +137,12 @@ export default function App() {
         await setDoc(userRef, { bookmarks: newBookmarks }, { merge: true });
     }, [bookmarks, userId]);
 
-    const handleFontSizeChange = (size) => {
-        setFontSize(size);
-        localStorage.setItem('fontSize', size);
+    const handleFontSizeChange = (amount) => {
+        setFontSize(prevSize => {
+            const newSize = Math.max(12, Math.min(32, prevSize + amount));
+            localStorage.setItem('fontSize', newSize.toString());
+            return newSize;
+        });
     };
 
     const handlePlanSelect = (plan) => {
@@ -129,22 +156,22 @@ export default function App() {
         window.open(telegramUrl, '_blank');
         setSelectedPlan(null);
     };
-    
+
     const renderContent = () => {
         if (page === 'details' && selectedNovel) {
-            return <NovelDetails 
-                novel={selectedNovel} 
-                onBack={() => setPage('list')}
+            return <NovelDetails
+                novel={selectedNovel}
+                onBack={() => { setPage('list'); setSelectedNovel(null); }}
                 onSelectChapter={handleSelectChapter}
                 chapters={chapters}
                 isLoadingChapters={isLoadingChapters}
                 subscription={subscription}
                 lastReadData={lastReadData}
-                onGenreSelect={() => { setActiveTab('search'); setPage('list'); }}
+                onGenreSelect={(genre) => { setActiveTab('search'); setPage('list'); }}
             />;
         }
         if (page === 'reader' && selectedChapter) {
-            return <ChapterReader 
+            return <ChapterReader
                 chapter={selectedChapter}
                 novel={selectedNovel}
                 onBack={() => setPage('details')}
@@ -162,7 +189,7 @@ export default function App() {
 
         switch (activeTab) {
             case 'search':
-                return <SearchPage 
+                return <SearchPage
                     novels={novels}
                     onSelectNovel={handleSelectNovel}
                     bookmarks={bookmarks}
@@ -170,14 +197,15 @@ export default function App() {
                     onGenreSelect={(genre) => console.log(genre)}
                 />;
             case 'bookmarks':
-                return <BookmarksPage 
-                    allNovels={novels}
+                const bookmarkedNovels = novels.filter(novel => bookmarks.includes(novel.id));
+                return <BookmarksPage
+                    allNovels={bookmarkedNovels}
                     onSelectNovel={handleSelectNovel}
                     bookmarks={bookmarks}
                     onToggleBookmark={handleToggleBookmark}
                 />;
             case 'profile':
-                return <ProfilePage 
+                return <ProfilePage
                     user={user}
                     subscription={subscription}
                     auth={auth}
@@ -199,7 +227,7 @@ export default function App() {
         }
     };
 
-    if (isLoading) return <LoadingSpinner />; // <-- Теперь этот спиннер показывает ТОЛЬКО проверку пользователя
+    if (isLoading) return <LoadingSpinner />;
     if (!user) return <AuthScreen auth={auth} />;
 
     return (

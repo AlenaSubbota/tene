@@ -34,7 +34,7 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Build
-        run: npm run build
+        run: npm run build:gh
         env: # <-- ВОТ ВАЖНАЯ ЧАСТЬ ДЛЯ ВАШИХ КЛЮЧЕЙ
           VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
           VITE_AUTH_DOMAIN: ${{ secrets.VITE_AUTH_DOMAIN }}

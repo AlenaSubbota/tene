@@ -3,7 +3,7 @@
 import React from 'react';
 import { Auth } from './Auth.jsx';
 
-export const AuthScreen = ({ auth }) => {
+export const AuthScreen = ({ auth, onRegisterClick }) => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
       <div className="w-full max-w-sm text-center">
@@ -12,7 +12,7 @@ export const AuthScreen = ({ auth }) => {
           Войдите или создайте аккаунт, чтобы продолжить.
         </p>
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">
-          <Auth auth={auth} />
+          <Auth auth={auth} onRegisterClick={onRegisterClick} />
         </div>
       </div>
     </div>

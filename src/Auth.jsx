@@ -7,16 +7,17 @@ import {
   updateProfile
 } from "firebase/auth";
 
-export const Auth = ({ auth }) => {
+// ---> [ИЗМЕНЕНИЕ 1] Добавляем onRegisterClick в принимаемые props
+export const Auth = ({ auth, onRegisterClick }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
-
+  
   const handleAuthAction = async (e) => {
     e.preventDefault();
-    setError(''); // Сбрасываем ошибку перед новой попыткой
+    setError('');
 
     if (isRegistering) {
       // --- РЕГИСТРАЦИЯ ---
@@ -26,7 +27,6 @@ export const Auth = ({ auth }) => {
       }
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        // Сразу после регистрации обновляем профиль, добавляя имя
         await updateProfile(userCredential.user, { displayName: displayName });
       } catch (err) {
         setError(getFriendlyErrorMessage(err.code));
@@ -41,7 +41,6 @@ export const Auth = ({ auth }) => {
     }
   };
 
-  // Функция для более понятных сообщений об ошибках
   const getFriendlyErrorMessage = (errorCode) => {
     switch (errorCode) {
       case 'auth/invalid-email':
@@ -97,7 +96,20 @@ export const Auth = ({ auth }) => {
       </form>
 
       <div className="flex items-center justify-center">
-        <button onClick={() => { setIsRegistering(!isRegistering); setError(''); }} className="text-sm text-accent hover:underline">
+        {/* ---> [ИЗМЕНЕНИЕ 2] Обновляем onClick для вызова onRegisterClick */}
+        <button 
+          onClick={() => { 
+            // Если мы находимся на экране входа (isRegistering === false) и нажимаем на кнопку,
+            // то мы переключаемся на регистрацию. Именно в этот момент нужно вызвать onRegisterClick.
+            if (!isRegistering) {
+              onRegisterClick();
+            }
+            // Эта логика остается без изменений
+            setIsRegistering(!isRegistering); 
+            setError(''); 
+          }} 
+          className="text-sm text-accent hover:underline"
+        >
           {isRegistering ? 'У меня уже есть аккаунт' : 'Создать новый аккаунт'}
         </button>
       </div>

@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, increment } from 'firebase/firestore';
 import { db } from "../../firebase-config";
-// ИСПРАВЛЕННЫЕ ИМПОРТЫ: теперь все идет из '../components'
 import { LockIcon } from '../icons.jsx';
 import { Header } from '../Header.jsx';
 import { SubscriptionModal } from '../SubscriptionModal.jsx';
@@ -18,6 +17,21 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
             </div>
         );
     }
+    
+    // Этот блок теперь полностью рабочий
+    useEffect(() => {
+        if (novel && novel.id) {
+            const viewedKey = `viewed-${novel.id}`;
+            if (!sessionStorage.getItem(viewedKey)) {
+                sessionStorage.setItem(viewedKey, 'true');
+                const statsDocRef = doc(db, "novel_stats", novel.id.toString());
+                setDoc(statsDocRef, { 
+                    views: increment(1) 
+                }, { merge: true })
+                .catch(err => console.error("Ошибка обновления счетчика просмотров:", err));
+            }
+        }
+    }, [novel]);
 
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);

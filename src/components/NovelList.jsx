@@ -1,5 +1,5 @@
 import React from 'react';
-import { BookmarkIcon } from './';
+import { BookmarkIcon, EyeIcon } from './';
 
 export const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => (
     <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 p-4 text-text-main">
@@ -10,7 +10,17 @@ export const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }
               <BookmarkIcon filled={bookmarks.includes(novel.id)} width="20" height="20" />
             </button>
             <img src={`/${novel.coverUrl}`} alt={novel.title} className="w-full aspect-[2/3] object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 border border-border-color" />
-            <h2 className="mt-2 font-semibold text-xs truncate">{novel.title}</h2>
+             {/* 👇 ЗАМЕНИТЕ ЭТОТ БЛОК */}
+            <div className="flex items-center justify-between mt-2 gap-2">
+                <h2 className="font-semibold text-xs truncate flex-1">{novel.title}</h2>
+                {novel.views > 0 && (
+                  <div className="flex items-center gap-1 text-xs opacity-60 flex-shrink-0">
+                    <EyeIcon className="w-4 h-4" />
+                    <span>{novel.views}</span>
+                  </div>
+                )}
+            </div>
+            {/* КОНЕЦ БЛОКА НА ЗАМЕНУ */}
           </div>
         </div>
       )) : (

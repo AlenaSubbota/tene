@@ -1,9 +1,10 @@
 import React from 'react';
 import { signOut } from "firebase/auth";
-import { Header } from "../Header.jsx"; // или "../Header.jsx"
-import { LogOutIcon } from "../icons.jsx"; // Указываем путь к конкретному файлу иконки
+import { Header } from "../Header.jsx";
+import { LogOutIcon } from "../icons.jsx";
 
-export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth, onThemeToggle, currentTheme }) => {
+// ---> [ИЗМЕНЕНИЕ] Добавлен onShowPolicy в список props
+export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, auth, onThemeToggle, currentTheme, onShowHelp }) => {
     const handleLogout = () => {
         signOut(auth).catch((error) => {
             console.error("Ошибка выхода:", error);
@@ -75,7 +76,8 @@ export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId
                     </div>
                 )}
             </div>
-            <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4">
+            
+            <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4 mb-4">
                  <h3 className="font-bold mb-2">Ваш ID для привязки</h3>
                 <p className="text-sm opacity-70 mb-3">
                     Этот ID нужен для связи вашего аккаунта с Telegram-ботом. 
@@ -90,6 +92,14 @@ export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId
                     className="w-full py-2 rounded-lg bg-gray-200 text-gray-800 font-bold transition-all hover:scale-105 disabled:opacity-50"
                 >
                     Копировать ID
+                </button>
+            </div>
+             <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4">
+                <button
+                    onClick={onShowHelp} // <-- ИЗМЕНЕНО
+                    className="w-full text-left text-sm text-accent hover:underline"
+                >
+                    Справка и правовая информация
                 </button>
             </div>
         </div>

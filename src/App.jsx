@@ -1,10 +1,12 @@
 // src/App.jsx
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { doc, getDoc, setDoc, onSnapshot } from "firebase/firestore";
+// 👇 [ИЗМЕНЕНИЕ 1] Добавлены getDocs для загрузки статистики
+import { doc, getDoc, collection, setDoc, onSnapshot, getDocs } from "firebase/firestore";
 import { onAuthStateChanged, getRedirectResult } from "firebase/auth";
 import { db, auth } from './firebase-config.js';
 import { AuthScreen } from './AuthScreen.jsx';
+import { HelpScreen } from './components/pages/HelpScreen.jsx';
 
 import { LoadingSpinner } from './components/LoadingSpinner.jsx';
 import { SubscriptionModal } from './components/SubscriptionModal.jsx';
@@ -43,6 +45,10 @@ export default function App() {
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [selectedNews, setSelectedNews] = useState(null);
+  
+  const [needsPolicyAcceptance, setNeedsPolicyAcceptance] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+
   const BOT_USERNAME = "tenebrisverbot";
   const userId = user?.uid;
 
@@ -79,13 +85,13 @@ export default function App() {
     });
   }, [fontClass, updateUserDoc]);
 
-  // *** ОПТИМИЗАЦИЯ: Разделяем onSnapshot и getDoc для данных пользователя ***
   useEffect(() => {
     let unsubSubscription = () => {};
     let isMounted = true;
     
+    
     const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
-      unsubSubscription(); // Отписываемся от предыдущего слушателя подписки
+      unsubSubscription();
       
       if (firebaseUser) {
         if (!isMounted) return;
@@ -95,7 +101,6 @@ export default function App() {
         
         const userDocRef = doc(db, "users", firebaseUser.uid);
 
-        // --- Загружаем некритичные данные ОДИН РАЗ ---
         const docSnap = await getDoc(userDocRef);
         if (isMounted) {
             if (docSnap.exists()) {
@@ -109,7 +114,6 @@ export default function App() {
             }
         }
         
-        // --- Ставим слушатель ТОЛЬКО на подписку ---
         unsubSubscription = onSnapshot(userDocRef, (doc) => {
           if (isMounted) {
             setSubscription(doc.data()?.subscription || null);
@@ -133,21 +137,43 @@ export default function App() {
       console.error("Ошибка при обработке входа через Telegram:", error);
     });
 
-    fetch(`/data/novels.json`)
-      .then(res => res.json())
-      .then(data => {
-          if (isMounted) {
-            setNovels(data.novels)
-          }
-      })
-      .catch(err => console.error("Ошибка загрузки новелл:", err));
+    // 👇 [ИЗМЕНЕНИЕ 2] Вся логика загрузки новелл и статистики вынесена сюда
+    const fetchNovelsAndStats = async () => {
+        try {
+            // 1. Загружаем основную информацию о новеллах из JSON
+            const novelsResponse = await fetch(`/data/novels.json`);
+            const novelsData = await novelsResponse.json();
+            
+            // 2. Загружаем статистику просмотров из Firebase
+            const statsSnapshot = await getDocs(collection(db, "novel_stats"));
+            const statsMap = new Map();
+            statsSnapshot.forEach(doc => {
+                statsMap.set(doc.id, doc.data().views);
+            });
+
+            // 3. Объединяем данные: добавляем просмотры к каждой новелле
+            const mergedNovels = novelsData.novels.map(novel => ({
+                ...novel,
+                views: statsMap.get(novel.id.toString()) || 0 // Используем || 0, если просмотров еще нет
+            }));
+
+            if (isMounted) {
+                setNovels(mergedNovels);
+            }
+
+        } catch (err) {
+            console.error("Ошибка загрузки новелл или статистики:", err);
+        }
+    };
+    
+    fetchNovelsAndStats(); // Вызываем новую функцию
 
     return () => {
       isMounted = false;
       unsubAuth();
       unsubSubscription();
     };
-  }, []);
+  }, []); // Пустой массив зависимостей, чтобы это выполнилось один раз при старте
 
   useEffect(() => {
       if (!selectedNovel) {
@@ -321,8 +347,19 @@ export default function App() {
     return <LoadingSpinner />;
   }
 
+  if (showHelp) {
+    return <HelpScreen onBack={() => setShowHelp(false)} />;
+  }
+
+  // NOTE: PolicyScreen не был предоставлен, поэтому я закомментировал его
+  /*
+  if (needsPolicyAcceptance) {
+    return <PolicyScreen onAccept={() => setNeedsPolicyAcceptance(false)} />;
+  }
+  */
+  
   if (!user) {
-    return <AuthScreen auth={auth} />;
+    return <AuthScreen auth={auth} onRegisterClick={() => setNeedsPolicyAcceptance(true)} />;
   }
 
   const renderContent = () => {
@@ -378,7 +415,16 @@ export default function App() {
       case 'bookmarks':
         return <BookmarksPage novels={bookmarkedNovels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
       case 'profile':
-        return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={handleGetSubscription} userId={userId} auth={auth} onThemeToggle={handleThemeToggle} currentTheme={theme}/>
+        return <ProfilePage 
+                user={user} 
+                subscription={subscription} 
+                onGetSubscriptionClick={handleGetSubscription} 
+                userId={userId} 
+                auth={auth} 
+                onThemeToggle={handleThemeToggle} 
+                currentTheme={theme}
+                onShowHelp={() => setShowHelp(true)}
+              />
       default:
         return <Header title="Библиотека" />
     }

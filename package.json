@@ -10,9 +10,12 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@yandex-cloud/nodejs-sdk": "^2.9.0",
     "firebase": "^12.2.1",
+    "json2csv": "^6.0.0-alpha.2",
     "react": "^19.1.1",
-    "react-dom": "^19.1.1"
+    "react-dom": "^19.1.1",
+    "ydb-sdk": "^5.11.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.2",

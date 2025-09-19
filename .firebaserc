@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "tenebris-verbum"
-  }
+    "default": "tenebris-verbum",
+    "y": "tene-9f8c9"
+  },
+  "targets": {},
+  "etags": {}
 }

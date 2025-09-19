@@ -1,7 +1,8 @@
 // src/AuthScreen.jsx
 
 import React from 'react';
-import { Auth } from './Auth.jsx';
+import { AuthForm } from './Auth'; // <-- 1. ИЗМЕНИТЕ ИМПОРТ
+import { auth } from './firebase-config'; // Убедитесь, что auth импортирован
 
 export const AuthScreen = ({ auth, onRegisterClick }) => {
   return (
@@ -12,7 +13,7 @@ export const AuthScreen = ({ auth, onRegisterClick }) => {
           Войдите или создайте аккаунт, чтобы продолжить.
         </p>
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">
-          <Auth auth={auth} onRegisterClick={onRegisterClick} />
+           <AuthForm onRegisterClick={onRegisterClick} />
         </div>
       </div>
     </div>

@@ -1,14 +1,55 @@
 // src/Auth.jsx
 
-import React, { useState } from 'react';
+import React, { createContext, useState, useContext, useEffect } from 'react';
 import {
+  onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  signOut,
 } from "firebase/auth";
+import { auth } from './firebase-config'; // Убедитесь, что импортируете auth из вашего конфига
 
-// ---> [ИЗМЕНЕНИЕ 1] Добавляем onRegisterClick в принимаемые props
-export const Auth = ({ auth, onRegisterClick }) => {
+// --- 1. Создаем контекст ---
+const AuthContext = createContext();
+
+// --- 2. Создаем провайдер, который будет "оберткой" для всего приложения ---
+export const AuthProvider = ({ children }) => {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // onAuthStateChanged слушает изменения состояния аутентификации
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+
+    // Отписываемся от слушателя при размонтировании компонента
+    return () => unsubscribe();
+  }, []);
+
+  const value = {
+    user,
+    loading,
+    // Вы можете добавить сюда другие функции, если они понадобятся в других частях приложения
+    // например: register, login, logout
+  };
+
+  // Пока идет проверка пользователя, можно показывать заглушку (но в нашем случае App.jsx уже это делает)
+  return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
+};
+
+// --- 3. Создаем и экспортируем хук useAuth ---
+// Именно его и не хватало вашему приложению
+export const useAuth = () => {
+  return useContext(AuthContext);
+};
+
+
+// --- 4. Компонент с формой авторизации остается почти без изменений ---
+// Мы просто убираем его экспорт по умолчанию и делаем именованным
+export const AuthForm = ({ onRegisterClick }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,7 +61,6 @@ export const Auth = ({ auth, onRegisterClick }) => {
     setError('');
 
     if (isRegistering) {
-      // --- РЕГИСТРАЦИЯ ---
       if (!displayName.trim()) {
         setError('Пожалуйста, введите имя.');
         return;
@@ -32,10 +72,10 @@ export const Auth = ({ auth, onRegisterClick }) => {
         setError(getFriendlyErrorMessage(err.code));
       }
     } else {
-      // --- ВХОД ---
       try {
         await signInWithEmailAndPassword(auth, email, password);
-      } catch (err) {
+      } catch (err)
+ {
         setError(getFriendlyErrorMessage(err.code));
       }
     }
@@ -43,17 +83,12 @@ export const Auth = ({ auth, onRegisterClick }) => {
 
   const getFriendlyErrorMessage = (errorCode) => {
     switch (errorCode) {
-      case 'auth/invalid-email':
-        return 'Неверный формат электронной почты.';
+      case 'auth/invalid-email': return 'Неверный формат электронной почты.';
       case 'auth/user-not-found':
-      case 'auth/wrong-password':
-        return 'Неверный email или пароль.';
-      case 'auth/email-already-in-use':
-        return 'Этот email уже зарегистрирован.';
-      case 'auth/weak-password':
-        return 'Пароль слишком слабый. Используйте не менее 6 символов.';
-      default:
-        return 'Произошла ошибка. Пожалуйста, попробуйте еще раз.';
+      case 'auth/wrong-password': return 'Неверный email или пароль.';
+      case 'auth/email-already-in-use': return 'Этот email уже зарегистрирован.';
+      case 'auth/weak-password': return 'Пароль слишком слабый. Используйте не менее 6 символов.';
+      default: return 'Произошла ошибка. Пожалуйста, попробуйте еще раз.';
     }
   };
 
@@ -96,15 +131,11 @@ export const Auth = ({ auth, onRegisterClick }) => {
       </form>
 
       <div className="flex items-center justify-center">
-        {/* ---> [ИЗМЕНЕНИЕ 2] Обновляем onClick для вызова onRegisterClick */}
         <button 
           onClick={() => { 
-            // Если мы находимся на экране входа (isRegistering === false) и нажимаем на кнопку,
-            // то мы переключаемся на регистрацию. Именно в этот момент нужно вызвать onRegisterClick.
-            if (!isRegistering) {
+            if (!isRegistering && onRegisterClick) {
               onRegisterClick();
             }
-            // Эта логика остается без изменений
             setIsRegistering(!isRegistering); 
             setError(''); 
           }} 

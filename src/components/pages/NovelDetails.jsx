@@ -6,9 +6,11 @@ import { Header } from '../Header.jsx';
 import { SubscriptionModal } from '../SubscriptionModal.jsx';
 import { PaymentMethodModal } from '../PaymentMethodModal.jsx';
 import { ArrowRightIcon } from '../icons.jsx';
-
+import { useAuth } from '../../Auth'; // <-- ИЗМЕНЕНИЕ: Импортируем хук для получения статуса авторизации
 
 export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack }) => {
+    const { user } = useAuth(); // <-- ИЗМЕНЕНИЕ: Получаем текущего пользователя
+
     if (!novel) {
         return (
             <div>
@@ -18,12 +20,18 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
         );
     }
     
-    // Этот блок теперь полностью рабочий
+    // Этот блок теперь будет работать корректно
     useEffect(() => {
-        if (novel && novel.id) {
+        // <-- ИЗМЕНЕНИЕ: Добавляем проверку, что пользователь авторизован (user !== null)
+        if (user && novel && novel.id) {
             const viewedKey = `viewed-${novel.id}`;
             if (!sessionStorage.getItem(viewedKey)) {
                 sessionStorage.setItem(viewedKey, 'true');
+                // Предполагается, что у вас есть правила для 'novel_stats'
+                // Если нет, нужно будет добавить:
+                // match /novel_stats/{novelId} {
+                //   allow write: if request.auth.uid != null;
+                // }
                 const statsDocRef = doc(db, "novel_stats", novel.id.toString());
                 setDoc(statsDocRef, { 
                     views: increment(1) 
@@ -31,7 +39,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                 .catch(err => console.error("Ошибка обновления счетчика просмотров:", err));
             }
         }
-    }, [novel]);
+    }, [novel, user]); // <-- ИЗМЕНЕНИЕ: Добавляем 'user' в массив зависимостей
 
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);

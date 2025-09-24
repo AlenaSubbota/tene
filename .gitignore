@@ -25,3 +25,4 @@ dist-ssr
 
 .env
 firebase-credentials.json
+firebase-config.js

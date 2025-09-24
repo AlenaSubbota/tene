@@ -75,6 +75,23 @@ export default function App() {
       return;
     }
 
+    // --- НАЧАЛО ПРЕДЛАГАЕМОГО ИЗМЕНЕНИЯ ---
+
+    // Проверяем, является ли пользователь новым
+    const checkIsNewUser = async () => {
+      // У объекта user есть метаданные о времени создания
+      const metadata = auth.currentUser.metadata;
+      // Если время создания и последнего входа почти совпадают (с погрешностью),
+      // считаем пользователя новым.
+      if (metadata.creationTime === metadata.lastSignInTime) {
+        setShowHelp(true); // Показываем экран справки
+      }
+    };
+
+    checkIsNewUser();
+
+    // --- КОНЕЦ ПРЕДЛАГАЕМОГО ИЗМЕНЕНИЯ ---
+
     // Пользователь есть, начинаем загрузку всего
     setIsLoadingContent(true);
 

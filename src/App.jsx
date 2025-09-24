@@ -72,56 +72,31 @@ export default function App() {
       setSubscription(null);
       setBookmarks([]);
       setLastReadData({});
+      setNeedsPolicyAcceptance(false); // Сбрасываем при выходе
       return;
     }
-
-    // --- НАЧАЛО ПРЕДЛАГАЕМОГО ИЗМЕНЕНИЯ ---
-
-    // Проверяем, является ли пользователь новым
-    const checkIsNewUser = async () => {
-      // У объекта user есть метаданные о времени создания
-      const metadata = auth.currentUser.metadata;
-      // Если время создания и последнего входа почти совпадают (с погрешностью),
-      // считаем пользователя новым.
-      if (metadata.creationTime === metadata.lastSignInTime) {
-        setShowHelp(true); // Показываем экран справки
-      }
-    };
-
-    checkIsNewUser();
-
-    // --- КОНЕЦ ПРЕДЛАГАЕМОГО ИЗМЕНЕНИЯ ---
 
     // Пользователь есть, начинаем загрузку всего
     setIsLoadingContent(true);
 
-    // --- НАЧАЛО ИСПРАВЛЕННОГО БЛОКА ---
-    // Функция для загрузки новелл и статистики просмотров из Firestore
     const fetchNovelsAndStats = async () => {
         try {
-            // Шаг 1: Загружаем новеллы из коллекции 'novels'
             const novelsSnapshot = await getDocs(collection(db, "novels"));
-            const novelsData = novelsSnapshot.docs.map(doc => {
-                const data = doc.data();
-                return { ...data, id: doc.id }; // Используем ID документа как главный 'id'
-            });
+            const novelsData = novelsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
-            // Шаг 2: Загружаем статистику из 'novel_stats'
             const statsSnapshot = await getDocs(collection(db, "novel_stats"));
             const statsMap = new Map();
             statsSnapshot.forEach(doc => statsMap.set(doc.id, doc.data().views));
 
-            // Шаг 3: Объединяем новеллы со статистикой
             const mergedNovels = novelsData.map(novel => ({
                 ...novel,
                 views: statsMap.get(novel.id) || 0
             }));
 
-            setNovels(mergedNovels); // Обновляем состояние
-
+            setNovels(mergedNovels);
         } catch (err) {
             console.error("Ошибка загрузки новелл или статистики из Firestore:", err);
-            setNovels([]); // В случае ошибки ставим пустой массив
+            setNovels([]);
         }
     };
     
@@ -135,15 +110,11 @@ export default function App() {
         }
     };
 
-    // Запускаем все асинхронные загрузки параллельно
-    // Убедимся, что вызываем функцию с правильным именем: fetchNovelsAndStats
     Promise.all([fetchNovelsAndStats(), checkAdminStatus()]).finally(() => {
-        setIsLoadingContent(false); // Завершаем общую загрузку в любом случае
+        setIsLoadingContent(false);
     });
-    // --- КОНЕЦ ИСПРАВЛЕННОГО БЛОКА ---
 
-
-    // Подписка на изменения данных пользователя (осталась без изменений)
+    // Подписка на изменения данных пользователя
     const userDocRef = doc(db, "users", user.uid);
     const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
@@ -155,14 +126,24 @@ export default function App() {
               setFontSize(data.settings.fontSize || 16);
               setFontClass(data.settings.fontClass || 'font-sans');
             }
+            // --- ИЗМЕНЕНИЕ: Проверяем, принято ли соглашение ---
+            // Если поля policyAccepted нет или оно false, показываем экран принятия
+            if (!data.policyAccepted) {
+              setNeedsPolicyAcceptance(true);
+            } else {
+              setNeedsPolicyAcceptance(false);
+            }
+        } else {
+            // Если документа пользователя еще нет (сразу после регистрации),
+            // также считаем, что нужно принять соглашение.
+            setNeedsPolicyAcceptance(true);
         }
     }, (error) => {
         console.error("Ошибка подписки на данные пользователя:", error);
     });
 
-    // Отписываемся от слушателя при выходе или смене пользователя
     return () => unsubscribeUser();
-  }, [user, authLoading]); // Зависимость от user и authLoading
+  }, [user, authLoading]);
 
   // Загрузка глав для выбранной новеллы
   useEffect(() => {
@@ -170,7 +151,7 @@ export default function App() {
       setIsLoadingChapters(true);
       const fetchChapters = async () => {
           try {
-              const docRef = doc(db, 'chapter_info', selectedNovel.id); // .toString() не нужен, так как id уже строка
+              const docRef = doc(db, 'chapter_info', selectedNovel.id);
               const docSnap = await getDoc(docRef);
               if (docSnap.exists() && docSnap.data()) {
                   const data = docSnap.data();
@@ -201,9 +182,13 @@ export default function App() {
     tg.ready();
     tg.expand();
     tg.onEvent('backButtonClicked', handleBack);
-    if (page === 'list') { tg.BackButton.hide(); } else { tg.BackButton.show(); }
+    if (page === 'list' || needsPolicyAcceptance) { // Скрываем кнопку "назад", если нужно принять соглашение
+      tg.BackButton.hide(); 
+    } else { 
+      tg.BackButton.show(); 
+    }
     return () => tg.offEvent('backButtonClicked', handleBack);
-  }, [page, handleBack]);
+  }, [page, handleBack, needsPolicyAcceptance]);
 
   // --- ВСЕ ВАШИ ФУНКЦИИ-ОБРАБОТЧИКИ ОСТАЛИСЬ ЗДЕСЬ ---
   const updateUserDoc = useCallback(async (dataToUpdate) => {
@@ -266,17 +251,35 @@ export default function App() {
       });
   };
 
+  // --- ИЗМЕНЕНИЕ: Новая функция для принятия соглашения ---
+  const handleAcceptPolicy = async () => {
+    if (userId) {
+      // Записываем в документ пользователя, что он принял соглашение
+      await updateUserDoc({ policyAccepted: true });
+      // Скрываем экран соглашения немедленно
+      setNeedsPolicyAcceptance(false);
+    }
+  };
+
   // --- ЛОГИКА РЕНДЕРИНГА ---
-  if (authLoading || isLoadingContent) {
+  if (authLoading || (isLoadingContent && !needsPolicyAcceptance)) {
     return <LoadingSpinner />;
   }
+  
+  // --- ИЗМЕНЕНИЕ: Логика показа экрана соглашения ---
+  // Если пользователь авторизован, но должен принять соглашение
+  if (user && needsPolicyAcceptance) {
+    return <HelpScreen onAccept={handleAcceptPolicy} />;
+  }
 
+  // Обычный показ справки из профиля
   if (showHelp) {
     return <HelpScreen onBack={() => setShowHelp(false)} />;
   }
   
   if (!user) {
-    return <AuthScreen onRegisterClick={() => setNeedsPolicyAcceptance(true)} />;
+    // onRegisterClick больше не нужен, т.к. логика завязана на данных из Firestore
+    return <AuthScreen />;
   }
 
   const renderContent = () => {

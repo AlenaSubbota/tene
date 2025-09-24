@@ -236,7 +236,7 @@ const PrivacySection = () => (
     </div>
 );
 
-export const HelpScreen = ({ onBack }) => {
+export const HelpScreen = ({ onBack, onAccept }) => {
     const [activeTab, setActiveTab] = useState('guide');
 
     const tabs = [
@@ -246,8 +246,9 @@ export const HelpScreen = ({ onBack }) => {
     ];
 
     return (
-        <div className="bg-background min-h-screen text-text-main">
-            <Header title="Справка и информация" onBack={onBack} />
+        <div className="bg-background min-h-screen text-text-main pb-24"> {/* Добавлен отступ снизу */}
+            {/* Если есть onAccept, кнопка "Назад" не показывается */}
+            <Header title="Справка и информация" onBack={onAccept ? undefined : onBack} />
             
             <div className="px-4 pt-4">
                 <div className="flex space-x-1 rounded-lg bg-component-bg p-1 border border-border-color">
@@ -269,6 +270,18 @@ export const HelpScreen = ({ onBack }) => {
                 {activeTab === 'terms' && <TermsSection />}
                 {activeTab === 'privacy' && <PrivacySection />}
             </div>
+
+            {/* Блок с кнопкой "Принять" */}
+            {onAccept && (
+                <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-sm border-t border-border-color shadow-lg">
+                    <button
+                        onClick={onAccept}
+                        className="w-full bg-accent text-white font-bold py-3 px-4 rounded-lg hover:bg-accent/90 transition-colors"
+                    >
+                        Принять и продолжить
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

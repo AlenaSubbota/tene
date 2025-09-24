@@ -4,16 +4,17 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-  "dev": "vite",
-  "build:firebase": "vite build",
-  "build:gh": "vite build --mode gh-pages",
-  "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
-  "preview": "vite preview"
-},
+    "dev": "vite",
+    "build:firebase": "vite build",
+    "build:gh": "vite build --mode gh-pages",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview"
+  },
   "dependencies": {
     "@yandex-cloud/nodejs-sdk": "^2.9.0",
     "firebase": "^12.2.1",
     "json2csv": "^6.0.0-alpha.2",
+    "lottie-react": "^2.4.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "ydb-sdk": "^5.11.1"

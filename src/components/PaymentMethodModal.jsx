@@ -13,7 +13,7 @@ export const PaymentMethodModal = ({ onClose, onSelectMethod, plan }) => {
                     </button>
                     <button onClick={() => onSelectMethod('tribut')} className="w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 border-border-color bg-background hover:border-accent-hover">
                         <p className="font-bold">❤️ Донат через tribut</p>
-                        <p className="text-sm opacity-70">Более быстрый способ</p>
+                        <p className="text-sm opacity-70">Ручная проверка (до 24 часов)</p>
                     </button>
                     <button onClick={() => onSelectMethod('boosty')} className="w-full text-left p-4 rounded-xl border-2 transition-colors duration-200 border-border-color bg-background hover:border-accent-hover">
                         <p className="font-bold">🧡 Оплатить через Boosty</p>
@@ -21,7 +21,7 @@ export const PaymentMethodModal = ({ onClose, onSelectMethod, plan }) => {
                     </button>
                     <div className="text-center pt-2">
                         <button onClick={() => onSelectMethod('boosty')} className="text-sm text-accent hover:underline">
-                            Уже есть подписка? Синхронизировать аккаунт
+                            Уже есть подписка Boosty? Синхронизировать аккаунт
                         </button>
                     </div>
                 </div>

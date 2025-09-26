@@ -10,19 +10,21 @@ export const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }
               <BookmarkIcon filled={bookmarks.includes(novel.id)} width="20" height="20" />
             </button>
             <img src={`/${novel.coverUrl}`} alt={novel.title} className="w-full aspect-[2/3] object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 border border-border-color" />
-             <div className="flex items-center justify-between mt-2 gap-2">
-    {/* 👇 НОВЫЙ БЛОК-ОБЁРТКА ДЛЯ ЗАГОЛОВКА 👇 */}
-    <div className="flex-1 min-w-0">
-        <h2 className="font-semibold text-xs truncate text-text-main">{novel.title}</h2>
-    </div>
+            
+            <div className="flex items-center justify-between mt-2 gap-2">
+              {/* Этот блок отвечает за заголовок и просмотры */}
+              <div className="flex-1 min-w-0">
+                  <h2 className="font-semibold text-xs truncate text-text-main">{novel.title}</h2>
+              </div>
 
-    {novel.views > 0 && (
-      <div className="flex items-center gap-1 text-xs opacity-60 flex-shrink-0">
-        <EyeIcon className="w-4 h-4" />
-        <span>{novel.views}</span>
-      </div>
-    )}
-</div>
+              {novel.views > 0 && (
+                <div className="flex items-center gap-1 text-xs opacity-60 flex-shrink-0">
+                  <EyeIcon className="w-4 h-4" />
+                  <span>{novel.views}</span>
+                </div>
+              )}
+            </div>
+
           </div>
         </div>
       )) : (

@@ -26,3 +26,8 @@ dist-ssr
 .env
 firebase-credentials.json
 firebase-config.js
+
+# Системные и временные файлы
+.DS_Store
+.zsh_history
+.viminfo

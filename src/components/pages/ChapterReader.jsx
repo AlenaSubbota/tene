@@ -147,53 +147,57 @@ export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, user
     }, [novel.id, chapter.id, chapter.isPaid, hasActiveSubscription]);
 
     const handleCommentSubmit = useCallback(async (e, parentId = null) => {
-      e.preventDefault();
-      const text = parentId ? replyText : newComment;
-      if (!text.trim() || !userId) return;
+    e.preventDefault();
+    const text = parentId ? replyText : newComment;
+    if (!text.trim() || !userId) return;
 
-      try {
-          await setDoc(chapterMetaRef, {}, { merge: true });
+    try {
+        // Убедимся, что документ-контейнер для комментариев существует
+        await setDoc(chapterMetaRef, {}, { merge: true });
 
-          const newCommentData = {
-              userId,
-              userName: userName || "Аноним",
-              text,
-              timestamp: serverTimestamp(),
-              likeCount: 0,
-              novelTitle: novel.title,
-              chapterTitle: chapter.title
-          };
+        // 1. Добавляем поле isNotified: false
+        const newCommentData = {
+            userId,
+            userName: userName || "Аноним",
+            text,
+            timestamp: serverTimestamp(),
+            likeCount: 0,
+            novelTitle: novel.title,
+            chapterTitle: chapter.title,
+            isNotified: false // <--- РЕШЕНИЕ ПРОБЛЕМЫ С УВЕДОМЛЕНИЯМИ
+        };
 
-          let replyToUid = null;
-          if (parentId) {
-              newCommentData.replyTo = parentId;
-              const parentCommentDoc = await getDoc(doc(commentsColRef, parentId));
-              if (parentCommentDoc.exists()) {
-                  replyToUid = parentCommentDoc.data().userId;
-              }
-          }
+        // Если это ответ, добавляем ID родительского комментария
+        if (parentId) {
+            newCommentData.replyTo = parentId;
+            const parentCommentDoc = await getDoc(doc(commentsColRef, parentId));
+            if (parentCommentDoc.exists()) {
+                // Добавляем ID автора родительского комментария для уведомлений об ответе
+                newCommentData.parentUserId = parentCommentDoc.data().userId;
+            }
+        }
+        
+        const addedDocRef = await addDoc(commentsColRef, newCommentData);
+        
+        // Оптимистичное обновление интерфейса
+        setComments(prev => [{ ...newCommentData, id: addedDocRef.id, userHasLiked: false, timestamp: new Date() }, ...prev]);
+        
+        // 2. УДАЛИЛИ лишнюю запись в коллекцию "notifications"
 
-          const addedDocRef = await addDoc(commentsColRef, newCommentData);
-          setComments(prev => [{ ...newCommentData, id: addedDocRef.id, userHasLiked: false, timestamp: new Date() }, ...prev]);
+        // 3. Теперь этот код будет выполняться без ошибок
+        if (parentId) {
+            setReplyingTo(null);
+            setReplyText("");
+        } else {
+            setNewComment(""); // <--- РЕШЕНИЕ ПРОБЛЕМЫ С ОЧИСТКОЙ ПОЛЯ
+        }
 
-          const notificationColRef = collection(db, "notifications");
-          await addDoc(notificationColRef, {
-              ...newCommentData,
-              processed: false,
-              createdAt: serverTimestamp(),
-              replyToUid: replyToUid
-          });
-
-          if (parentId) {
-              setReplyingTo(null);
-              setReplyText("");
-          } else {
-              setNewComment("");
-          }
-      } catch (error) {
-          console.error("Ошибка добавления комментария:", error);
-      }
-    }, [userId, userName, newComment, replyText, chapterMetaRef, novel.id, chapter.id, novel.title, chapter.title, commentsColRef]);
+    } catch (error) {
+        console.error("Ошибка добавления комментария:", error);
+        // Можно добавить уведомление для пользователя об ошибке
+        // alert("Не удалось отправить комментарий. Попробуйте снова.");
+    }
+}, [userId, userName, newComment, replyText, chapterMetaRef, novel.id, chapter.id, novel.title, chapter.title, commentsColRef]);
 
     const handleCommentLike = useCallback(async (commentId) => {
       if (!userId) return;

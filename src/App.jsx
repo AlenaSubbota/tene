@@ -146,30 +146,32 @@ export default function App() {
   }, [user, authLoading]);
 
   // Загрузка глав для выбранной новеллы
-  useEffect(() => {
-      if (!selectedNovel) { setChapters([]); return; }
-      setIsLoadingChapters(true);
-      const fetchChapters = async () => {
-          try {
-              const docRef = doc(db, 'chapter_info', selectedNovel.id);
-              const docSnap = await getDoc(docRef);
-              if (docSnap.exists() && docSnap.data()) {
-                  const data = docSnap.data();
-                  const chaptersData = data.chapters || {};
-                  const chaptersArray = Object.keys(chaptersData).map(key => ({
-                      id: parseInt(key),
-                      title: `Глава ${key}`,
-                      isPaid: chaptersData[key].isPaid || false
-                  })).sort((a, b) => a.id - b.id);
-                  setChapters(chaptersArray);
-              } else { setChapters([]); }
-          } catch (error) {
-              console.error("Ошибка загрузки глав:", error);
-              setChapters([]);
-          } finally { setIsLoadingChapters(false); }
-      };
-      fetchChapters();
-  }, [selectedNovel]);
+useEffect(() => {
+    if (!selectedNovel) { setChapters([]); return; }
+    setIsLoadingChapters(true);
+    const fetchChapters = async () => {
+        try {
+            const docRef = doc(db, 'chapter_info', selectedNovel.id);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists() && docSnap.data()) {
+                const data = docSnap.data();
+                const chaptersData = data.chapters || {};
+                const chaptersArray = Object.keys(chaptersData).map(key => ({
+                    id: parseInt(key),
+                    title: `Глава ${key}`,
+                    isPaid: chaptersData[key].isPaid || false,
+                    // 👇 ВОТ ИСПРАВЛЕНИЕ: Добавляем дату из Firebase
+                    published_at: chaptersData[key].published_at || null 
+                })).sort((a, b) => a.id - b.id);
+                setChapters(chaptersArray);
+            } else { setChapters([]); }
+        } catch (error) {
+            console.error("Ошибка загрузки глав:", error);
+            setChapters([]);
+        } finally { setIsLoadingChapters(false); }
+    };
+    fetchChapters();
+}, [selectedNovel]);
 
   const handleBack = useCallback(() => {
       if (page === 'reader') { setSelectedChapter(null); setPage('details'); }

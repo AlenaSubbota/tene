@@ -7,7 +7,17 @@ import { PaymentMethodModal } from '../PaymentMethodModal.jsx';
 import { Comment, groupComments } from '../Comment.jsx';
 import { Header } from '../Header.jsx';
 
-export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, userId, userName, currentFontClass, onSelectChapter, allChapters, subscription, botUsername, onBack, isUserAdmin }) => {
+export const ChapterReader = ({
+    chapter, novel, userId, userName, subscription, botUsername, onBack, isUserAdmin,
+    allChapters, onSelectChapter,
+    // --- НАСТРОЙКИ ---
+    fontSize, onFontSizeChange,
+    fontFamily, onFontFamilyChange,
+    lineHeight, onLineHeightChange,
+    textAlign, onTextAlignChange,
+    textIndent, onTextIndentChange,
+    paragraphSpacing, onParagraphSpacingChange
+}) => {
 
     if (!novel || !chapter) {
         return (
@@ -18,13 +28,11 @@ export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, user
        );
     }
 
-    // Состояния для комментариев и пагинации
+    // Состояния компонента (без изменений)
     const [comments, setComments] = useState([]);
     const [lastCommentDoc, setLastCommentDoc] = useState(null);
     const [hasMoreComments, setHasMoreComments] = useState(true);
     const [isLoadingComments, setIsLoadingComments] = useState(false);
-
-    // Остальные состояния компонента
     const [newComment, setNewComment] = useState("");
     const [editingCommentId, setEditingCommentId] = useState(null);
     const [editingText, setEditingText] = useState("");
@@ -115,7 +123,7 @@ export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, user
         };
 
         fetchInitialData();
-    }, [chapterMetaRef, userId, novel.id, chapter.id]); // Добавлен fetchComments в зависимости, но useCallback его защищает
+    }, [chapterMetaRef, userId, novel.id, chapter.id, fetchComments]);
 
     useEffect(() => {
       const fetchContent = async () => {
@@ -152,10 +160,8 @@ export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, user
     if (!text.trim() || !userId) return;
 
     try {
-        // Убедимся, что документ-контейнер для комментариев существует
         await setDoc(chapterMetaRef, {}, { merge: true });
 
-        // 1. Добавляем поле isNotified: false
         const newCommentData = {
             userId,
             userName: userName || "Аноним",
@@ -164,38 +170,30 @@ export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, user
             likeCount: 0,
             novelTitle: novel.title,
             chapterTitle: chapter.title,
-            isNotified: false // <--- РЕШЕНИЕ ПРОБЛЕМЫ С УВЕДОМЛЕНИЯМИ
+            isNotified: false
         };
 
-        // Если это ответ, добавляем ID родительского комментария
         if (parentId) {
             newCommentData.replyTo = parentId;
             const parentCommentDoc = await getDoc(doc(commentsColRef, parentId));
             if (parentCommentDoc.exists()) {
-                // Добавляем ID автора родительского комментария для уведомлений об ответе
                 newCommentData.parentUserId = parentCommentDoc.data().userId;
             }
         }
         
         const addedDocRef = await addDoc(commentsColRef, newCommentData);
         
-        // Оптимистичное обновление интерфейса
         setComments(prev => [{ ...newCommentData, id: addedDocRef.id, userHasLiked: false, timestamp: new Date() }, ...prev]);
         
-        // 2. УДАЛИЛИ лишнюю запись в коллекцию "notifications"
-
-        // 3. Теперь этот код будет выполняться без ошибок
         if (parentId) {
             setReplyingTo(null);
             setReplyText("");
         } else {
-            setNewComment(""); // <--- РЕШЕНИЕ ПРОБЛЕМЫ С ОЧИСТКОЙ ПОЛЯ
+            setNewComment("");
         }
 
     } catch (error) {
         console.error("Ошибка добавления комментария:", error);
-        // Можно добавить уведомление для пользователя об ошибке
-        // alert("Не удалось отправить комментарий. Попробуйте снова.");
     }
 }, [userId, userName, newComment, replyText, chapterMetaRef, novel.id, chapter.id, novel.title, chapter.title, commentsColRef]);
 
@@ -339,13 +337,13 @@ export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, user
 
     const renderMarkdown = (markdownText) => {
       if (window.marked) {
+        // Убираем лишние стили отсюда
         const rawHtml = window.marked.parse(markdownText);
-        return `<div class="prose">${rawHtml}</div>`;
+        return `<div class="prose max-w-none">${rawHtml}</div>`;
       }
       return markdownText;
     };
     
-    // Сортируем комментарии для отображения, так как мы их загружаем в обратном порядке
     const sortedComments = useMemo(() => {
         return [...comments].sort((a, b) => {
             const dateA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
@@ -353,20 +351,37 @@ export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, user
             return dateA - dateB;
         });
     }, [comments]);
-
+    
+    // ОБНОВЛЕНИЕ: Стили для контейнера текста
+    const contentStyle = {
+        fontSize: `${fontSize}px`,
+        fontFamily: fontFamily,
+        lineHeight: lineHeight,
+        textAlign: textAlign,
+    };
 
     return (
       <div className="min-h-screen transition-colors duration-300 bg-background text-text-main">
+        {/* --- ИСПРАВЛЕНИЕ: Добавляем динамический тег <style> для управления отступами --- */}
+        <style>
+          {`
+            .chapter-content p {
+              text-indent: ${textIndent}em;
+              margin-bottom: ${paragraphSpacing}em;
+            }
+          `}
+        </style>
         <Header title={novel.title} onBack={onBack} />
         <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto pb-24">
           <h2 className="text-lg sm:text-xl mb-8 text-center opacity-80 font-sans">{chapter.title}</h2>
           <div
-            className={`whitespace-normal leading-relaxed ${currentFontClass}`}
-            style={{ fontSize: `${fontSize}px` }}
+            className="whitespace-normal chapter-content" // Добавляем класс для таргетинга стилей
+            style={contentStyle}
             dangerouslySetInnerHTML={{ __html: isLoadingContent ? '<p class="text-center">Загрузка текста главы...</p>' : renderMarkdown(chapterContent) }}
           />
           <div className="text-center my-8 text-accent font-bold text-2xl tracking-widest">╚══ ≪ °❈° ≫ ══╝</div>
           <div className="border-t border-border-color pt-8">
+            {/* ... (остальной JSX без изменений до модального окна настроек) ... */}
             <div className="flex items-center gap-4 mb-8">
               <button onClick={handleLike} className="flex items-center gap-2 text-accent-hover transition-transform hover:scale-110">
                 <HeartIcon filled={userHasLiked} className={userHasLiked ? "text-accent" : ''} />
@@ -424,6 +439,7 @@ export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, user
             </form>
           </div>
         </div>
+        
         <div className="fixed bottom-0 left-0 right-0 p-2 border-t border-border-color bg-component-bg flex justify-between items-center z-10 text-text-main">
           <button onClick={() => handleChapterClick(prevChapter)} disabled={!prevChapter} className="p-2 disabled:opacity-50"><BackIcon/></button>
           <div className="flex gap-2">
@@ -432,6 +448,7 @@ export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, user
           </div>
           <button onClick={() => handleChapterClick(nextChapter)} disabled={!nextChapter} className="p-2 disabled:opacity-50"><ArrowRightIcon className="opacity-100"/></button>
         </div>
+
         {showChapterList && (
           <div className="fixed inset-0 bg-black/50 z-20" onClick={() => setShowChapterList(false)}>
             <div className="absolute bottom-0 left-0 right-0 max-h-[45vh] p-4 rounded-t-2xl bg-component-bg flex flex-col" onClick={e => e.stopPropagation()}>
@@ -452,16 +469,66 @@ export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, user
             </div>
           </div>
         )}
+
+        {/* --- ОБНОВЛЕНИЕ: Модальное окно настроек с новыми шрифтами --- */}
         {showSettings && (
            <div className="fixed inset-0 bg-black/50 z-20" onClick={() => setShowSettings(false)}>
                <div className="absolute bottom-0 left-0 right-0 p-4 rounded-t-2xl bg-component-bg text-text-main" onClick={e => e.stopPropagation()}>
                   <h3 className="font-bold text-lg mb-4">Настройки чтения</h3>
-                   <div className="flex items-center justify-between">
-                    <span>Размер текста</span>
-                    <div className="w-28 h-12 rounded-full bg-background flex items-center justify-around border border-border-color">
-                      <button onClick={() => onFontSizeChange(-1)} className="text-2xl font-bold">-</button>
-                      <button onClick={() => onFontSizeChange(1)} className="text-2xl font-bold">+</button>
-                    </div>
+                  <div className="space-y-4">
+                      {/* --- Размер текста --- */}
+                      <div className="flex items-center justify-between">
+                          <span>Размер текста</span>
+                          <div className="flex items-center gap-2">
+                              <button onClick={() => onFontSizeChange(-1)} className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-xl font-bold">-</button>
+                              <span>{fontSize}</span>
+                              <button onClick={() => onFontSizeChange(1)} className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-xl font-bold">+</button>
+                          </div>
+                      </div>
+                      {/* --- Выбор шрифта --- */}
+                      <div className="flex items-center justify-between">
+                          <span>Шрифт</span>
+                          <div className="flex gap-2 flex-wrap">
+                              <button onClick={() => onFontFamilyChange("'JetBrains Mono', monospace")} className={`px-3 py-1 rounded-md text-sm ${fontFamily && fontFamily.includes('JetBrains Mono') ? 'bg-accent text-white' : 'bg-background'}`}>Стандарт</button>
+                              <button onClick={() => onFontFamilyChange("'Montserrat', sans-serif")} className={`px-3 py-1 rounded-md text-sm ${fontFamily && fontFamily.includes('Montserrat') ? 'bg-accent text-white' : 'bg-background'}`}>Montserrat</button>
+                              <button onClick={() => onFontFamilyChange("'Lora', serif")} className={`px-3 py-1 rounded-md text-sm ${fontFamily && fontFamily.includes('Lora') ? 'bg-accent text-white' : 'bg-background'}`}>Lora</button>
+                          </div>
+                      </div>
+                      {/* --- Междустрочный интервал --- */}
+                       <div className="flex items-center justify-between">
+                          <span>Интервал</span>
+                          <div className="flex items-center gap-2">
+                              <button onClick={() => onLineHeightChange(-0.1)} className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-xl font-bold">-</button>
+                              <span>{lineHeight.toFixed(1)}</span>
+                              <button onClick={() => onLineHeightChange(0.1)} className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-xl font-bold">+</button>
+                          </div>
+                      </div>
+                       {/* --- Выравнивание --- */}
+                      <div className="flex items-center justify-between">
+                          <span>Выравнивание</span>
+                          <div className="flex gap-2">
+                              <button onClick={() => onTextAlignChange('left')} className={`px-3 py-1 rounded-md ${textAlign === 'left' ? 'bg-accent text-white' : 'bg-background'}`}>По левому</button>
+                              <button onClick={() => onTextAlignChange('justify')} className={`px-3 py-1 rounded-md ${textAlign === 'justify' ? 'bg-accent text-white' : 'bg-background'}`}>По ширине</button>
+                          </div>
+                      </div>
+                      {/* --- Красная строка --- */}
+                      <div className="flex items-center justify-between">
+                          <span>Красная строка</span>
+                           <div className="flex gap-2">
+                              <button onClick={() => onTextIndentChange(0)} className={`px-3 py-1 rounded-md ${textIndent === 0 ? 'bg-accent text-white' : 'bg-background'}`}>Нет</button>
+                              <button onClick={() => onTextIndentChange(1.5)} className={`px-3 py-1 rounded-md ${textIndent === 1.5 ? 'bg-accent text-white' : 'bg-background'}`}>Да</button>
+                              <button onClick={() => onTextIndentChange(3)} className={`px-3 py-1 rounded-md ${textIndent === 3 ? 'bg-accent text-white' : 'bg-background'}`}>Большая</button>
+                          </div>
+                      </div>
+                       {/* --- Отступ между абзацами --- */}
+                      <div className="flex items-center justify-between">
+                          <span>Отступ абзаца</span>
+                          <div className="flex items-center gap-2">
+                              <button onClick={() => onParagraphSpacingChange(-0.1)} className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-xl font-bold">-</button>
+                              <span>{paragraphSpacing.toFixed(1)}</span>
+                              <button onClick={() => onParagraphSpacingChange(0.1)} className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-xl font-bold">+</button>
+                          </div>
+                      </div>
                   </div>
                </div>
            </div>
@@ -470,4 +537,4 @@ export const ChapterReader = ({ chapter, novel, fontSize, onFontSizeChange, user
         {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
       </div>
     );
-  };
+};

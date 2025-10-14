@@ -1,6 +1,6 @@
 // src/App.jsx
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { doc, getDoc, collection, setDoc, onSnapshot, getDocs } from "firebase/firestore";
 import { db, auth } from './firebase-config.js';
 import { useAuth } from './Auth';
@@ -27,10 +27,8 @@ export default function App() {
   // --- Состояние аутентификации из useAuth ---
   const { user, loading: authLoading } = useAuth();
 
-  // --- ВСЕ ВАШИ СОСТОЯНИЯ ОСТАЛИСЬ ЗДЕСЬ ---
+  // --- ОБЩИЕ СОСТОЯНИЯ ---
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
-  const [fontSize, setFontSize] = useState(16);
-  const [fontClass, setFontClass] = useState('font-sans');
   const [page, setPage] = useState('list');
   const [activeTab, setActiveTab] = useState('library');
   const [novels, setNovels] = useState([]);
@@ -51,10 +49,24 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [needsPolicyAcceptance, setNeedsPolicyAcceptance] = useState(false);
 
+  // --- НОВОЕ: ЦЕНТРАЛИЗОВАННОЕ СОСТОЯНИЕ ДЛЯ НАСТРОЕК ЧТЕНИЯ ---
+  const [readingSettings, setReadingSettings] = useState(() => {
+    const savedSettings = localStorage.getItem('readingSettings');
+    const defaultSettings = {
+        fontSize: 16,
+        fontFamily: "'JetBrains Mono', monospace", // <-- Шрифт по умолчанию
+        lineHeight: 1.6,
+        textAlign: 'left',
+        textIndent: 1.5,
+        paragraphSpacing: 1, // <-- Увеличил значение по умолчанию для наглядности
+    };
+    return savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
+  });
+
   const BOT_USERNAME = "tenebrisverbot";
   const userId = user?.uid;
 
-  // --- ВСЕ ВАШИ useEffect ОСТАЛИСЬ ЗДЕСЬ ---
+  // --- useEffect'ы ---
 
   // Применение темы
   useEffect(() => {
@@ -62,40 +74,38 @@ export default function App() {
     root.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('theme', theme);
   }, [theme]);
+  
+  // НОВОЕ: Сохранение настроек чтения в localStorage при их изменении
+  useEffect(() => {
+    localStorage.setItem('readingSettings', JSON.stringify(readingSettings));
+  }, [readingSettings]);
 
   // ГЛАВНЫЙ useEffect ДЛЯ ЗАГРУЗКИ ДАННЫХ
   useEffect(() => {
-    if (authLoading) return; // Ждем окончания проверки авторизации
-    if (!user) { // Если пользователя нет, сбрасываем все и выходим
+    if (authLoading) return; 
+    if (!user) { 
       setIsLoadingContent(false);
       setNovels([]);
       setSubscription(null);
       setBookmarks([]);
       setLastReadData({});
-      setNeedsPolicyAcceptance(false); // Сбрасываем при выходе
+      setNeedsPolicyAcceptance(false); 
       return;
     }
-
-    // Пользователь есть, начинаем загрузку всего
+    
     setIsLoadingContent(true);
 
     const fetchNovelsAndStats = async () => {
         try {
             const novelsSnapshot = await getDocs(collection(db, "novels"));
             const novelsData = novelsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-
             const statsSnapshot = await getDocs(collection(db, "novel_stats"));
             const statsMap = new Map();
             statsSnapshot.forEach(doc => statsMap.set(doc.id, doc.data().views));
-
-            const mergedNovels = novelsData.map(novel => ({
-                ...novel,
-                views: statsMap.get(novel.id) || 0
-            }));
-
+            const mergedNovels = novelsData.map(novel => ({ ...novel, views: statsMap.get(novel.id) || 0 }));
             setNovels(mergedNovels);
         } catch (err) {
-            console.error("Ошибка загрузки новелл или статистики из Firestore:", err);
+            console.error("Ошибка загрузки новелл или статистики:", err);
             setNovels([]);
         }
     };
@@ -122,20 +132,16 @@ export default function App() {
             setSubscription(data.subscription || null);
             setLastReadData(data.lastRead || {});
             setBookmarks(data.bookmarks || []);
+            // --- ИЗМЕНЕНИЕ: Загружаем все настройки из Firebase ---
             if (data.settings) {
-              setFontSize(data.settings.fontSize || 16);
-              setFontClass(data.settings.fontClass || 'font-sans');
+              setReadingSettings(prev => ({ ...prev, ...data.settings }));
             }
-            // --- ИЗМЕНЕНИЕ: Проверяем, принято ли соглашение ---
-            // Если поля policyAccepted нет или оно false, показываем экран принятия
             if (!data.policyAccepted) {
               setNeedsPolicyAcceptance(true);
             } else {
               setNeedsPolicyAcceptance(false);
             }
         } else {
-            // Если документа пользователя еще нет (сразу после регистрации),
-            // также считаем, что нужно принять соглашение.
             setNeedsPolicyAcceptance(true);
         }
     }, (error) => {
@@ -146,7 +152,7 @@ export default function App() {
   }, [user, authLoading]);
 
   // Загрузка глав для выбранной новеллы
-useEffect(() => {
+  useEffect(() => {
     if (!selectedNovel) { setChapters([]); return; }
     setIsLoadingChapters(true);
     const fetchChapters = async () => {
@@ -160,7 +166,6 @@ useEffect(() => {
                     id: parseInt(key),
                     title: `Глава ${key}`,
                     isPaid: chaptersData[key].isPaid || false,
-                    // 👇 ВОТ ИСПРАВЛЕНИЕ: Добавляем дату из Firebase
                     published_at: chaptersData[key].published_at || null 
                 })).sort((a, b) => a.id - b.id);
                 setChapters(chaptersArray);
@@ -171,7 +176,7 @@ useEffect(() => {
         } finally { setIsLoadingChapters(false); }
     };
     fetchChapters();
-}, [selectedNovel]);
+  }, [selectedNovel]);
 
   const handleBack = useCallback(() => {
       if (page === 'reader') { setSelectedChapter(null); setPage('details'); }
@@ -184,7 +189,7 @@ useEffect(() => {
     tg.ready();
     tg.expand();
     tg.onEvent('backButtonClicked', handleBack);
-    if (page === 'list' || needsPolicyAcceptance) { // Скрываем кнопку "назад", если нужно принять соглашение
+    if (page === 'list' || needsPolicyAcceptance) { 
       tg.BackButton.hide(); 
     } else { 
       tg.BackButton.show(); 
@@ -192,7 +197,7 @@ useEffect(() => {
     return () => tg.offEvent('backButtonClicked', handleBack);
   }, [page, handleBack, needsPolicyAcceptance]);
 
-  // --- ВСЕ ВАШИ ФУНКЦИИ-ОБРАБОТЧИКИ ОСТАЛИСЬ ЗДЕСЬ ---
+  // --- Функции-обработчики ---
   const updateUserDoc = useCallback(async (dataToUpdate) => {
     if (userId) {
         await setDoc(doc(db, "users", userId), dataToUpdate, { merge: true });
@@ -201,13 +206,23 @@ useEffect(() => {
 
   const handleThemeToggle = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
-  const handleTextSizeChange = useCallback((amount) => {
-    setFontSize(prevSize => {
-        const newSize = Math.max(12, Math.min(32, prevSize + amount));
-        updateUserDoc({ settings: { fontSize: newSize, fontClass } });
-        return newSize;
+  // --- НОВОЕ: ЕДИНАЯ ФУНКЦИЯ ДЛЯ ОБНОВЛЕНИЯ НАСТРОЕК ---
+  const handleSettingChange = useCallback((key, value) => {
+    setReadingSettings(prev => {
+        const newValue = typeof value === 'function' ? value(prev[key]) : value;
+
+        // Ограничения
+        if (key === 'fontSize' && (newValue < 12 || newValue > 28)) return prev;
+        if ((key === 'lineHeight' || key === 'paragraphSpacing') && (newValue < 1.0 || newValue > 2.5)) return prev;
+
+        const newSettings = { ...prev, [key]: newValue };
+
+        // Сохраняем в Firestore асинхронно
+        updateUserDoc({ settings: newSettings });
+
+        return newSettings;
     });
-  }, [fontClass, updateUserDoc]);
+  }, [updateUserDoc]);
 
   const handleSelectChapter = useCallback(async (chapter) => {
     setSelectedChapter(chapter);
@@ -253,12 +268,9 @@ useEffect(() => {
       });
   };
 
-  // --- ИЗМЕНЕНИЕ: Новая функция для принятия соглашения ---
   const handleAcceptPolicy = async () => {
     if (userId) {
-      // Записываем в документ пользователя, что он принял соглашение
       await updateUserDoc({ policyAccepted: true });
-      // Скрываем экран соглашения немедленно
       setNeedsPolicyAcceptance(false);
     }
   };
@@ -268,19 +280,15 @@ useEffect(() => {
     return <LoadingSpinner />;
   }
   
-  // --- ИЗМЕНЕНИЕ: Логика показа экрана соглашения ---
-  // Если пользователь авторизован, но должен принять соглашение
   if (user && needsPolicyAcceptance) {
     return <HelpScreen onAccept={handleAcceptPolicy} />;
   }
 
-  // Обычный показ справки из профиля
   if (showHelp) {
     return <HelpScreen onBack={() => setShowHelp(false)} />;
   }
   
   if (!user) {
-    // onRegisterClick больше не нужен, т.к. логика завязана на данных из Firestore
     return <AuthScreen />;
   }
 
@@ -289,7 +297,40 @@ useEffect(() => {
       return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chapters={chapters} isLoadingChapters={isLoadingChapters} lastReadData={lastReadData} onBack={handleBack} />;
     }
     if (page === 'reader') {
-      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} userId={userId} userName={user?.displayName || 'Аноним'} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} />;
+      // --- ИЗМЕНЕНИЕ: Передаем все новые props в ChapterReader ---
+      return (
+        <ChapterReader 
+          chapter={selectedChapter} 
+          novel={selectedNovel} 
+          userId={userId} 
+          userName={user?.displayName || 'Аноним'} 
+          allChapters={chapters} 
+          subscription={subscription} 
+          botUsername={BOT_USERNAME} 
+          onBack={handleBack} 
+          isUserAdmin={isUserAdmin} 
+          onSelectChapter={handleSelectChapter}
+          
+          // --- Новые props для настроек ---
+          fontSize={readingSettings.fontSize}
+          onFontSizeChange={(increment) => handleSettingChange('fontSize', val => val + increment)}
+          
+          fontFamily={readingSettings.fontFamily}
+          onFontFamilyChange={(family) => handleSettingChange('fontFamily', family)}
+
+          lineHeight={readingSettings.lineHeight}
+          onLineHeightChange={(increment) => handleSettingChange('lineHeight', val => val + increment)}
+          
+          textAlign={readingSettings.textAlign}
+          onTextAlignChange={(align) => handleSettingChange('textAlign', align)}
+
+          textIndent={readingSettings.textIndent}
+          onTextIndentChange={(indent) => handleSettingChange('textIndent', indent)}
+
+          paragraphSpacing={readingSettings.paragraphSpacing}
+          onParagraphSpacingChange={(increment) => handleSettingChange('paragraphSpacing', val => val + increment)}
+        />
+      );
     }
 
     switch (activeTab) {

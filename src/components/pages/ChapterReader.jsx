@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query,
     orderBy, addDoc, serverTimestamp, runTransaction, getDocs, limit,
-    startAfter
+    startAfter, arrayUnion, arrayRemove
 } from "firebase/firestore";
 import { db } from "../../firebase-config.js";
 import { HeartIcon, BackIcon, ArrowRightIcon, SettingsIcon, SendIcon } from '../icons.jsx';
@@ -32,8 +32,9 @@ export const ChapterReader = ({
        );
     }
 
-    // Состояния компонента (без изменений)
+    // Состояния компонента
     const [comments, setComments] = useState([]);
+    const [likedCommentIds, setLikedCommentIds] = useState(new Set());
     const [lastCommentDoc, setLastCommentDoc] = useState(null);
     const [hasMoreComments, setHasMoreComments] = useState(true);
     const [isLoadingComments, setIsLoadingComments] = useState(false);
@@ -56,98 +57,97 @@ export const ChapterReader = ({
     const commentsColRef = useMemo(() => collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`), [novel.id, chapter.id]);
 
     const loadMoreComments = useCallback(async () => {
-        if (isLoadingComments || !hasMoreComments) return;
+        // Проверка, чтобы кнопка не работала, если нет lastCommentDoc
+        if (isLoadingComments || !hasMoreComments || !lastCommentDoc) return;
         setIsLoadingComments(true);
-
         try {
-            // Запрос всегда начинается после последнего известного документа
             const q = query(commentsColRef, orderBy("timestamp", "desc"), startAfter(lastCommentDoc), limit(20));
-
             const documentSnapshots = await getDocs(q);
-            const newCommentsData = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            const newCommentsData = documentSnapshots.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                userHasLiked: likedCommentIds.has(doc.id) // Проверка лайка без запроса к БД
+            }));
 
-            let commentsWithLikes = newCommentsData;
-            if (userId && newCommentsData.length > 0) {
-                 commentsWithLikes = await Promise.all(
-                    newCommentsData.map(async (comment) => {
-                        const likeDocRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${comment.id}/likes`, userId);
-                        const likeDocSnap = await getDoc(likeDocRef);
-                        return { ...comment, userHasLiked: likeDocSnap.exists() };
-                    })
-                );
-            }
-
-            // Важно: мы ДОБАВЛЯЕМ комментарии к существующему списку
-            setComments(prevComments => [...prevComments, ...commentsWithLikes]);
-
+            setComments(prevComments => [...prevComments, ...newCommentsData]);
+            
             const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1];
-            setLastCommentDoc(lastVisible);
+            setLastCommentDoc(lastVisible || null); // Устанавливаем null, если больше нет документов
+            setHasMoreComments(documentSnapshots.docs.length >= 20);
 
-            if (documentSnapshots.docs.length < 20) {
-                setHasMoreComments(false);
-            }
         } catch (error) {
             console.error("Ошибка подгрузки комментариев: ", error);
         } finally {
             setIsLoadingComments(false);
         }
-    }, [isLoadingComments, hasMoreComments, lastCommentDoc, commentsColRef, userId, novel.id, chapter.id]);
+    }, [isLoadingComments, hasMoreComments, lastCommentDoc, commentsColRef, likedCommentIds]);
 
-
+    
      useEffect(() => {
+        // ✅ Главный защитник: не запускаем ничего, пока нет ID пользователя
+        // или других необходимых данных.
+        if (!userId || !novel?.id || !chapter?.id) {
+            // Можно установить состояние, что данные еще не готовы
+            setComments([]);
+            setIsLoadingComments(false);
+            return; // Прерываем выполнение хука
+        }
+
         const fetchInitialData = async () => {
             setIsLoadingComments(true);
+            // Сброс состояний перед загрузкой
+            setComments([]);
+            setLastCommentDoc(null);
+            setHasMoreComments(true);
+
             try {
-                // Загрузка лайков главы (без изменений)
-                const metaSnap = await getDoc(chapterMetaRef);
+                // Теперь мы уверены, что userId существует на момент вызова
+                const metaSnapPromise = getDoc(chapterMetaRef);
+                const chapterLikePromise = getDoc(doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId));
+                const userCommentLikesPromise = getDoc(doc(db, "user_comment_likes", userId));
+                const commentsPromise = getDocs(query(commentsColRef, orderBy("timestamp", "desc"), limit(20)));
+
+                const [metaSnap, chapterLikeSnap, userCommentLikesSnap, commentsSnap] = await Promise.all([
+                    metaSnapPromise, chapterLikePromise, userCommentLikesPromise, commentsPromise
+                ]);
+
+                // Обрабатываем лайки
                 setLikeCount(metaSnap.exists() ? metaSnap.data().likeCount || 0 : 0);
-                if (userId) {
-                    const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
-                    const likeSnap = await getDoc(likeRef);
-                    setUserHasLiked(likeSnap.exists());
-                } else {
-                    setUserHasLiked(false);
-                }
-                
-                // Загружаем самую первую страницу комментариев
-                const q = query(commentsColRef, orderBy("timestamp", "desc"), limit(20));
-                const documentSnapshots = await getDocs(q);
-                const newCommentsData = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setUserHasLiked(chapterLikeSnap?.exists() ?? false);
 
-                // ... (логика проверки лайков такая же)
-                 let commentsWithLikes = newCommentsData;
-                 if (userId && newCommentsData.length > 0) {
-                      commentsWithLikes = await Promise.all(
-                         newCommentsData.map(async (comment) => {
-                             const likeDocRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${comment.id}/likes`, userId);
-                             const likeDocSnap = await getDoc(likeDocRef);
-                             return { ...comment, userHasLiked: likeDocSnap.exists() };
-                         })
-                     );
-                 }
-                
-                // Важно: мы ПОЛНОСТЬЮ ЗАМЕНЯЕМ старый список комментариев
-                setComments(commentsWithLikes);
+                const chapterKey = `${novel.id}_${chapter.id}`;
+                const likedIds = userCommentLikesSnap?.data()?.chapters?.[chapterKey]?.likedCommentIds || [];
+                const likedIdsSet = new Set(likedIds);
+                setLikedCommentIds(likedIdsSet);
 
-                // Обновляем состояния для пагинации
-                setLastCommentDoc(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
-                setHasMoreComments(documentSnapshots.docs.length >= 20);
+                // Обрабатываем комментарии
+                const commentsData = commentsSnap.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data(),
+                    userHasLiked: likedIdsSet.has(doc.id)
+                }));
+                setComments(commentsData);
+
+                // ✅ КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: Правильно устанавливаем lastCommentDoc
+                // Если комментариев нет, lastVisible будет undefined, и мы установим null.
+                // Это предотвратит сбой кнопки "Загрузить еще".
+                const lastVisible = commentsSnap.docs[commentsSnap.docs.length - 1];
+                setLastCommentDoc(lastVisible || null);
+                setHasMoreComments(commentsSnap.docs.length >= 20);
 
             } catch (error) {
                 console.error("Ошибка загрузки данных главы:", error);
-                setComments([]); // В случае ошибки очищаем список
+                setComments([]); // В случае ошибки гарантированно очищаем
             } finally {
                 setIsLoadingComments(false);
             }
         };
 
         fetchInitialData();
-    // Этот хук зависит только от ID главы/новеллы, а не от функций.
-    // Это разрывает бесконечный цикл обновлений.
+        // Убедитесь, что userId есть в массиве зависимостей
     }, [chapterMetaRef, userId, novel.id, chapter.id, commentsColRef]);
 
-
-    // Загрузка текста главы (без изменений)
     useEffect(() => {
       const fetchContent = async () => {
           setIsLoadingContent(true);
@@ -174,107 +174,102 @@ export const ChapterReader = ({
       };
       
       fetchContent();
-
     }, [novel.id, chapter.id, chapter.isPaid, hasActiveSubscription]);
 
-    // Все остальные функции-обработчики остаются БЕЗ ИЗМЕНЕНИЙ
     const handleCommentSubmit = useCallback(async (e, parentId = null) => {
-    e.preventDefault();
-    const text = parentId ? replyText : newComment;
-    if (!text.trim() || !userId) return;
+        e.preventDefault();
+        const text = parentId ? replyText : newComment;
+        if (!text.trim() || !userId) return;
 
-    try {
-        await setDoc(chapterMetaRef, {}, { merge: true });
-        const newCommentData = {
-            userId,
-            userName: userName || "Аноним",
-            text,
-            timestamp: serverTimestamp(),
-            likeCount: 0,
-            novelTitle: novel.title,
-            chapterTitle: chapter.title,
-            isNotified: false
-        };
+        try {
+            await setDoc(chapterMetaRef, {}, { merge: true });
+            const newCommentData = { userId, userName: userName || "Аноним", text, timestamp: serverTimestamp(), likeCount: 0, novelTitle: novel.title, chapterTitle: chapter.title, isNotified: false };
 
-        if (parentId) {
-            newCommentData.replyTo = parentId;
-            const parentCommentDoc = await getDoc(doc(commentsColRef, parentId));
-            if (parentCommentDoc.exists()) {
-                newCommentData.parentUserId = parentCommentDoc.data().userId;
+            if (parentId) {
+                newCommentData.replyTo = parentId;
+                const parentCommentDoc = await getDoc(doc(commentsColRef, parentId));
+                if (parentCommentDoc.exists()) { newCommentData.parentUserId = parentCommentDoc.data().userId; }
             }
-        }
-        
-        const addedDocRef = await addDoc(commentsColRef, newCommentData);
-        setComments(prev => [{ ...newCommentData, id: addedDocRef.id, userHasLiked: false, timestamp: new Date() }, ...prev]);
-        
-        if (parentId) {
-            setReplyingTo(null);
-            setReplyText("");
-        } else {
-            setNewComment("");
-        }
+            
+            const addedDocRef = await addDoc(commentsColRef, newCommentData);
+            setComments(prev => [{ ...newCommentData, id: addedDocRef.id, userHasLiked: false, timestamp: new Date() }, ...prev]);
+            
+            if (parentId) { setReplyingTo(null); setReplyText(""); } else { setNewComment(""); }
 
-    } catch (error) {
-        console.error("Ошибка добавления комментария:", error);
-    }
-}, [userId, userName, newComment, replyText, chapterMetaRef, novel.id, chapter.id, novel.title, chapter.title, commentsColRef]);
+        } catch (error) {
+            console.error("Ошибка добавления комментария:", error);
+        }
+    }, [userId, userName, newComment, replyText, chapterMetaRef, novel.title, chapter.title, commentsColRef]);
 
     const handleCommentLike = useCallback(async (commentId) => {
-      if (!userId) return;
-      const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
-      const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${commentId}/likes`, userId);
+        if (!userId) return;
+        const isLiked = likedCommentIds.has(commentId);
+        setLikedCommentIds(prevSet => {
+            const newSet = new Set(prevSet);
+            if (isLiked) { newSet.delete(commentId); } else { newSet.add(commentId); }
+            return newSet;
+        });
+        setComments(prevComments => prevComments.map(c =>
+            c.id === commentId
+                ? { ...c, userHasLiked: !isLiked, likeCount: isLiked ? (c.likeCount || 1) - 1 : (c.likeCount || 0) + 1 }
+                : c
+        ));
+        const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
+        const userLikesRef = doc(db, "user_comment_likes", userId);
+        const chapterKey = `${novel.id}_${chapter.id}`;
+        try {
+    await runTransaction(db, async (transaction) => {
+        const commentDoc = await transaction.get(commentRef);
+        if (!commentDoc.exists()) return;
 
-      setComments(prevComments => prevComments.map(c => {
-          if (c.id === commentId) {
-              const newLikeCount = c.userHasLiked ? (c.likeCount || 1) - 1 : (c.likeCount || 0) + 1;
-              return { ...c, userHasLiked: !c.userHasLiked, likeCount: newLikeCount };
-          }
-          return c;
-      }));
+        const currentLikes = commentDoc.data().likeCount || 0;
+        
+        // Используем точечную нотацию для обновления вложенного объекта
+        const userLikesUpdatePath = `chapters.${chapterKey}.likedCommentIds`;
 
-      try {
-          await runTransaction(db, async (transaction) => {
-              const likeDoc = await transaction.get(likeRef);
-              const commentDoc = await transaction.get(commentRef);
-              if (!commentDoc.exists()) return;
-              const currentLikes = commentDoc.data().likeCount || 0;
-              if (likeDoc.exists()) {
-                  transaction.delete(likeRef);
-                  transaction.update(commentRef, { likeCount: Math.max(0, currentLikes - 1) });
-              } else {
-                  transaction.set(likeRef, { timestamp: serverTimestamp() });
-                  transaction.update(commentRef, { likeCount: currentLikes + 1 });
-              }
-          });
-      } catch (error) {
-          console.error("Ошибка при обновлении лайка комментария:", error);
-          setComments(prevComments => prevComments.map(c => {
-            if (c.id === commentId) {
-                const newLikeCount = !c.userHasLiked ? (c.likeCount || 1) - 1 : (c.likeCount || 0) + 1;
-                return { ...c, userHasLiked: !c.userHasLiked, likeCount: newLikeCount };
-            }
-            return c;
-          }));
-      }
-    }, [userId, novel.id, chapter.id]);
-
+        if (isLiked) {
+            // Убираем лайк
+            transaction.update(commentRef, { likeCount: Math.max(0, currentLikes - 1) });
+            transaction.update(userLikesRef, { [userLikesUpdatePath]: arrayRemove(commentId) });
+        } else {
+            // Добавляем лайк
+            transaction.update(commentRef, { likeCount: currentLikes + 1 });
+            // При первом лайке в главе может понадобиться создать документ
+            // set с mergeFields гарантирует, что мы не перезапишем другие главы
+             transaction.set(userLikesRef, {
+                chapters: {
+                    [chapterKey]: {
+                        likedCommentIds: arrayUnion(commentId)
+                    }
+                }
+            }, { merge: true });
+        }
+    });
+} catch (error) {
+            console.error("Ошибка при обновлении лайка комментария:", error);
+            setLikedCommentIds(prevSet => {
+                const newSet = new Set(prevSet);
+                if (isLiked) { newSet.add(commentId); } else { newSet.delete(commentId); }
+                return newSet;
+            });
+            setComments(prevComments => prevComments.map(c =>
+                c.id === commentId
+                    ? { ...c, userHasLiked: isLiked, likeCount: isLiked ? (c.likeCount || 0) + 1 : (c.likeCount || 1) - 1 }
+                    : c
+            ));
+        }
+    }, [userId, novel.id, chapter.id, likedCommentIds]);
+    
       const handleEdit = useCallback((comment) => {
-          if (comment) {
-              setEditingCommentId(comment.id);
-              setEditingText(comment.text);
-          } else {
-              setEditingCommentId(null);
-              setEditingText("");
-          }
+          setEditingCommentId(comment ? comment.id : null);
+          setEditingText(comment ? comment.text : "");
       }, []);
 
       const handleUpdateComment = useCallback(async (commentId) => {
           if (!editingText.trim()) return;
           const commentRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`, commentId);
           await updateDoc(commentRef, { text: editingText });
-          
           setComments(prev => prev.map(c => c.id === commentId ? { ...c, text: editingText } : c));
-          
           setEditingCommentId(null);
           setEditingText("");
       }, [editingText, novel.id, chapter.id]);
@@ -292,18 +287,15 @@ export const ChapterReader = ({
 
     const handleLike = async () => {
       if (!userId) return;
-      
       const hasLiked = userHasLiked;
       setUserHasLiked(!hasLiked);
       setLikeCount(prev => hasLiked ? prev - 1 : prev + 1);
-
       const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
       try {
           await runTransaction(db, async (transaction) => {
-              const likeDoc = await transaction.get(likeRef);
               const metaDoc = await transaction.get(chapterMetaRef);
               const currentLikes = metaDoc.data()?.likeCount || 0;
-              if (likeDoc.exists()) {
+              if (hasLiked) {
                   transaction.delete(likeRef);
                   transaction.set(chapterMetaRef, { likeCount: Math.max(0, currentLikes - 1) }, { merge: true });
               } else {
@@ -369,7 +361,8 @@ export const ChapterReader = ({
         return [...comments].sort((a, b) => {
             const dateA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
             const dateB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
-            return dateA - dateB;
+            // Сортируем от новых к старым для отображения
+            return dateB - dateA;
         });
     }, [comments]);
     
@@ -380,7 +373,6 @@ export const ChapterReader = ({
         textAlign: textAlign,
     };
 
-    // Весь JSX остается без изменений, кроме ОДНОГО места
     return (
       <div className="min-h-screen transition-colors duration-300 bg-background text-text-main">
         <style>
@@ -409,8 +401,9 @@ export const ChapterReader = ({
             </div>
             <h3 className="text-xl font-bold mb-4">Комментарии</h3>
             <div className="space-y-4 mb-6">
+              {/* ✅ ИЗМЕНЕНИЕ: Убрал groupComments, так как sortedComments уже отсортирован как надо */}
               {comments.length > 0
-                  ? groupComments(sortedComments).map(comment =>
+                  ? sortedComments.map(comment =>
                       <Comment
                           key={comment.id}
                           comment={comment}
@@ -434,7 +427,6 @@ export const ChapterReader = ({
               {isLoadingComments && comments.length === 0 && <p className="text-center opacity-70">Загрузка комментариев...</p>}
               {hasMoreComments && !isLoadingComments && comments.length > 0 && (
                 <div className="text-center pt-4">
-                    {/* ✅ ИЗМЕНЕНИЕ №3: Кнопка теперь вызывает новую функцию */}
                     <button 
                         onClick={loadMoreComments}
                         disabled={isLoadingComments}
@@ -460,7 +452,8 @@ export const ChapterReader = ({
           </div>
         </div>
         
-        {/* Нижняя панель и модальные окна без изменений */}
+        {/* ... остальной JSX без изменений ... */}
+
         <div className="fixed bottom-0 left-0 right-0 p-2 border-t border-border-color bg-component-bg flex justify-between items-center z-10 text-text-main">
           <button onClick={() => handleChapterClick(prevChapter)} disabled={!prevChapter} className="p-2 disabled:opacity-50"><BackIcon/></button>
           <div className="flex gap-2">

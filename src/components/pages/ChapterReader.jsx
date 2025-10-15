@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, orderBy, addDoc, serverTimestamp, runTransaction, getDocs, limit, startAfter } from "firebase/firestore";
+import {
+    doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query,
+    orderBy, addDoc, serverTimestamp, runTransaction, getDocs, limit,
+    startAfter
+} from "firebase/firestore";
 import { db } from "../../firebase-config.js";
 import { HeartIcon, BackIcon, ArrowRightIcon, SettingsIcon, SendIcon } from '../icons.jsx';
 import { SubscriptionModal } from '../SubscriptionModal.jsx';
@@ -51,18 +55,13 @@ export const ChapterReader = ({
     const chapterMetaRef = useMemo(() => doc(db, "chapters_metadata", `${novel.id}_${chapter.id}`), [novel.id, chapter.id]);
     const commentsColRef = useMemo(() => collection(db, `chapters_metadata/${novel.id}_${chapter.id}/comments`), [novel.id, chapter.id]);
 
-    // Функция для загрузки порции комментариев
-    const fetchComments = useCallback(async () => {
+    const loadMoreComments = useCallback(async () => {
         if (isLoadingComments || !hasMoreComments) return;
         setIsLoadingComments(true);
 
         try {
-            let q;
-            if (lastCommentDoc) {
-                q = query(commentsColRef, orderBy("timestamp", "desc"), startAfter(lastCommentDoc), limit(20));
-            } else {
-                q = query(commentsColRef, orderBy("timestamp", "desc"), limit(20));
-            }
+            // Запрос всегда начинается после последнего известного документа
+            const q = query(commentsColRef, orderBy("timestamp", "desc"), startAfter(lastCommentDoc), limit(20));
 
             const documentSnapshots = await getDocs(q);
             const newCommentsData = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -78,6 +77,7 @@ export const ChapterReader = ({
                 );
             }
 
+            // Важно: мы ДОБАВЛЯЕМ комментарии к существующему списку
             setComments(prevComments => [...prevComments, ...commentsWithLikes]);
 
             const lastVisible = documentSnapshots.docs[documentSnapshots.docs.length - 1];
@@ -87,25 +87,20 @@ export const ChapterReader = ({
                 setHasMoreComments(false);
             }
         } catch (error) {
-            console.error("Ошибка загрузки комментариев: ", error);
+            console.error("Ошибка подгрузки комментариев: ", error);
         } finally {
             setIsLoadingComments(false);
         }
     }, [isLoadingComments, hasMoreComments, lastCommentDoc, commentsColRef, userId, novel.id, chapter.id]);
 
-    // Загрузка основной информации о главе и первой порции комментариев
-    useEffect(() => {
-        // Сброс состояния при смене главы
-        setComments([]);
-        setLastCommentDoc(null);
-        setHasMoreComments(true);
-        setIsLoadingComments(false); // Убедимся, что сбрасываем состояние загрузки
 
+     useEffect(() => {
         const fetchInitialData = async () => {
+            setIsLoadingComments(true);
             try {
+                // Загрузка лайков главы (без изменений)
                 const metaSnap = await getDoc(chapterMetaRef);
                 setLikeCount(metaSnap.exists() ? metaSnap.data().likeCount || 0 : 0);
-
                 if (userId) {
                     const likeRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/likes`, userId);
                     const likeSnap = await getDoc(likeRef);
@@ -114,17 +109,45 @@ export const ChapterReader = ({
                     setUserHasLiked(false);
                 }
                 
-                // Запускаем загрузку первой порции комментариев
-                await fetchComments();
+                // Загружаем самую первую страницу комментариев
+                const q = query(commentsColRef, orderBy("timestamp", "desc"), limit(20));
+                const documentSnapshots = await getDocs(q);
+                const newCommentsData = documentSnapshots.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                // ... (логика проверки лайков такая же)
+                 let commentsWithLikes = newCommentsData;
+                 if (userId && newCommentsData.length > 0) {
+                      commentsWithLikes = await Promise.all(
+                         newCommentsData.map(async (comment) => {
+                             const likeDocRef = doc(db, `chapters_metadata/${novel.id}_${chapter.id}/comments/${comment.id}/likes`, userId);
+                             const likeDocSnap = await getDoc(likeDocRef);
+                             return { ...comment, userHasLiked: likeDocSnap.exists() };
+                         })
+                     );
+                 }
+                
+                // Важно: мы ПОЛНОСТЬЮ ЗАМЕНЯЕМ старый список комментариев
+                setComments(commentsWithLikes);
+
+                // Обновляем состояния для пагинации
+                setLastCommentDoc(documentSnapshots.docs[documentSnapshots.docs.length - 1]);
+                setHasMoreComments(documentSnapshots.docs.length >= 20);
 
             } catch (error) {
                 console.error("Ошибка загрузки данных главы:", error);
+                setComments([]); // В случае ошибки очищаем список
+            } finally {
+                setIsLoadingComments(false);
             }
         };
 
         fetchInitialData();
-    }, [chapterMetaRef, userId, novel.id, chapter.id]); // Добавлен fetchComments в зависимости, но useCallback его защищает
+    // Этот хук зависит только от ID главы/новеллы, а не от функций.
+    // Это разрывает бесконечный цикл обновлений.
+    }, [chapterMetaRef, userId, novel.id, chapter.id, commentsColRef]);
 
+
+    // Загрузка текста главы (без изменений)
     useEffect(() => {
       const fetchContent = async () => {
           setIsLoadingContent(true);
@@ -154,16 +177,14 @@ export const ChapterReader = ({
 
     }, [novel.id, chapter.id, chapter.isPaid, hasActiveSubscription]);
 
+    // Все остальные функции-обработчики остаются БЕЗ ИЗМЕНЕНИЙ
     const handleCommentSubmit = useCallback(async (e, parentId = null) => {
     e.preventDefault();
     const text = parentId ? replyText : newComment;
     if (!text.trim() || !userId) return;
 
     try {
-        // Убедимся, что документ-контейнер для комментариев существует
         await setDoc(chapterMetaRef, {}, { merge: true });
-
-        // 1. Добавляем поле isNotified: false
         const newCommentData = {
             userId,
             userName: userName || "Аноним",
@@ -172,38 +193,29 @@ export const ChapterReader = ({
             likeCount: 0,
             novelTitle: novel.title,
             chapterTitle: chapter.title,
-            isNotified: false // <--- РЕШЕНИЕ ПРОБЛЕМЫ С УВЕДОМЛЕНИЯМИ
+            isNotified: false
         };
 
-        // Если это ответ, добавляем ID родительского комментария
         if (parentId) {
             newCommentData.replyTo = parentId;
             const parentCommentDoc = await getDoc(doc(commentsColRef, parentId));
             if (parentCommentDoc.exists()) {
-                // Добавляем ID автора родительского комментария для уведомлений об ответе
                 newCommentData.parentUserId = parentCommentDoc.data().userId;
             }
         }
         
         const addedDocRef = await addDoc(commentsColRef, newCommentData);
-        
-        // Оптимистичное обновление интерфейса
         setComments(prev => [{ ...newCommentData, id: addedDocRef.id, userHasLiked: false, timestamp: new Date() }, ...prev]);
         
-        // 2. УДАЛИЛИ лишнюю запись в коллекцию "notifications"
-
-        // 3. Теперь этот код будет выполняться без ошибок
         if (parentId) {
             setReplyingTo(null);
             setReplyText("");
         } else {
-            setNewComment(""); // <--- РЕШЕНИЕ ПРОБЛЕМЫ С ОЧИСТКОЙ ПОЛЯ
+            setNewComment("");
         }
 
     } catch (error) {
         console.error("Ошибка добавления комментария:", error);
-        // Можно добавить уведомление для пользователя об ошибке
-        // alert("Не удалось отправить комментарий. Попробуйте снова.");
     }
 }, [userId, userName, newComment, replyText, chapterMetaRef, novel.id, chapter.id, novel.title, chapter.title, commentsColRef]);
 
@@ -347,7 +359,6 @@ export const ChapterReader = ({
 
     const renderMarkdown = (markdownText) => {
       if (window.marked) {
-        // Убираем лишние стили отсюда
         const rawHtml = window.marked.parse(markdownText);
         return `<div class="prose max-w-none">${rawHtml}</div>`;
       }
@@ -362,7 +373,6 @@ export const ChapterReader = ({
         });
     }, [comments]);
     
-    // ОБНОВЛЕНИЕ: Стили для контейнера текста
     const contentStyle = {
         fontSize: `${fontSize}px`,
         fontFamily: fontFamily,
@@ -370,9 +380,9 @@ export const ChapterReader = ({
         textAlign: textAlign,
     };
 
+    // Весь JSX остается без изменений, кроме ОДНОГО места
     return (
       <div className="min-h-screen transition-colors duration-300 bg-background text-text-main">
-        {/* --- ИСПРАВЛЕНИЕ: Добавляем динамический тег <style> для управления отступами --- */}
         <style>
           {`
             .chapter-content p {
@@ -385,13 +395,12 @@ export const ChapterReader = ({
         <div className="p-4 sm:p-6 md:p-8 max-w-3xl mx-auto pb-24">
           <h2 className="text-lg sm:text-xl mb-8 text-center opacity-80 font-sans">{chapter.title}</h2>
           <div
-            className="whitespace-normal chapter-content" // Добавляем класс для таргетинга стилей
+            className="whitespace-normal chapter-content"
             style={contentStyle}
             dangerouslySetInnerHTML={{ __html: isLoadingContent ? '<p class="text-center">Загрузка текста главы...</p>' : renderMarkdown(chapterContent) }}
           />
           <div className="text-center my-8 text-accent font-bold text-2xl tracking-widest">╚══ ≪ °❈° ≫ ══╝</div>
           <div className="border-t border-border-color pt-8">
-            {/* ... (остальной JSX без изменений до модального окна настроек) ... */}
             <div className="flex items-center gap-4 mb-8">
               <button onClick={handleLike} className="flex items-center gap-2 text-accent-hover transition-transform hover:scale-110">
                 <HeartIcon filled={userHasLiked} className={userHasLiked ? "text-accent" : ''} />
@@ -422,11 +431,12 @@ export const ChapterReader = ({
                       />)
                   : !isLoadingComments && <p className="opacity-70 text-sm">Комментариев пока нет. Будьте первым!</p>
               }
-              {isLoadingComments && <p className="text-center opacity-70">Загрузка комментариев...</p>}
+              {isLoadingComments && comments.length === 0 && <p className="text-center opacity-70">Загрузка комментариев...</p>}
               {hasMoreComments && !isLoadingComments && comments.length > 0 && (
                 <div className="text-center pt-4">
+                    {/* ✅ ИЗМЕНЕНИЕ №3: Кнопка теперь вызывает новую функцию */}
                     <button 
-                        onClick={fetchComments}
+                        onClick={loadMoreComments}
                         disabled={isLoadingComments}
                         className="text-accent hover:underline font-semibold px-4 py-2 rounded-lg disabled:opacity-50"
                     >
@@ -450,6 +460,7 @@ export const ChapterReader = ({
           </div>
         </div>
         
+        {/* Нижняя панель и модальные окна без изменений */}
         <div className="fixed bottom-0 left-0 right-0 p-2 border-t border-border-color bg-component-bg flex justify-between items-center z-10 text-text-main">
           <button onClick={() => handleChapterClick(prevChapter)} disabled={!prevChapter} className="p-2 disabled:opacity-50"><BackIcon/></button>
           <div className="flex gap-2">
@@ -480,13 +491,11 @@ export const ChapterReader = ({
           </div>
         )}
 
-        {/* --- ОБНОВЛЕНИЕ: Модальное окно настроек с новыми шрифтами --- */}
         {showSettings && (
            <div className="fixed inset-0 bg-black/50 z-20" onClick={() => setShowSettings(false)}>
                <div className="absolute bottom-0 left-0 right-0 p-4 rounded-t-2xl bg-component-bg text-text-main" onClick={e => e.stopPropagation()}>
                   <h3 className="font-bold text-lg mb-4">Настройки чтения</h3>
                   <div className="space-y-4">
-                      {/* --- Размер текста --- */}
                       <div className="flex items-center justify-between">
                           <span>Размер текста</span>
                           <div className="flex items-center gap-2">
@@ -495,7 +504,6 @@ export const ChapterReader = ({
                               <button onClick={() => onFontSizeChange(1)} className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-xl font-bold">+</button>
                           </div>
                       </div>
-                      {/* --- Выбор шрифта --- */}
                       <div className="flex items-center justify-between">
                           <span>Шрифт</span>
                           <div className="flex gap-2 flex-wrap">
@@ -504,7 +512,6 @@ export const ChapterReader = ({
                               <button onClick={() => onFontFamilyChange("'Lora', serif")} className={`px-3 py-1 rounded-md text-sm ${fontFamily && fontFamily.includes('Lora') ? 'bg-accent text-white' : 'bg-background'}`}>Lora</button>
                           </div>
                       </div>
-                      {/* --- Междустрочный интервал --- */}
                        <div className="flex items-center justify-between">
                           <span>Интервал</span>
                           <div className="flex items-center gap-2">
@@ -513,7 +520,6 @@ export const ChapterReader = ({
                               <button onClick={() => onLineHeightChange(0.1)} className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-xl font-bold">+</button>
                           </div>
                       </div>
-                       {/* --- Выравнивание --- */}
                       <div className="flex items-center justify-between">
                           <span>Выравнивание</span>
                           <div className="flex gap-2">
@@ -521,7 +527,6 @@ export const ChapterReader = ({
                               <button onClick={() => onTextAlignChange('justify')} className={`px-3 py-1 rounded-md ${textAlign === 'justify' ? 'bg-accent text-white' : 'bg-background'}`}>По ширине</button>
                           </div>
                       </div>
-                      {/* --- Красная строка --- */}
                       <div className="flex items-center justify-between">
                           <span>Красная строка</span>
                            <div className="flex gap-2">
@@ -530,7 +535,6 @@ export const ChapterReader = ({
                               <button onClick={() => onTextIndentChange(3)} className={`px-3 py-1 rounded-md ${textIndent === 3 ? 'bg-accent text-white' : 'bg-background'}`}>Большая</button>
                           </div>
                       </div>
-                       {/* --- Отступ между абзацами --- */}
                       <div className="flex items-center justify-between">
                           <span>Отступ абзаца</span>
                           <div className="flex items-center gap-2">

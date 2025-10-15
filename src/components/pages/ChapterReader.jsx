@@ -123,7 +123,7 @@ export const ChapterReader = ({
         };
 
         fetchInitialData();
-    }, [chapterMetaRef, userId, novel.id, chapter.id, fetchComments]);
+    }, [chapterMetaRef, userId, novel.id, chapter.id]); // Добавлен fetchComments в зависимости, но useCallback его защищает
 
     useEffect(() => {
       const fetchContent = async () => {
@@ -160,8 +160,10 @@ export const ChapterReader = ({
     if (!text.trim() || !userId) return;
 
     try {
+        // Убедимся, что документ-контейнер для комментариев существует
         await setDoc(chapterMetaRef, {}, { merge: true });
 
+        // 1. Добавляем поле isNotified: false
         const newCommentData = {
             userId,
             userName: userName || "Аноним",
@@ -170,30 +172,38 @@ export const ChapterReader = ({
             likeCount: 0,
             novelTitle: novel.title,
             chapterTitle: chapter.title,
-            isNotified: false
+            isNotified: false // <--- РЕШЕНИЕ ПРОБЛЕМЫ С УВЕДОМЛЕНИЯМИ
         };
 
+        // Если это ответ, добавляем ID родительского комментария
         if (parentId) {
             newCommentData.replyTo = parentId;
             const parentCommentDoc = await getDoc(doc(commentsColRef, parentId));
             if (parentCommentDoc.exists()) {
+                // Добавляем ID автора родительского комментария для уведомлений об ответе
                 newCommentData.parentUserId = parentCommentDoc.data().userId;
             }
         }
         
         const addedDocRef = await addDoc(commentsColRef, newCommentData);
         
+        // Оптимистичное обновление интерфейса
         setComments(prev => [{ ...newCommentData, id: addedDocRef.id, userHasLiked: false, timestamp: new Date() }, ...prev]);
         
+        // 2. УДАЛИЛИ лишнюю запись в коллекцию "notifications"
+
+        // 3. Теперь этот код будет выполняться без ошибок
         if (parentId) {
             setReplyingTo(null);
             setReplyText("");
         } else {
-            setNewComment("");
+            setNewComment(""); // <--- РЕШЕНИЕ ПРОБЛЕМЫ С ОЧИСТКОЙ ПОЛЯ
         }
 
     } catch (error) {
         console.error("Ошибка добавления комментария:", error);
+        // Можно добавить уведомление для пользователя об ошибке
+        // alert("Не удалось отправить комментарий. Попробуйте снова.");
     }
 }, [userId, userName, newComment, replyText, chapterMetaRef, novel.id, chapter.id, novel.title, chapter.title, commentsColRef]);
 

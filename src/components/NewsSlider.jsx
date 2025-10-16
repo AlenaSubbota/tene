@@ -5,17 +5,40 @@ export const NewsSlider = ({ onReadMore }) => {
     const [news, setNews] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(0);
 
+    // ✅ Возвращаем логику загрузки из локального файла news.json
     useEffect(() => {
-    fetch(`/data/news.json`)
-        .then(res => res.json())
-            .then(setNews)
-            .catch(err => console.error("Failed to fetch news", err));
-    }, []);
+        // Указываем полный путь от корня папки public
+        fetch('/data/news.json')
+            .then(res => {
+                if (!res.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return res.json();
+            })
+            .then(data => {
+                // Сортируем новости, чтобы новые были первыми (если в файле есть поле date)
+                const sortedNews = data.sort((a, b) => new Date(b.date) - new Date(a.date));
+                setNews(sortedNews);
+            })
+            .catch(err => console.error("Не удалось загрузить news.json:", err));
+    }, []); // Пустой массив зависимостей, чтобы загрузка произошла один раз
 
-    const nextNews = () => setCurrentIndex((prev) => (prev + 1) % news.length);
-    const prevNews = () => setCurrentIndex((prev) => (prev - 1 + news.length) % news.length);
+    const nextNews = () => {
+        if (news.length > 0) {
+            setCurrentIndex((prev) => (prev + 1) % news.length);
+        }
+    };
+    
+    const prevNews = () => {
+        if (news.length > 0) {
+            setCurrentIndex((prev) => (prev - 1 + news.length) % news.length);
+        }
+    };
 
-    if (news.length === 0) return null;
+    // Если новостей нет, компонент ничего не будет отображать
+    if (news.length === 0) {
+        return null; 
+    }
 
     const currentNewsItem = news[currentIndex];
 
@@ -36,3 +59,4 @@ export const NewsSlider = ({ onReadMore }) => {
         </div>
     );
 };
+

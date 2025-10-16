@@ -1,7 +1,7 @@
 // src/App.jsx
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, collection, setDoc, onSnapshot, getDocs } from "firebase/firestore";
+import { doc, getDoc, collection, setDoc, onSnapshot } from "firebase/firestore";
 import { db, auth } from './firebase-config.js';
 import { useAuth } from './Auth';
 
@@ -31,7 +31,6 @@ export default function App() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [page, setPage] = useState('list');
   const [activeTab, setActiveTab] = useState('library');
-  const [novels, setNovels] = useState([]);
   const [selectedNovel, setSelectedNovel] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
@@ -41,7 +40,6 @@ export default function App() {
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [lastReadData, setLastReadData] = useState({});
   const [bookmarks, setBookmarks] = useState([]);
-  const [isLoadingContent, setIsLoadingContent] = useState(true);
   
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -49,16 +47,15 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [needsPolicyAcceptance, setNeedsPolicyAcceptance] = useState(false);
 
-  // --- НОВОЕ: ЦЕНТРАЛИЗОВАННОЕ СОСТОЯНИЕ ДЛЯ НАСТРОЕК ЧТЕНИЯ ---
   const [readingSettings, setReadingSettings] = useState(() => {
     const savedSettings = localStorage.getItem('readingSettings');
     const defaultSettings = {
         fontSize: 16,
-        fontFamily: "'JetBrains Mono', monospace", // <-- Шрифт по умолчанию
+        fontFamily: "'JetBrains Mono', monospace",
         lineHeight: 1.6,
         textAlign: 'left',
         textIndent: 1.5,
-        paragraphSpacing: 1, // <-- Увеличил значение по умолчанию для наглядности
+        paragraphSpacing: 1,
     };
     return savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
   });
@@ -66,16 +63,20 @@ export default function App() {
   const BOT_USERNAME = "tenebrisverbot";
   const userId = user?.uid;
 
-  // --- useEffect'ы ---
+  // --- ✅ ПЕРЕНОСИМ ОБРАБОТЧИКИ НАВЕРХ ---
+  const handleBack = useCallback(() => {
+      if (page === 'reader') { setSelectedChapter(null); setPage('details'); }
+      else if (page === 'details') { setSelectedNovel(null); setGenreFilter(null); setPage('list'); }
+  }, [page]);
 
-  // Применение темы
+
+  // --- useEffect'ы ---
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('theme', theme);
   }, [theme]);
   
-  // НОВОЕ: Сохранение настроек чтения в localStorage при их изменении
   useEffect(() => {
     localStorage.setItem('readingSettings', JSON.stringify(readingSettings));
   }, [readingSettings]);
@@ -84,31 +85,12 @@ export default function App() {
   useEffect(() => {
     if (authLoading) return; 
     if (!user) { 
-      setIsLoadingContent(false);
-      setNovels([]);
       setSubscription(null);
       setBookmarks([]);
       setLastReadData({});
       setNeedsPolicyAcceptance(false); 
       return;
     }
-    
-    setIsLoadingContent(true);
-
-    const fetchNovelsAndStats = async () => {
-        try {
-            const novelsSnapshot = await getDocs(collection(db, "novels"));
-            const novelsData = novelsSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-            const statsSnapshot = await getDocs(collection(db, "novel_stats"));
-            const statsMap = new Map();
-            statsSnapshot.forEach(doc => statsMap.set(doc.id, doc.data().views));
-            const mergedNovels = novelsData.map(novel => ({ ...novel, views: statsMap.get(novel.id) || 0 }));
-            setNovels(mergedNovels);
-        } catch (err) {
-            console.error("Ошибка загрузки новелл или статистики:", err);
-            setNovels([]);
-        }
-    };
     
     const checkAdminStatus = async () => {
         try {
@@ -119,12 +101,8 @@ export default function App() {
             setIsUserAdmin(false);
         }
     };
+    checkAdminStatus();
 
-    Promise.all([fetchNovelsAndStats(), checkAdminStatus()]).finally(() => {
-        setIsLoadingContent(false);
-    });
-
-    // Подписка на изменения данных пользователя
     const userDocRef = doc(db, "users", user.uid);
     const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
@@ -132,7 +110,6 @@ export default function App() {
             setSubscription(data.subscription || null);
             setLastReadData(data.lastRead || {});
             setBookmarks(data.bookmarks || []);
-            // --- ИЗМЕНЕНИЕ: Загружаем все настройки из Firebase ---
             if (data.settings) {
               setReadingSettings(prev => ({ ...prev, ...data.settings }));
             }
@@ -151,7 +128,6 @@ export default function App() {
     return () => unsubscribeUser();
   }, [user, authLoading]);
 
-  // Загрузка глав для выбранной новеллы
   useEffect(() => {
     if (!selectedNovel) { setChapters([]); return; }
     setIsLoadingChapters(true);
@@ -178,11 +154,8 @@ export default function App() {
     fetchChapters();
   }, [selectedNovel]);
 
-  const handleBack = useCallback(() => {
-      if (page === 'reader') { setSelectedChapter(null); setPage('details'); }
-      else if (page === 'details') { setSelectedNovel(null); setGenreFilter(null); setPage('list'); }
-  }, [page]);
 
+  // ✅ ТЕПЕРЬ ЭТОТ useEffect НАХОДИТСЯ ПОСЛЕ handleBack И ОШИБКИ НЕ БУДЕТ
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg) return;
@@ -197,6 +170,7 @@ export default function App() {
     return () => tg.offEvent('backButtonClicked', handleBack);
   }, [page, handleBack, needsPolicyAcceptance]);
 
+
   // --- Функции-обработчики ---
   const updateUserDoc = useCallback(async (dataToUpdate) => {
     if (userId) {
@@ -206,20 +180,13 @@ export default function App() {
 
   const handleThemeToggle = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
-  // --- НОВОЕ: ЕДИНАЯ ФУНКЦИЯ ДЛЯ ОБНОВЛЕНИЯ НАСТРОЕК ---
   const handleSettingChange = useCallback((key, value) => {
     setReadingSettings(prev => {
         const newValue = typeof value === 'function' ? value(prev[key]) : value;
-
-        // Ограничения
         if (key === 'fontSize' && (newValue < 12 || newValue > 28)) return prev;
         if ((key === 'lineHeight' || key === 'paragraphSpacing') && (newValue < 1.0 || newValue > 2.5)) return prev;
-
         const newSettings = { ...prev, [key]: newValue };
-
-        // Сохраняем в Firestore асинхронно
         updateUserDoc({ settings: newSettings });
-
         return newSettings;
     });
   }, [updateUserDoc]);
@@ -276,7 +243,7 @@ export default function App() {
   };
 
   // --- ЛОГИКА РЕНДЕРИНГА ---
-  if (authLoading || (isLoadingContent && !needsPolicyAcceptance)) {
+  if (authLoading) {
     return <LoadingSpinner />;
   }
   
@@ -297,7 +264,6 @@ export default function App() {
       return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chapters={chapters} isLoadingChapters={isLoadingChapters} lastReadData={lastReadData} onBack={handleBack} />;
     }
     if (page === 'reader') {
-      // --- ИЗМЕНЕНИЕ: Передаем все новые props в ChapterReader ---
       return (
         <ChapterReader 
           chapter={selectedChapter} 
@@ -310,23 +276,16 @@ export default function App() {
           onBack={handleBack} 
           isUserAdmin={isUserAdmin} 
           onSelectChapter={handleSelectChapter}
-          
-          // --- Новые props для настроек ---
           fontSize={readingSettings.fontSize}
           onFontSizeChange={(increment) => handleSettingChange('fontSize', val => val + increment)}
-          
           fontFamily={readingSettings.fontFamily}
           onFontFamilyChange={(family) => handleSettingChange('fontFamily', family)}
-
           lineHeight={readingSettings.lineHeight}
           onLineHeightChange={(increment) => handleSettingChange('lineHeight', val => val + increment)}
-          
           textAlign={readingSettings.textAlign}
           onTextAlignChange={(align) => handleSettingChange('textAlign', align)}
-
           textIndent={readingSettings.textIndent}
           onTextIndentChange={(indent) => handleSettingChange('textIndent', indent)}
-
           paragraphSpacing={readingSettings.paragraphSpacing}
           onParagraphSpacingChange={(increment) => handleSettingChange('paragraphSpacing', val => val + increment)}
         />
@@ -338,16 +297,27 @@ export default function App() {
         return (<>
             <Header title="Библиотека" />
             <NewsSlider onReadMore={setSelectedNews} />
-            {genreFilter && (<div className="flex items-center justify-between p-3 mx-4 mb-0 rounded-lg border border-border-color bg-component-bg text-text-main">
-                <p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p>
-                <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
-            </div>)}
-            <NovelList novels={novels.filter(n => !genreFilter || (n.genres && n.genres.includes(genreFilter)))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+            {genreFilter && (
+                <div className="flex items-center justify-between p-3 mx-4 mb-0 rounded-lg border border-border-color bg-component-bg text-text-main">
+                    <p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p>
+                    <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
+                </div>
+            )}
+            <NovelList 
+                onSelectNovel={handleSelectNovel} 
+                bookmarks={bookmarks} 
+                onToggleBookmark={handleToggleBookmark} 
+                genreFilter={genreFilter} 
+            />
         </>);
-      case 'search': return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
-      case 'bookmarks': return <BookmarksPage novels={novels.filter(n => bookmarks.includes(n.id))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
-      case 'profile': return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={() => setIsSubModalOpen(true)} userId={userId} auth={auth} onThemeToggle={handleThemeToggle} currentTheme={theme} onShowHelp={() => setShowHelp(true)} />;
-      default: return <Header title="Библиотека" />;
+      case 'search': 
+        return <SearchPage onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
+      case 'bookmarks': 
+        return <BookmarksPage onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
+      case 'profile': 
+        return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={() => setIsSubModalOpen(true)} userId={userId} auth={auth} onThemeToggle={handleThemeToggle} currentTheme={theme} onShowHelp={() => setShowHelp(true)} />;
+      default: 
+        return <Header title="Библиотека" />;
     }
   };
 

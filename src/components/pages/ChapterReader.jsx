@@ -357,14 +357,14 @@ export const ChapterReader = ({
       return markdownText;
     };
     
-    const sortedComments = useMemo(() => {
-        return [...comments].sort((a, b) => {
-            const dateA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
-            const dateB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
-            // Сортируем от новых к старым для отображения
-            return dateB - dateA;
-        });
-    }, [comments]);
+    const groupedComments = useMemo(() => {
+    const sorted = [...comments].sort((a, b) => {
+        const dateA = a.timestamp?.toDate ? a.timestamp.toDate().getTime() : 0;
+        const dateB = b.timestamp?.toDate ? b.timestamp.toDate().getTime() : 0;
+        return dateA - dateB;
+    });
+    return groupComments(sorted);
+}, [comments]);
     
     const contentStyle = {
         fontSize: `${fontSize}px`,
@@ -400,30 +400,30 @@ export const ChapterReader = ({
               </button>
             </div>
             <h3 className="text-xl font-bold mb-4">Комментарии</h3>
-            <div className="space-y-4 mb-6">
-              {/* ✅ ИЗМЕНЕНИЕ: Убрал groupComments, так как sortedComments уже отсортирован как надо */}
-              {comments.length > 0
-                  ? sortedComments.map(comment =>
-                      <Comment
-                          key={comment.id}
-                          comment={comment}
-                          onReply={handleReply}
-                          onLike={handleCommentLike}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                          onUpdate={handleUpdateComment}
-                          isUserAdmin={isUserAdmin}
-                          currentUserId={userId}
-                          editingCommentId={editingCommentId}
-                          editingText={editingText}
-                          setEditingText={setEditingText}
-                          replyingTo={replyingTo}
-                          replyText={replyText}
-                          setReplyText={setReplyText}
-                          onCommentSubmit={handleCommentSubmit}
-                      />)
-                  : !isLoadingComments && <p className="opacity-70 text-sm">Комментариев пока нет. Будьте первым!</p>
-              }
+<div className="space-y-4 mb-6">
+  {/* ✅ ИСПРАВЛЕННЫЙ КОД */}
+  {comments.length > 0
+      ? groupedComments.reverse().map(comment => // Используем groupedComments и .reverse()
+          <Comment
+              key={comment.id}
+              comment={comment}
+              onReply={handleReply}
+              onLike={handleCommentLike}
+              onEdit={handleEdit}
+              onDelete={handleDelete}
+              onUpdate={handleUpdateComment}
+              isUserAdmin={isUserAdmin}
+              currentUserId={userId}
+              editingCommentId={editingCommentId}
+              editingText={editingText}
+              setEditingText={setEditingText}
+              replyingTo={replyingTo}
+              replyText={replyText}
+              setReplyText={setReplyText}
+              onCommentSubmit={handleCommentSubmit}
+          />)
+      : !isLoadingComments && <p className="opacity-70 text-sm">Комментариев пока нет. Будьте первым!</p>
+  }
               {isLoadingComments && comments.length === 0 && <p className="text-center opacity-70">Загрузка комментариев...</p>}
               {hasMoreComments && !isLoadingComments && comments.length > 0 && (
                 <div className="text-center pt-4">

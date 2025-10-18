@@ -1,10 +1,10 @@
-// src/App.jsx (ФИНАЛЬНАЯ ИСПРАВЛЕННАЯ ВЕРСИЯ)
+// src/App.jsx (ФИНАЛЬНАЯ ИСПРАВЛЕННАЯ ВЕРСИЯ V2)
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase-config.js';
 import { useAuth } from './Auth';
 
-// Импорты всех ваших компонентов и экранов (остаются без изменений)
+// Импорты всех ваших компонентов (остаются без изменений)
 import { AuthScreen } from './AuthScreen.jsx';
 import { HelpScreen } from './components/pages/HelpScreen.jsx';
 import LoadingSpinner from './components/LoadingSpinner.jsx';
@@ -21,12 +21,11 @@ import { BookmarksPage } from './components/pages/BookmarksPage.jsx';
 import { ProfilePage } from './components/pages/ProfilePage.jsx';
 import { SearchPage } from './components/pages/SearchPage.jsx';
 
-
 export default function App() {
   const { user, loading: authLoading } = useAuth();
 
   // Все состояния приложения
-  const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [fontSize, setFontSize] = useState(16);
   const [fontClass, setFontClass] = useState('font-sans');
   const [page, setPage] = useState('list');
@@ -51,19 +50,20 @@ export default function App() {
   const BOT_USERNAME = "tenebrisverbot";
   const userId = user?.id;
 
-  // Эффект для применения темы (без изменений)
+  // Эффект для применения темы
   useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.toggle('dark', theme === 'dark');
+    root.classList.remove('light', 'dark');
+    root.classList.add(theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  // --- ИСПРАВЛЕНИЕ №1: Этот useEffect отвечает ТОЛЬКО за профиль и политику ---
+  // Этот useEffect отвечает ТОЛЬКО за профиль и политику
   useEffect(() => {
-    if (authLoading) return; // Ждем окончания загрузки аутентификации
+    if (authLoading) return;
 
     if (!user) {
-      // Если пользователь вышел, сбрасываем все его данные
+      // Сброс состояний при выходе пользователя
       setIsLoadingContent(false);
       setNeedsPolicyAcceptance(false);
       setNovels([]);
@@ -80,23 +80,20 @@ export default function App() {
         .eq('id', user.id)
         .single();
 
-      if (error && error.code !== 'PGRST116') { // Игнорируем ошибку "профиль не найден"
+      if (error && error.code !== 'PGRST116') {
         console.error("Ошибка загрузки профиля:", error);
-      } else if (profileData && profileData.policy_accepted) {
-        // Профиль есть, и политика принята
+      } else if (profileData?.policy_accepted) {
         setSubscription(profileData.subscription || null);
         setLastReadData(profileData.last_read || {});
         setBookmarks(profileData.bookmarks || []);
         setNeedsPolicyAcceptance(false);
       } else {
-        // Профиля нет или политика не принята
         setNeedsPolicyAcceptance(true);
       }
     };
 
     checkProfileAndPolicy();
 
-    // Подписка на изменения в профиле (остается без изменений)
     const channel = supabase
       .channel(`profiles_user_${user.id}`)
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
@@ -113,13 +110,10 @@ export default function App() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user?.id, authLoading]);
+  }, [user?.id, authLoading]); // Зависимость от user.id решает проблему перезагрузки
 
-  // --- ИСПРАВЛЕНИЕ №2: Этот useEffect отвечает ТОЛЬКО за загрузку новелл ---
+  // Этот useEffect отвечает ТОЛЬКО за загрузку новелл
   useEffect(() => {
-    // Эта функция будет выполняться только при выполнении ДВУХ условий:
-    // 1. Пользователь авторизован (`user` существует)
-    // 2. Политика принята (`needsPolicyAcceptance` равно `false`)
     if (user && !needsPolicyAcceptance) {
       setIsLoadingContent(true);
       const fetchNovels = async () => {
@@ -141,13 +135,13 @@ export default function App() {
       };
       fetchNovels();
     } else {
-      // Если одно из условий не выполнено, контент не грузим
-       setNovels([]); // Очищаем список новелл на случай, если пользователь вышел
-       setIsLoadingContent(false);
+      setNovels([]);
+      setIsLoadingContent(false);
     }
-  }, [user, needsPolicyAcceptance]); // Зависимости: user и needsPolicyAcceptance
+    // 👇 --- КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ЗДЕСЬ --- 👇
+  }, [user?.id, needsPolicyAcceptance]); // Зависимость от user.id вместо user
 
-  // Загрузка глав для выбранной новеллы (без изменений)
+  // Загрузка глав для выбранной новеллы
   useEffect(() => {
     if (!selectedNovel) { setChapters([]); return; }
     setIsLoadingChapters(true);
@@ -180,7 +174,6 @@ export default function App() {
     else if (page === 'details') { setSelectedNovel(null); setGenreFilter(null); setPage('list'); }
   }, [page]);
 
-  // Хук для Telegram (без изменений)
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg) return;
@@ -195,16 +188,16 @@ export default function App() {
     return () => tg.offEvent('backButtonClicked', handleBack);
   }, [page, handleBack, needsPolicyAcceptance]);
 
-  // Функция обновления данных пользователя (без изменений)
   const updateUserData = useCallback(async (dataToUpdate) => {
     if (userId) {
+      // Для .upsert() важно, чтобы 'id' был частью самого объекта
+      const dataToUpsert = { ...dataToUpdate, id: userId };
+
       const { error } = await supabase
         .from('profiles')
-        .update(dataToUpdate)
-        .eq('id', userId);
-      if (error) {
-        console.error("Ошибка обновления профиля:", error);
-      }
+        .upsert(dataToUpsert); // <--- ИСПОЛЬЗУЕМ UPSERT
+        
+      if (error) console.error("Ошибка обновления профиля (upsert):", error);
     }
   }, [userId]);
 
@@ -246,63 +239,44 @@ export default function App() {
   const handlePaymentMethodSelect = async (method) => {
     const tg = window.Telegram?.WebApp;
     if (!tg || !userId || !selectedPlan) {
-      if (tg) tg.showAlert("Произошла ошибка.");
+      tg?.showAlert("Произошла ошибка.");
       return;
     }
     tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты...", async (confirmed) => {
       if (!confirmed) return;
-      try {
-        await updateUserData({ pending_subscription: { ...selectedPlan, method, date: new Date().toISOString() } });
-        tg.openTelegramLink(`https://t.me/${BOT_USERNAME}?start=${userId}`);
-        tg.close();
-      } catch (error) {
-        console.error("Ошибка записи в Supabase:", error);
-        tg.showAlert("Не удалось сохранить ваш выбор.");
-      }
+      await updateUserData({ pending_subscription: { ...selectedPlan, method, date: new Date().toISOString() } });
+      tg.openTelegramLink(`https://t.me/${BOT_USERNAME}?start=${userId}`);
+      tg.close();
     });
   };
 
-  // --- ИСПРАВЛЕНИЕ №3: Эта функция теперь просто меняет состояние, что запускает загрузку новелл ---
   const handleAcceptPolicy = async () => {
     if (userId) {
       await updateUserData({ policy_accepted: true });
-      // Теперь изменение этого состояния вызовет запуск второго useEffect для загрузки контента
       setNeedsPolicyAcceptance(false);
     }
   };
 
-  // --- ЛОГИКА РЕНДЕРИНГА ---
-  // Показываем главный спиннер, если:
-  // 1. Идет проверка аутентификации
-  // 2. Идет загрузка контента (и при этом мы не ждем принятия политики)
   if (authLoading || (isLoadingContent && !needsPolicyAcceptance && user)) {
     return <LoadingSpinner />;
   }
-
-  // Показываем экран политики, если пользователь авторизован, но политика не принята
   if (user && needsPolicyAcceptance) {
     return <HelpScreen onAccept={handleAcceptPolicy} />;
   }
-
-  // Показываем экран справки, если пользователь нажал на кнопку в профиле
   if (showHelp) {
     return <HelpScreen onBack={() => setShowHelp(false)} />;
   }
-
-  // Показываем экран авторизации, если пользователь не вошел
   if (!user) {
     return <AuthScreen />;
   }
 
-  // Функция для рендеринга основного контента (без изменений)
   const renderContent = () => {
     if (page === 'details') {
       return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chapters={chapters} isLoadingChapters={isLoadingChapters} lastReadData={lastReadData} onBack={handleBack} />;
     }
     if (page === 'reader') {
-      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} userId={userId} userName={user?.user_metadata?.display_name || 'Аноним'} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} />;
+      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} userId={userId} userName={user?.user_metadata?.display_name || 'Аноним'} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} />;
     }
-
     switch (activeTab) {
       case 'library':
         return (<>

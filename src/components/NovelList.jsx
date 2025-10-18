@@ -7,7 +7,7 @@ import { BookmarkIcon, EyeIcon } from './';
 // Компонент теперь просто принимает готовый массив новелл и отображает его.
 // Это делает его намного проще и быстрее.
 export const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => {
-    
+        
     // Если новеллы еще не загрузились, показываем заглушку
     if (!novels) {
         return <div className="text-center p-4"><p>Загрузка новелл...</p></div>;
@@ -18,6 +18,18 @@ export const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }
         return <p className="text-center opacity-70 p-4">Новеллы не найдены.</p>;
     }
 
+    const formatViews = (num) => {
+  if (num === null || num === undefined) return '0';
+  try {
+    // Используем Intl.NumberFormat для красивого сокращения
+    return new Intl.NumberFormat('en-US', {
+      notation: 'compact',
+      maximumFractionDigits: 1
+    }).format(num);
+  } catch (e) {
+    return num.toString();
+  }
+};
     return (
         <div>
             <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 p-4 text-text-main">
@@ -37,7 +49,8 @@ export const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }
                       {novel.views > 0 && (
                         <div className="flex items-center gap-1 text-xs opacity-60 flex-shrink-0">
                           <EyeIcon className="w-4 h-4" />
-                          <span>{novel.views}</span>
+                          {/* --- ИСПРАВЛЕНИЕ ЗДЕСЬ --- */}
+                          <span>{formatViews(novel.views)}</span>
                         </div>
                       )}
                     </div>

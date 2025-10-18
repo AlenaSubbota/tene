@@ -38,7 +38,7 @@ export const ChapterReader = ({
             setIsLoadingContent(true);
             
             if (chapter.isPaid && !hasActiveSubscription) {
-                setChapterContent('### 🔒 Для доступа к этой главе необходима подписка.');
+                setChapterContent('### 🔒 Для доступа к этой главе необходима премиум-подписка.');
                 setIsLoadingContent(false);
                 return;
             }

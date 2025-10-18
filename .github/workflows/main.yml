@@ -34,18 +34,19 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Build
+        # Передаем секреты как переменные окружения в команду сборки
+        # Vite автоматически их подхватит, т.к. они начинаются с VITE_
         run: npm run build:gh
-        env: # <-- ВОТ ВАЖНАЯ ЧАСТЬ ДЛЯ ВАШИХ КЛЮЧЕЙ
-          supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-          supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Загружаем из папки 'docs', как указано в вашем vite.config.js
+          # Загружаем из папки 'docs'
           path: './docs'
       
   # Задача публикации

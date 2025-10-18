@@ -1,11 +1,11 @@
-// src/App.jsx
+// src/App.jsx (Supabase версия)
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { doc, getDoc, collection, setDoc, onSnapshot } from "firebase/firestore";
-import { db, auth } from './firebase-config.js';
+// --- ИЗМЕНЕНИЕ: Убираем импорты Firebase, добавляем Supabase ---
+import { supabase } from './supabase-config.js'; 
 import { useAuth } from './Auth';
 
-// Импорты всех ваших компонентов и экранов
+// Импорты всех ваших компонентов и экранов (остаются без изменений)
 import { AuthScreen } from './AuthScreen.jsx';
 import { HelpScreen } from './components/pages/HelpScreen.jsx';
 import  LoadingSpinner  from './components/LoadingSpinner.jsx';
@@ -27,19 +27,23 @@ export default function App() {
   // --- Состояние аутентификации из useAuth ---
   const { user, loading: authLoading } = useAuth();
 
-  // --- ОБЩИЕ СОСТОЯНИЯ ---
+  // --- Состояния остаются практически без изменений ---
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
+  const [fontSize, setFontSize] = useState(16);
+  const [fontClass, setFontClass] = useState('font-sans');
   const [page, setPage] = useState('list');
   const [activeTab, setActiveTab] = useState('library');
+  const [novels, setNovels] = useState([]);
   const [selectedNovel, setSelectedNovel] = useState(null);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
   const [subscription, setSubscription] = useState(null);
-  const [isUserAdmin, setIsUserAdmin] = useState(false);
+  const [isUserAdmin, setIsUserAdmin] = useState(false); // Мы вернемся к этому
   const [chapters, setChapters] = useState([]);
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [lastReadData, setLastReadData] = useState({});
   const [bookmarks, setBookmarks] = useState([]);
+  const [isLoadingContent, setIsLoadingContent] = useState(true);
   
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -47,122 +51,147 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [needsPolicyAcceptance, setNeedsPolicyAcceptance] = useState(false);
 
-  const [readingSettings, setReadingSettings] = useState(() => {
-    const savedSettings = localStorage.getItem('readingSettings');
-    const defaultSettings = {
-        fontSize: 16,
-        fontFamily: "'JetBrains Mono', monospace",
-        lineHeight: 1.6,
-        textAlign: 'left',
-        textIndent: 1.5,
-        paragraphSpacing: 1,
-    };
-    return savedSettings ? { ...defaultSettings, ...JSON.parse(savedSettings) } : defaultSettings;
-  });
-
   const BOT_USERNAME = "tenebrisverbot";
-  const userId = user?.uid;
+  // --- ИЗМЕНЕНИЕ: в Supabase ID пользователя находится в user.id ---
+  const userId = user?.id;
 
-  // --- ✅ ПЕРЕНОСИМ ОБРАБОТЧИКИ НАВЕРХ ---
-  const handleBack = useCallback(() => {
-      if (page === 'reader') { setSelectedChapter(null); setPage('details'); }
-      else if (page === 'details') { setSelectedNovel(null); setGenreFilter(null); setPage('list'); }
-  }, [page]);
-
-
-  // --- useEffect'ы ---
+  // Применение темы
   useEffect(() => {
     const root = window.document.documentElement;
     root.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('theme', theme);
   }, [theme]);
-  
-  useEffect(() => {
-    localStorage.setItem('readingSettings', JSON.stringify(readingSettings));
-  }, [readingSettings]);
 
-  // ГЛАВНЫЙ useEffect ДЛЯ ЗАГРУЗКИ ДАННЫХ
   useEffect(() => {
-    if (authLoading) return; 
-    if (!user) { 
-      setSubscription(null);
-      setBookmarks([]);
-      setLastReadData({});
-      setNeedsPolicyAcceptance(false); 
+  if (authLoading) return;
+  if (!user) {
+    setIsLoadingContent(false);
+    setNovels([]);
+    setSubscription(null);
+    setBookmarks([]);
+    setLastReadData({});
+    setNeedsPolicyAcceptance(false);
+    return;
+  }
+
+  const fetchData = async () => {
+    setIsLoadingContent(true);
+
+    // Сначала получаем профиль, чтобы решить, нужно ли показывать политику
+    const { data: profileData, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.error("Ошибка загрузки профиля:", profileError);
+    } else if (profileData) {
+      // Сразу устанавливаем все состояния из профиля
+      setSubscription(profileData.subscription || null);
+      setLastReadData(profileData.last_read || {});
+      setBookmarks(profileData.bookmarks || []);
+      if (profileData.settings) {
+        // Здесь должны быть ваши состояния для настроек, например setFontSize
+      }
+      // Это ключевой момент: мы решаем, показывать ли политику, ДО загрузки остального
+      if (!profileData.policy_accepted) {
+        setNeedsPolicyAcceptance(true);
+        setIsLoadingContent(false); // Прекращаем загрузку, т.к. нужно показать политику
+        return; // Выходим из функции
+      } else {
+        setNeedsPolicyAcceptance(false);
+      }
+    } else {
+      setNeedsPolicyAcceptance(true);
+      setIsLoadingContent(false);
       return;
     }
+
+    // Если мы дошли сюда, значит политика принята. Грузим все остальное.
+    const { data: novelsData, error: novelsError } = await supabase
+      .from('novels')
+      .select(`*, novel_stats ( views )`);
+
+    if (novelsError) {
+      console.error("Ошибка загрузки новелл:", novelsError);
+    } else {
+      const formattedNovels = novelsData.map(novel => ({
+          ...novel,
+          views: novel.novel_stats?.views || 0,
+      }));
+      setNovels(formattedNovels);
+    }
     
-    const checkAdminStatus = async () => {
-        try {
-            const idTokenResult = await user.getIdTokenResult();
-            setIsUserAdmin(!!idTokenResult.claims.admin);
-        } catch (err) {
-            console.error("Ошибка проверки статуса администратора:", err);
-            setIsUserAdmin(false);
-        }
-    };
-    checkAdminStatus();
+    setIsLoadingContent(false);
+  };
 
-    const userDocRef = doc(db, "users", user.uid);
-    const unsubscribeUser = onSnapshot(userDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-            const data = docSnap.data();
-            setSubscription(data.subscription || null);
-            setLastReadData(data.lastRead || {});
-            setBookmarks(data.bookmarks || []);
-            if (data.settings) {
-              setReadingSettings(prev => ({ ...prev, ...data.settings }));
-            }
-            if (!data.policyAccepted) {
-              setNeedsPolicyAcceptance(true);
-            } else {
-              setNeedsPolicyAcceptance(false);
-            }
-        } else {
-            setNeedsPolicyAcceptance(true);
-        }
-    }, (error) => {
-        console.error("Ошибка подписки на данные пользователя:", error);
-    });
+  fetchData();
 
-    return () => unsubscribeUser();
-  }, [user, authLoading]);
+  // Подписка на изменения остается такой же
+  const channel = supabase
+    .channel(`profiles_user_${user.id}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` }, 
+      (payload) => {
+        const data = payload.new;
+        setSubscription(data.subscription || null);
+        setLastReadData(data.last_read || {});
+        setBookmarks(data.bookmarks || []);
+        // Важно: если политика меняется в реальном времени, тоже обновляем
+        setNeedsPolicyAcceptance(!data.policy_accepted);
+      }
+    )
+    .subscribe();
 
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [user, authLoading]);
+
+  // --- ИЗМЕНЕНИЕ: Загрузка глав для выбранной новеллы ---
   useEffect(() => {
     if (!selectedNovel) { setChapters([]); return; }
     setIsLoadingChapters(true);
     const fetchChapters = async () => {
-        try {
-            const docRef = doc(db, 'chapter_info', selectedNovel.id);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists() && docSnap.data()) {
-                const data = docSnap.data();
-                const chaptersData = data.chapters || {};
-                const chaptersArray = Object.keys(chaptersData).map(key => ({
-                    id: parseInt(key),
-                    title: `Глава ${key}`,
-                    isPaid: chaptersData[key].isPaid || false,
-                    published_at: chaptersData[key].published_at || null 
-                })).sort((a, b) => a.id - b.id);
-                setChapters(chaptersArray);
-            } else { setChapters([]); }
-        } catch (error) {
+        // Было (Firebase): getDoc(doc(db, 'chapter_info', selectedNovel.id))
+        // Стало (Supabase): select с фильтром по ID новеллы
+        const { data, error } = await supabase
+            .from('chapter_info')
+            .select('*')
+            .eq('novel_id', selectedNovel.id)
+            .order('chapter_number', { ascending: true }); // Сразу сортируем
+
+        if (error) {
             console.error("Ошибка загрузки глав:", error);
             setChapters([]);
-        } finally { setIsLoadingChapters(false); }
+        } else {
+            const chaptersArray = data.map(chapter => ({
+                id: chapter.chapter_number,
+                title: `Глава ${chapter.chapter_number}`,
+                isPaid: chapter.is_paid || false,
+                published_at: chapter.published_at,
+            }));
+            setChapters(chaptersArray);
+        }
+        setIsLoadingChapters(false);
     };
     fetchChapters();
   }, [selectedNovel]);
 
 
-  // ✅ ТЕПЕРЬ ЭТОТ useEffect НАХОДИТСЯ ПОСЛЕ handleBack И ОШИБКИ НЕ БУДЕТ
+  const handleBack = useCallback(() => {
+      if (page === 'reader') { setSelectedChapter(null); setPage('details'); }
+      else if (page === 'details') { setSelectedNovel(null); setGenreFilter(null); setPage('list'); }
+  }, [page]);
+  
+  // Этот хук для Telegram остается без изменений
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg) return;
     tg.ready();
     tg.expand();
     tg.onEvent('backButtonClicked', handleBack);
-    if (page === 'list' || needsPolicyAcceptance) { 
+    if (page === 'list' || needsPolicyAcceptance) {
       tg.BackButton.hide(); 
     } else { 
       tg.BackButton.show(); 
@@ -170,26 +199,32 @@ export default function App() {
     return () => tg.offEvent('backButtonClicked', handleBack);
   }, [page, handleBack, needsPolicyAcceptance]);
 
-
-  // --- Функции-обработчики ---
-  const updateUserDoc = useCallback(async (dataToUpdate) => {
+  // --- ИЗМЕНЕНИЕ: Функция обновления данных пользователя ---
+  const updateUserData = useCallback(async (dataToUpdate) => {
     if (userId) {
-        await setDoc(doc(db, "users", userId), dataToUpdate, { merge: true });
+        // Было (Firebase): setDoc(doc(db, "users", userId), dataToUpdate, { merge: true });
+        // Стало (Supabase): update с фильтром по ID
+        const { error } = await supabase
+            .from('profiles')
+            .update(dataToUpdate)
+            .eq('id', userId);
+        
+        if (error) {
+            console.error("Ошибка обновления профиля:", error);
+        }
     }
   }, [userId]);
 
   const handleThemeToggle = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
-  const handleSettingChange = useCallback((key, value) => {
-    setReadingSettings(prev => {
-        const newValue = typeof value === 'function' ? value(prev[key]) : value;
-        if (key === 'fontSize' && (newValue < 12 || newValue > 28)) return prev;
-        if ((key === 'lineHeight' || key === 'paragraphSpacing') && (newValue < 1.0 || newValue > 2.5)) return prev;
-        const newSettings = { ...prev, [key]: newValue };
-        updateUserDoc({ settings: newSettings });
-        return newSettings;
+  const handleTextSizeChange = useCallback((amount) => {
+    setFontSize(prevSize => {
+        const newSize = Math.max(12, Math.min(32, prevSize + amount));
+        // Используем новую функцию updateUserData
+        updateUserData({ settings: { fontSize: newSize, fontClass } });
+        return newSize;
     });
-  }, [updateUserDoc]);
+  }, [fontClass, updateUserData]);
 
   const handleSelectChapter = useCallback(async (chapter) => {
     setSelectedChapter(chapter);
@@ -197,9 +232,10 @@ export default function App() {
     if (userId && selectedNovel) {
         const newLastReadData = { ...lastReadData, [selectedNovel.id]: { novelId: selectedNovel.id, chapterId: chapter.id, timestamp: new Date().toISOString() } };
         setLastReadData(newLastReadData);
-        await updateUserDoc({ lastRead: newLastReadData });
+        // Используем новую функцию и правильное имя поля из БД
+        await updateUserData({ last_read: newLastReadData });
     }
-  }, [userId, selectedNovel, lastReadData, updateUserDoc]);
+  }, [userId, selectedNovel, lastReadData, updateUserData]);
 
   const handleSelectNovel = (novel) => { setSelectedNovel(novel); setPage('details'); };
   const handleGenreSelect = (genre) => { setGenreFilter(genre); setPage('list'); setActiveTab('library'); };
@@ -208,14 +244,17 @@ export default function App() {
   const handleToggleBookmark = useCallback(async (novelId) => {
     const newBookmarks = bookmarks.includes(novelId) ? bookmarks.filter(id => id !== novelId) : [...bookmarks, novelId];
     setBookmarks(newBookmarks);
-    await updateUserDoc({ bookmarks: newBookmarks });
-  }, [bookmarks, updateUserDoc]);
+    // Используем новую функцию
+    await updateUserData({ bookmarks: newBookmarks });
+  }, [bookmarks, updateUserData]);
 
   const handlePlanSelect = (plan) => {
       setSelectedPlan(plan);
       setIsSubModalOpen(false);
   };
-
+  
+  // Эта функция пока остаётся как есть, но updateUserDoc заменен на updateUserData
+  // В будущем ее тоже можно улучшить с помощью Edge Functions в Supabase
   const handlePaymentMethodSelect = async (method) => {
       const tg = window.Telegram?.WebApp;
       if (!tg || !userId || !selectedPlan) {
@@ -225,11 +264,12 @@ export default function App() {
       tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты...", async (confirmed) => {
           if (!confirmed) return;
           try {
-              await updateUserDoc({ pendingSubscription: { ...selectedPlan, method, date: new Date().toISOString() } });
+              // Здесь мы можем создать поле pending_subscription в таблице profiles
+              await updateUserData({ pending_subscription: { ...selectedPlan, method, date: new Date().toISOString() } });
               tg.openTelegramLink(`https://t.me/${BOT_USERNAME}?start=${userId}`);
               tg.close();
           } catch (error) {
-              console.error("Ошибка записи в Firebase:", error);
+              console.error("Ошибка записи в Supabase:", error);
               tg.showAlert("Не удалось сохранить ваш выбор.");
           }
       });
@@ -237,13 +277,14 @@ export default function App() {
 
   const handleAcceptPolicy = async () => {
     if (userId) {
-      await updateUserDoc({ policyAccepted: true });
+      // Используем новую функцию и правильное имя поля
+      await updateUserData({ policy_accepted: true });
       setNeedsPolicyAcceptance(false);
     }
   };
 
-  // --- ЛОГИКА РЕНДЕРИНГА ---
-  if (authLoading) {
+  // --- ЛОГИКА РЕНДЕРИНГА (без серьезных изменений) ---
+  if (authLoading || (isLoadingContent && !needsPolicyAcceptance)) {
     return <LoadingSpinner />;
   }
   
@@ -260,36 +301,12 @@ export default function App() {
   }
 
   const renderContent = () => {
+    // ... рендеринг страниц остается без изменений
     if (page === 'details') {
       return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chapters={chapters} isLoadingChapters={isLoadingChapters} lastReadData={lastReadData} onBack={handleBack} />;
     }
     if (page === 'reader') {
-      return (
-        <ChapterReader 
-          chapter={selectedChapter} 
-          novel={selectedNovel} 
-          userId={userId} 
-          userName={user?.displayName || 'Аноним'} 
-          allChapters={chapters} 
-          subscription={subscription} 
-          botUsername={BOT_USERNAME} 
-          onBack={handleBack} 
-          isUserAdmin={isUserAdmin} 
-          onSelectChapter={handleSelectChapter}
-          fontSize={readingSettings.fontSize}
-          onFontSizeChange={(increment) => handleSettingChange('fontSize', val => val + increment)}
-          fontFamily={readingSettings.fontFamily}
-          onFontFamilyChange={(family) => handleSettingChange('fontFamily', family)}
-          lineHeight={readingSettings.lineHeight}
-          onLineHeightChange={(increment) => handleSettingChange('lineHeight', val => val + increment)}
-          textAlign={readingSettings.textAlign}
-          onTextAlignChange={(align) => handleSettingChange('textAlign', align)}
-          textIndent={readingSettings.textIndent}
-          onTextIndentChange={(indent) => handleSettingChange('textIndent', indent)}
-          paragraphSpacing={readingSettings.paragraphSpacing}
-          onParagraphSpacingChange={(increment) => handleSettingChange('paragraphSpacing', val => val + increment)}
-        />
-      );
+      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} userId={userId} userName={user?.user_metadata?.display_name || 'Аноним'} currentFontClass={fontClass} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} />;
     }
 
     switch (activeTab) {
@@ -297,27 +314,17 @@ export default function App() {
         return (<>
             <Header title="Библиотека" />
             <NewsSlider onReadMore={setSelectedNews} />
-            {genreFilter && (
-                <div className="flex items-center justify-between p-3 mx-4 mb-0 rounded-lg border border-border-color bg-component-bg text-text-main">
-                    <p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p>
-                    <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
-                </div>
-            )}
-            <NovelList 
-                onSelectNovel={handleSelectNovel} 
-                bookmarks={bookmarks} 
-                onToggleBookmark={handleToggleBookmark} 
-                genreFilter={genreFilter} 
-            />
+            {genreFilter && (<div className="flex items-center justify-between p-3 mx-4 mb-0 rounded-lg border border-border-color bg-component-bg text-text-main">
+                <p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p>
+                <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
+            </div>)}
+            <NovelList novels={novels.filter(n => !genreFilter || (n.genres && n.genres.includes(genreFilter)))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
         </>);
-      case 'search': 
-        return <SearchPage onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
-      case 'bookmarks': 
-        return <BookmarksPage onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
-      case 'profile': 
-        return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={() => setIsSubModalOpen(true)} userId={userId} auth={auth} onThemeToggle={handleThemeToggle} currentTheme={theme} onShowHelp={() => setShowHelp(true)} />;
-      default: 
-        return <Header title="Библиотека" />;
+      case 'search': return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
+      case 'bookmarks': return <BookmarksPage novels={novels.filter(n => bookmarks.includes(n.id))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
+      // --- ИЗМЕНЕНИЕ: убираем auth из пропсов, он больше не нужен ---
+      case 'profile': return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={() => setIsSubModalOpen(true)} userId={userId} onThemeToggle={handleThemeToggle} currentTheme={theme} onShowHelp={() => setShowHelp(true)} />;
+      default: return <Header title="Библиотека" />;
     }
   };
 

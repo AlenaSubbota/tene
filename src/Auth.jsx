@@ -1,54 +1,46 @@
-// src/Auth.jsx
+// src/Auth.jsx (Supabase версия)
 
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import {
-  onAuthStateChanged,
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  updateProfile,
-  signOut,
-} from "firebase/auth";
-import { auth } from './firebase-config'; // Убедитесь, что импортируете auth из вашего конфига
+// --- ИЗМЕНЕНИЕ: Убираем импорты Firebase, добавляем Supabase ---
+import { supabase } from './supabase-config.js';
 
-// --- 1. Создаем контекст ---
+// --- 1. Контекст остается без изменений ---
 const AuthContext = createContext();
 
-// --- 2. Создаем провайдер, который будет "оберткой" для всего приложения ---
+// --- 2. Провайдер переписан под Supabase ---
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // onAuthStateChanged слушает изменения состояния аутентификации
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    // Получаем текущую сессию при первой загрузке
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
       setLoading(false);
     });
 
+    // onAuthStateChange в Supabase слушает изменения (вход, выход)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
     // Отписываемся от слушателя при размонтировании компонента
-    return () => unsubscribe();
+    return () => subscription.unsubscribe();
   }, []);
 
-  const value = {
-    user,
-    loading,
-    // Вы можете добавить сюда другие функции, если они понадобятся в других частях приложения
-    // например: register, login, logout
-  };
+  const value = { user, loading };
 
-  // Пока идет проверка пользователя, можно показывать заглушку (но в нашем случае App.jsx уже это делает)
+  // Логика рендеринга остается той же
   return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
 };
 
-// --- 3. Создаем и экспортируем хук useAuth ---
-// Именно его и не хватало вашему приложению
+// --- 3. Хук useAuth остается без изменений ---
 export const useAuth = () => {
   return useContext(AuthContext);
 };
 
 
-// --- 4. Компонент с формой авторизации остается почти без изменений ---
-// Мы просто убираем его экспорт по умолчанию и делаем именованным
+// --- 4. Компонент с формой авторизации переписан под Supabase ---
 export const AuthForm = ({ onRegisterClick }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
@@ -65,31 +57,43 @@ export const AuthForm = ({ onRegisterClick }) => {
         setError('Пожалуйста, введите имя.');
         return;
       }
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        await updateProfile(userCredential.user, { displayName: displayName });
-      } catch (err) {
-        setError(getFriendlyErrorMessage(err.code));
-      }
+      // Было (Firebase): createUserWithEmailAndPassword
+      // Стало (Supabase): supabase.auth.signUp
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          // В Supabase дополнительные данные (имя) передаются так
+          data: {
+            display_name: displayName,
+          }
+        }
+      });
+      if (signUpError) setError(getFriendlyErrorMessage(signUpError.message));
+
     } else {
-      try {
-        await signInWithEmailAndPassword(auth, email, password);
-      } catch (err)
- {
-        setError(getFriendlyErrorMessage(err.code));
-      }
+      // Было (Firebase): signInWithEmailAndPassword
+      // Стало (Supabase): supabase.auth.signInWithPassword
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email,
+        password: password,
+      });
+      if (signInError) setError(getFriendlyErrorMessage(signInError.message));
     }
   };
 
-  const getFriendlyErrorMessage = (errorCode) => {
-    switch (errorCode) {
-      case 'auth/invalid-email': return 'Неверный формат электронной почты.';
-      case 'auth/user-not-found':
-      case 'auth/wrong-password': return 'Неверный email или пароль.';
-      case 'auth/email-already-in-use': return 'Этот email уже зарегистрирован.';
-      case 'auth/weak-password': return 'Пароль слишком слабый. Используйте не менее 6 символов.';
-      default: return 'Произошла ошибка. Пожалуйста, попробуйте еще раз.';
+  // Новая функция для обработки ошибок Supabase
+  const getFriendlyErrorMessage = (errorMessage) => {
+    if (errorMessage.includes('Invalid login credentials')) {
+        return 'Неверный email или пароль.';
     }
+    if (errorMessage.includes('User already registered')) {
+        return 'Этот email уже зарегистрирован.';
+    }
+    if (errorMessage.includes('Password should be at least 6 characters')) {
+        return 'Пароль слишком слабый. Используйте не менее 6 символов.';
+    }
+    return 'Произошла ошибка. Пожалуйста, попробуйте еще раз.';
   };
 
   return (
@@ -133,9 +137,7 @@ export const AuthForm = ({ onRegisterClick }) => {
       <div className="flex items-center justify-center">
         <button 
           onClick={() => { 
-            if (!isRegistering && onRegisterClick) {
-              onRegisterClick();
-            }
+            // onRegisterClick больше не нужен, убираем его
             setIsRegistering(!isRegistering); 
             setError(''); 
           }} 

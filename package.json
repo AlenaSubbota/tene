@@ -11,8 +11,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.75.1",
     "@yandex-cloud/nodejs-sdk": "^2.9.0",
-    "firebase": "^12.2.1",
     "json2csv": "^6.0.0-alpha.2",
     "lottie-react": "^2.4.1",
     "react": "^19.1.1",

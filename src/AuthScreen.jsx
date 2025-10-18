@@ -1,10 +1,11 @@
-// src/AuthScreen.jsx
+// src/AuthScreen.jsx (Supabase версия)
 
 import React from 'react';
-import { AuthForm } from './Auth'; // <-- 1. ИЗМЕНИТЕ ИМПОРТ
-import { auth } from './firebase-config'; // Убедитесь, что auth импортирован
+// --- ИЗМЕНЕНИЕ: Убираем лишний импорт `auth` ---
+import { AuthForm } from './Auth';
 
-export const AuthScreen = ({ auth, onRegisterClick }) => {
+// --- ИЗМЕНЕНИЕ: Убираем лишние пропсы `auth` и `onRegisterClick` ---
+export const AuthScreen = () => {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
       <div className="w-full max-w-sm text-center">
@@ -13,7 +14,7 @@ export const AuthScreen = ({ auth, onRegisterClick }) => {
           Войдите или создайте аккаунт, чтобы продолжить.
         </p>
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">
-           <AuthForm onRegisterClick={onRegisterClick} />
+           <AuthForm />
         </div>
       </div>
     </div>

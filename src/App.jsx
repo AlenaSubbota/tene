@@ -76,17 +76,27 @@ export default function App() {
     const checkProfileAndPolicy = async () => {
       const { data: profileData, error } = await supabase
         .from('profiles')
-        .select('policy_accepted, subscription, last_read, bookmarks')
+        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+        .select('policy_accepted, subscription, last_read, bookmarks, is_admin') 
         .eq('id', user.id)
         .single();
 
       if (error && error.code !== 'PGRST116') {
         console.error("Ошибка загрузки профиля:", error);
-      } else if (profileData?.policy_accepted) {
-        setSubscription(profileData.subscription || null);
-        setLastReadData(profileData.last_read || {});
-        setBookmarks(profileData.bookmarks || []);
-        setNeedsPolicyAcceptance(false);
+      } else if (profileData) { // <-- Убрали ?.policy_accepted
+        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+        setIsUserAdmin(profileData.is_admin || false); // Устанавливаем статус админа
+        // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+        
+        if (profileData.policy_accepted) {
+          setSubscription(profileData.subscription || null);
+          setLastReadData(profileData.last_read || {});
+          setBookmarks(profileData.bookmarks || []);
+          setNeedsPolicyAcceptance(false);
+        } else {
+          // Если профиль есть, но политика не принята
+          setNeedsPolicyAcceptance(true);
+        }
       } else {
         setNeedsPolicyAcceptance(true);
       }
@@ -94,22 +104,15 @@ export default function App() {
 
     checkProfileAndPolicy();
 
-    const channel = supabase
-      .channel(`profiles_user_${user.id}`)
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${user.id}` },
-        (payload) => {
-          const data = payload.new;
-          setSubscription(data.subscription || null);
-          setLastReadData(data.last_read || {});
-          setBookmarks(data.bookmarks || []);
-          setNeedsPolicyAcceptance(!data.policy_accepted);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // const channel = supabase
+//   .channel(`profiles_user_${user.id}`)
+//   .on('postgres_changes', ... )
+//   ...
+//   .subscribe();
+//
+// return () => {
+//   supabase.removeChannel(channel);
+// };
   }, [user?.id, authLoading]); // Зависимость от user.id решает проблему перезагрузки
 
   // Этот useEffect отвечает ТОЛЬКО за загрузку новелл
@@ -120,6 +123,7 @@ export default function App() {
         const { data: novelsData, error: novelsError } = await supabase
           .from('novels')
           .select(`*, novel_stats ( views )`);
+          // .order('views', { ascending: false, foreignTable: 'novel_stats' }); // <-- УБРАЛИ ЭТУ СТРОКУ
 
         if (novelsError) {
           console.error("Ошибка загрузки новелл:", novelsError);
@@ -129,6 +133,7 @@ export default function App() {
             ...novel,
             views: novel.novel_stats?.views || 0,
           }));
+          formattedNovels.sort((a, b) => b.views - a.views);
           setNovels(formattedNovels);
         }
         setIsLoadingContent(false);
@@ -148,7 +153,7 @@ export default function App() {
     const fetchChapters = async () => {
       const { data, error } = await supabase
         .from('chapter_info')
-        .select('*')
+        .select('chapter_number, is_paid, published_at, content_url')
         .eq('novel_id', selectedNovel.id)
         .order('chapter_number', { ascending: true });
 
@@ -161,6 +166,7 @@ export default function App() {
           title: `Глава ${chapter.chapter_number}`,
           isPaid: chapter.is_paid || false,
           published_at: chapter.published_at,
+          content_url: chapter.content_url
         }));
         setChapters(chaptersArray);
       }
@@ -275,8 +281,16 @@ export default function App() {
       return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chapters={chapters} isLoadingChapters={isLoadingChapters} lastReadData={lastReadData} onBack={handleBack} />;
     }
     if (page === 'reader') {
-      return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} userId={userId} userName={user?.user_metadata?.display_name || 'Аноним'} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} />;
-    }
+    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+    // Ищем имя в нескольких полях, которые может вернуть Telegram
+    const displayName = user?.user_metadata?.full_name || 
+                        user?.user_metadata?.user_name || 
+                        user?.user_metadata?.display_name || 
+                        'Аноним';
+    // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+                        
+    return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} userId={userId} userName={displayName} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} />;
+  }
     switch (activeTab) {
       case 'library':
         return (<>

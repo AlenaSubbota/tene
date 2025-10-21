@@ -75,7 +75,7 @@ export default function App() {
 
     const checkProfileAndPolicy = async () => {
       const { data: profileData, error } = await supabase
-        .from('profiles')
+        .from('users')
         // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
         .select('policy_accepted, subscription, last_read, bookmarks, is_admin') 
         .eq('id', user.id)
@@ -152,21 +152,21 @@ export default function App() {
     setIsLoadingChapters(true);
     const fetchChapters = async () => {
       const { data, error } = await supabase
-        .from('chapter_info')
-        .select('chapter_number, is_paid, published_at, content_url')
+        .from('chapters') // <-- ИСПРАВЛЕНО
+        .select('chapter_order, is_paid, published_at, content_path') // <-- ИСПРАВЛЕНО
         .eq('novel_id', selectedNovel.id)
-        .order('chapter_number', { ascending: true });
+        .order('chapter_order', { ascending: true }); // <-- ИСПРАВЛЕНО
 
       if (error) {
         console.error("Ошибка загрузки глав:", error);
         setChapters([]);
       } else {
         const chaptersArray = data.map(chapter => ({
-          id: chapter.chapter_number,
-          title: `Глава ${chapter.chapter_number}`,
+          id: chapter.chapter_order, // <-- ИСПРАВЛЕНО
+          title: `Глава ${chapter.chapter_order}`, // <-- ИСПРАВЛЕНО
           isPaid: chapter.is_paid || false,
           published_at: chapter.published_at,
-          content_url: chapter.content_url
+          content_path: chapter.content_path // <-- ИСПРАВЛЕНО
         }));
         setChapters(chaptersArray);
       }
@@ -200,7 +200,7 @@ export default function App() {
       const dataToUpsert = { ...dataToUpdate, id: userId };
 
       const { error } = await supabase
-        .from('profiles')
+        .from('users')
         .upsert(dataToUpsert); // <--- ИСПОЛЬЗУЕМ UPSERT
         
       if (error) console.error("Ошибка обновления профиля (upsert):", error);

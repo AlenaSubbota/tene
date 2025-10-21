@@ -72,9 +72,10 @@ export const ChapterReader = ({
         const fetchChapterData = async () => {
             if (!novel?.id || !chapter?.id) return;
             
-            // Проверка на content_url (остается)
-            if (!chapter.content_url) {
-                console.error("Ошибка: в 'chapter' отсутствует 'content_url'.");
+            // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+            // Проверяем правильное поле `content_path`
+            if (!chapter.content_path) { // <-- ИЗМЕНЕНИЕ №1
+                console.error("Ошибка: в 'chapter' отсутствует 'content_path'.");
                 setChapterContent('## Ошибка\n\nНе удалось найти путь к файлу главы.');
                 setIsLoadingContent(false);
                 setIsLoadingComments(false);
@@ -107,12 +108,14 @@ export const ChapterReader = ({
 
             // 2. Promise для загрузки текста (теперь с Signed URL)
             const contentPromise = (async () => {
-                // Генерируем временный (на 60 сек) URL.
-                // Этот запрос сработает, ТОЛЬКО если RLS-политика Storage разрешит
                 const { data, error } = await supabase
                     .storage
-                    .from('chapters-content')
-                    .createSignedUrl(chapter.content_url, 60); // 60 секунд
+                    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+                    // Убедитесь, что имя бакета 'chapter_content' (в ед. числе) верное
+                    .from('chapter_content') // <-- ИЗМЕНЕНИЕ №2 (Проверьте ваше имя бакета!)
+                    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+                    // Используем правильное поле `content_path`
+                    .createSignedUrl(chapter.content_path, 60); // <-- ИЗМЕНЕНИЕ №3
                 
                 if (error) {
                     // Эта ошибка сработает, если RLS-политика запретит доступ
@@ -167,7 +170,7 @@ export const ChapterReader = ({
         };
         
         fetchChapterData();
-    }, [novel?.id, chapter?.id, userId, hasActiveSubscription, chapter.content_url]);
+    }, [novel?.id, chapter?.id, userId, hasActiveSubscription, chapter.content_path]);
     
     // --- Применение стилей отступа параграфа (prose-override) ---
     useEffect(() => {

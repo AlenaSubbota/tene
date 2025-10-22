@@ -20,7 +20,7 @@ RUN npm run build
 FROM nginx:1.25-alpine
 
 # Копируем собранные файлы из этапа "builder" в публичную папку Nginx
-COPY --from=builder /app/dist /usr/share/nginx/html
+COPY --from=builder /app/docs /usr/share/nginx/html
 
 # Копируем наш собственный конфигурационный файл для Nginx
 # Мы создадим его на следующем шаге

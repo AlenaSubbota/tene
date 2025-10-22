@@ -25,10 +25,16 @@ export const groupComments = (commentsList) => {
 export const Comment = React.memo(({ comment, onReply, onLike, onEdit, onDelete, onUpdate, isUserAdmin, currentUserId, editingCommentId, editingText, setEditingText, replyingTo, replyText, setReplyText, onCommentSubmit }) => {
     // --- ИЗМЕНЕНИЕ: Форматируем дату из строки, а не из объекта Firebase ---
     const formatDate = (timestamp) => {
-        if (!timestamp) return '';
-        // 'timestamp' - это уже объект Date, который мы создали в ChapterReader
-        return timestamp.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    };
+    if (!timestamp) return '';
+    // Используем toLocaleString для отображения и даты, и времени
+    return timestamp.toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+};
 
     return (
         <div className="flex flex-col">

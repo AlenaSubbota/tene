@@ -170,7 +170,7 @@ export const ChapterReader = ({
         
         fetchChapterData();
     }, [novel?.id, chapter?.id, userId, hasActiveSubscription, chapter.content_path]); // Зависимости не меняются
-      
+
     // --- Применение стилей отступа параграфа (prose-override) ---
     useEffect(() => {
         const styleId = 'paragraph-spacing-style';
@@ -370,20 +370,26 @@ export const ChapterReader = ({
     }, [editingText]);
     
     // Удалить комментарий
-    const handleDelete = useCallback(async (commentId) => { 
-        const originalComments = comments;
-        setComments(prev => prev.filter(c => c.id !== commentId));
-        
-        const { error } = await supabase
-            .from('comments')
-            .delete()
-            .eq('id', commentId);
-            
-        if (error) {
-            console.error("Ошибка удаления:", error);
-            setComments(originalComments); // Откат
-        }
-    }, [comments]);
+    // Удалить комментарий (НОВАЯ ВЕРСИЯ С КАСКАДНЫМ УДАЛЕНИЕМ)
+const handleDelete = useCallback(async (commentId) => {
+    // Вызываем нашу новую функцию из базы данных
+    const { error } = await supabase
+        .rpc('delete_comment_and_replies', {
+            p_comment_id: commentId
+        });
+
+    if (error) {
+        console.error('Ошибка при каскадном удалении:', error);
+        // Можно показать пользователю уведомление об ошибке
+        alert("Не удалось удалить комментарий. Попробуйте снова.");
+    } else {
+        // Если удаление в базе прошло успешно,
+        // перезагружаем комментарии, чтобы обновить интерфейс.
+        // Это самый надежный способ.
+        console.log('Комментарий и все ответы на него удалены.');
+        reloadFirstPageComments(); // Эта функция у вас уже есть!
+    }
+}, [reloadFirstPageComments]); // Зависимость теперь от функции перезагрузки
     
     const handleReply = useCallback((commentId) => { 
         setReplyingTo(prev => (prev === commentId ? null : commentId));

@@ -1,34 +1,19 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-// Предполагается, что эти импорты настроены правильно в вашем проекте.
-// В этом примере они заменены на заглушки, чтобы код был самодостаточным.
-// import { supabase } from "../../supabase-config.js";
-// import { LockIcon } from '../icons.jsx';
-// import { Header } from '../Header.jsx';
-// import { SubscriptionModal } from '../SubscriptionModal.jsx';
-// import { PaymentMethodModal } from '../PaymentMethodModal.jsx';
-// import { useAuth } from '../../Auth.jsx';
+import { supabase } from "../../supabase-config.js";
+import { LockIcon } from '../icons.jsx';
+import { Header } from '../Header.jsx';
+import { SubscriptionModal } from '../SubscriptionModal.jsx';
+import { PaymentMethodModal } from '../PaymentMethodModal.jsx';
+import { useAuth } from '../../Auth.jsx';
 
-
-// --- КОМПОНЕНТЫ-ЗАГЛУШКИ ДЛЯ ДЕМОНСТРАЦИИ ---
-
-// --- КОМПОНЕНТЫ-ЗАГЛУШКИ ДЛЯ ДЕМОНСТРАЦИИ ---
-
-const LockIcon = () => ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M10 2a4 4 0 00-4 4v2H5a2 2 0 00-2 2v8a2 2 0 002 2h10a2 2 0 002-2V10a2 2 0 00-2-2h-1V6a4 4 0 00-4-4zm2 6V6a2 2 0 10-4 0v2h4z" clipRule="evenodd" /></svg> );
-const Header = ({ title, onBack }) => (
-    <div className="sticky top-0 z-10 flex items-center p-4 bg-background/80 backdrop-blur-sm border-b border-border-color">
-        <button onClick={onBack} className="mr-4 p-2 rounded-full hover:bg-component-bg transition-colors">&larr;</button>
-        <h1 className="text-lg font-bold truncate">{title}</h1>
-    </div>
-);
-const SubscriptionModal = ({ onClose, onSelectPlan }) => ( <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"><div className="bg-component-bg border border-border-color rounded-lg p-6 text-text-main max-w-sm w-full"><h2 className="text-2xl font-bold mb-4">Требуется подписка</h2><p className="mb-6 text-text-secondary">Для доступа к этой главе, пожалуйста, оформите подписку.</p><div className="flex justify-end gap-3"><button onClick={onClose} className="px-4 py-2 rounded-md bg-border-color hover:opacity-80 transition-opacity">Закрыть</button><button onClick={() => onSelectPlan({ id: 1, name: 'Premium' })} className="px-4 py-2 rounded-md bg-accent text-white hover:bg-accent-hover transition-colors font-semibold">Выбрать план</button></div></div></div>);
-const PaymentMethodModal = ({ onClose, onSelectMethod, plan }) => ( <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4"><div className="bg-component-bg border border-border-color rounded-lg p-6 text-text-main max-w-sm w-full"><h2 className="text-2xl font-bold mb-2">Оплата: {plan.name}</h2><p className="mb-6 text-text-secondary">Выберите удобный способ оплаты.</p><button onClick={() => onSelectMethod('telegram_stars')} className="w-full text-left p-3 rounded-md mb-4 bg-border-color hover:opacity-80 transition-opacity">Оплатить через Telegram</button><div className="flex justify-end"><button onClick={onClose} className="px-4 py-2 rounded-md bg-border-color hover:opacity-80 transition-opacity">Отмена</button></div></div></div>);
-const useAuth = () => ({ user: { id: 'test-user-id' } });
-const supabase = { rpc: async () => console.log('Supabase RPC called') };
-const formatDate = (dateString) => { if (!dateString) return ''; const date = new Date(dateString); return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' }); };
-
+const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+};
 
 // --- ОСНОВНОЙ КОМПОНЕНТ С ИСПРАВЛЕНИЯМИ ---
-export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack }) => {
+export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack, bookmarks, onToggleBookmark }) => {
     const { user } = useAuth();
 
     // --- ВАШ ФУНКЦИОНАЛ ОСТАЕТСЯ БЕЗ ИЗМЕНЕНИЙ ---
@@ -53,8 +38,19 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
     const descriptionRef = useRef(null);
     const [isLongDescription, setIsLongDescription] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
-    // ++ НОВОЕ СОСТОЯНИЕ ДЛЯ ЗАКЛАДКИ
-    const [isBookmarked, setIsBookmarked] = useState(false); 
+
+    const isBookmarked = useMemo(() => {
+    if (!novel?.id || !bookmarks) return false;
+    return bookmarks.includes(novel.id);
+}, [bookmarks, novel]);
+
+const handleBookmarkToggle = (e) => {
+    e.stopPropagation(); // Предотвращаем другие клики
+    if (novel?.id) {
+        // Эта функция приходит из App.jsx и сохраняет закладку в базу данных
+        onToggleBookmark(novel.id);
+    }
+};
 
     useEffect(() => {
         const timer = setTimeout(() => setIsMounted(true), 50);
@@ -78,15 +74,8 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
     const sortedChapters = useMemo(() => {
         if (!Array.isArray(chapters)) return [];
         const chaptersCopy = [...chapters];
-        return sortOrder === 'newest' ? chaptersCopy.sort((a, b) => b.id - a.id) : chaptersCopy.sort((a, b) => a.id - a.id);
+        return sortOrder === 'newest' ? chaptersCopy.sort((a, b) => b.id - a.id) : chaptersCopy.sort((a, b) => a.id - b.id);
     }, [chapters, sortOrder]);
-    
-    // ++ НОВЫЙ ОБРАБОТЧИК ДЛЯ ЗАКЛАДКИ
-    const handleBookmarkToggle = () => {
-        setIsBookmarked(prev => !prev);
-        // Здесь будет ваша логика для сохранения в Supabase или localStorage
-        console.log('Bookmark status changed:', !isBookmarked);
-    };
 
     const handleChapterClick = (chapter) => { if (!hasActiveSubscription && chapter.isPaid) setIsSubModalOpen(true); else onSelectChapter(chapter); };
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
@@ -145,7 +134,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
 
                             <div className="border-t border-border-color pt-6">
                                  <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Описание</h2>
-                                 <div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-700 ease-in-out prose prose-invert prose-sm text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[1000px]' : 'max-h-28'}`}>
+                                 <div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-700 ease-in-out prose prose-invert prose-sm text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}>
                                     <div dangerouslySetInnerHTML={{ __html: novel.description }} />
                                     {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
                                 </div>

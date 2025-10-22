@@ -51,8 +51,9 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd ~/tene-frontend 
-            
-            docker compose pull
-
-            docker compose up -d --no-deps tene-frontend
+  # Переходим в папку с ГЛАВНЫМ docker-compose.yml
+  cd ~/nginx-proxy
+  # Скачиваем последнюю версию образа приложения
+  docker compose pull tene-frontend
+  # Перезапускаем всё. Docker-compose обновит только tene-frontend
+  docker compose up -d --no-deps tene-frontend

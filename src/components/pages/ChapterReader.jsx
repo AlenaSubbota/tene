@@ -72,9 +72,7 @@ export const ChapterReader = ({
         const fetchChapterData = async () => {
             if (!novel?.id || !chapter?.id) return;
             
-            // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-            // Проверяем правильное поле `content_path`
-            if (!chapter.content_path) { // <-- ИЗМЕНЕНИЕ №1
+            if (!chapter.content_path) {
                 console.error("Ошибка: в 'chapter' отсутствует 'content_path'.");
                 setChapterContent('## Ошибка\n\nНе удалось найти путь к файлу главы.');
                 setIsLoadingContent(false);
@@ -85,9 +83,6 @@ export const ChapterReader = ({
             setIsLoadingContent(true);
             setIsLoadingComments(true);
             
-            // --- КЛИЕНТСКАЯ ПРОВЕРКА (ОСТАВЛЯЕМ) ---
-            // Она нужна, чтобы *быстро* показать замок,
-            // не дожидаясь ответа от сервера.
             if (chapter.isPaid && !hasActiveSubscription) {
                 setChapterContent('### 🔒 Для доступа к этой главе необходима премиум-подписка.');
                 setIsLoadingContent(false);
@@ -98,41 +93,41 @@ export const ChapterReader = ({
                 return;
             }
 
-            // --- ЗАГРУЗКА В 2 ПОТОКА (ТЕПЕРЬ БЕЗОПАСНАЯ) ---
-            
-            // 1. Promise для загрузки лайков и комментов (RPC-функция)
-            const dynamicDataPromise = supabase.rpc('get_chapter_data', {
+            // --- ОПТИМИЗАЦИЯ: ЗАГРУЗКА В 2 ПОТОКА ---
+
+            // 1. Promise для загрузки ВСЕХ ДИНАМИЧЕСКИХ ДАННЫХ (1 запрос)
+            // (Лайки главы + Комментарии + Лайки комментов - всё в 1 запросе)
+            const dynamicDataPromise = supabase.rpc('get_full_chapter_data', { // <-- НОВАЯ ФУНКЦИЯ
                 p_novel_id: novel.id,
                 p_chapter_number: chapter.id
             });
 
-            // 2. Promise для загрузки текста (теперь с Signed URL)
+            // 2. Promise для загрузки ТЕКСТА ГЛАВЫ (Storage) (1 запрос)
             const contentPromise = (async () => {
                 const { data, error } = await supabase
                     .storage
-                    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-                    // Убедитесь, что имя бакета 'chapter_content' (в ед. числе) верное
-                    .from('chapter_content') // <-- ИЗМЕНЕНИЕ №2 (Проверьте ваше имя бакета!)
-                    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-                    // Используем правильное поле `content_path`
-                    .createSignedUrl(chapter.content_path, 60); // <-- ИЗМЕНЕНИЕ №3
+                    .from('chapter_content') 
+                    .createSignedUrl(chapter.content_path, 60); 
                 
                 if (error) {
-                    // Эта ошибка сработает, если RLS-политика запретит доступ
                     throw new Error(`Доступ к главе запрещен: ${error.message}`);
                 }
                 
-                // Загружаем по временному URL
                 const res = await fetch(data.signedUrl);
                 if (!res.ok) throw new Error(`Не удалось загрузить файл: ${res.statusText}`);
                 return res.text();
             })();
 
+            // 'commentsPromise' (старый) больше не нужен, он объединен с 'dynamicDataPromise'
+
             try {
-                // Ждем оба ответа
-                const [textContent, { data: dynamicData, error: rpcError }] = await Promise.all([
-                    contentPromise,
-                    dynamicDataPromise
+                // Ждем ВСЕГО ДВА ответа
+                const [
+                    textContent, 
+                    { data: dynamicData, error: rpcError } // <-- dynamicData теперь содержит ВСЁ
+                ] = await Promise.all([
+                    contentPromise,     // [0] - Текст
+                    dynamicDataPromise  // [1] - Все данные (лайки + комменты)
                 ]);
 
                 if (rpcError) throw rpcError;
@@ -140,23 +135,27 @@ export const ChapterReader = ({
                 // Устанавливаем текст
                 setChapterContent(textContent || 'Глава пуста.');
                 
-                // Устанавливаем лайки и комменты
+                // Устанавливаем лайки ГЛАВЫ (из RPC)
                 setLikeCount(dynamicData.like_count || 0);
                 setUserHasLiked(dynamicData.user_has_liked || false);
+
+                // --- ИСПОЛЬЗУЕМ 'dynamicData.comments' ---
+                // 'userHasLiked' УЖЕ рассчитан на сервере!
                 const newComments = dynamicData.comments.map(c => ({
                     ...c,
-                    timestamp: new Date(c.created_at)
+                    // 'userHasLiked' уже пришел в объекте 'c'
+                    timestamp: new Date(c.created_at) // Просто преобразуем дату
                 }));
+                
                 setComments(newComments);
-                const COMMENTS_PER_PAGE = 20; 
+                
+                const COMMENTS_PER_PAGE = 20; // Константа осталась
                 setHasMoreComments(newComments.length === COMMENTS_PER_PAGE);
                 setCommentsPage(0);
 
             } catch (error) {
                 console.error("Ошибка загрузки данных главы:", error);
                 
-                // ЕСЛИ RLS-ПОЛИТИКА СРАБОТАЛА (ОШИБКА "Доступ к главе запрещен")
-                // Мы покажем пользователю сообщение о подписке.
                 if (error.message.includes('Доступ к главе запрещен') || error.message.includes('object_not_found')) {
                      setChapterContent('### 🔒 Для доступа к этой главе необходима премиум-подписка.');
                 } else {
@@ -170,8 +169,8 @@ export const ChapterReader = ({
         };
         
         fetchChapterData();
-    }, [novel?.id, chapter?.id, userId, hasActiveSubscription, chapter.content_path]);
-    
+    }, [novel?.id, chapter?.id, userId, hasActiveSubscription, chapter.content_path]); // Зависимости не меняются
+      
     // --- Применение стилей отступа параграфа (prose-override) ---
     useEffect(() => {
         const styleId = 'paragraph-spacing-style';

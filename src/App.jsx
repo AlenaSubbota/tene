@@ -143,7 +143,7 @@ export default function App() {
       setNovels([]);
       setIsLoadingContent(false);
     }
-    // 👇 --   - КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ЗДЕСЬ --- 👇
+    // 👇 --КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ЗДЕСЬ --- 👇
   }, [user?.id, needsPolicyAcceptance]); // Зависимость от user.id вместо user
 
   // Загрузка глав для выбранной новеллы

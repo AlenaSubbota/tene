@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "build": "CI=false vite build",
     "build:firebase": "vite build",
     "build:gh": "vite build --mode gh-pages",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",

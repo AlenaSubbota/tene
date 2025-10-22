@@ -1,7 +1,7 @@
-# Название нашего процесса
+
 name: Deploy Frontend to Timeweb VDS
 
-# Триггер: запускать при каждом push в ветку 'main'
+
 on:
   push:
     branches:
@@ -9,36 +9,35 @@ on:
 
 jobs:
   build-and-deploy:
-    # Запускаем на виртуальной машине Ubuntu
+
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Скачиваем исходный код из репозитория
+
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. Настраиваем Docker Buildx для ускорения сборки
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # 3. Входим в Docker Hub, используя наши секреты
+
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 4. Собираем Docker-образ и сразу загружаем его в Docker Hub
-      # Замените 'ваш_логин/tene-frontend' на ваше имя репозитория
+   
       - name: Build and push to Docker Hub
         uses: docker/build-push-action@v4
         with:
           context: .
           file: ./Dockerfile
           push: true
-          tags: alenasubbota/tene-frontend:latest # <-- ЗАМЕНИТЕ НА ВАШЕ
+          tags: alenasubbota/tene-frontend:latest
 
-      # 5. Выполняем команды на удаленном сервере
+
       - name: Deploy to Server
         uses: appleboy/ssh-action@master
         with:
@@ -46,11 +45,8 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # Переходим в папку с docker-compose.yml нашего фронтенда
             cd ~/tene-frontend 
             
-            # Скачиваем последнюю версию образа из Docker Hub
             docker compose pull
-            
-            # Перезапускаем сервис
+
             docker compose up -d --no-deps tene-frontend

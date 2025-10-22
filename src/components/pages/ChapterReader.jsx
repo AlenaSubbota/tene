@@ -69,107 +69,102 @@ export const ChapterReader = ({
     const hasActiveSubscription = subscription?.expires_at && new Date(subscription.expires_at) > new Date();
 
     useEffect(() => {
-        const fetchChapterData = async () => {
-            if (!novel?.id || !chapter?.id) return;
-            
-            if (!chapter.content_path) {
-                console.error("Ошибка: в 'chapter' отсутствует 'content_path'.");
-                setChapterContent('## Ошибка\n\nНе удалось найти путь к файлу главы.');
-                setIsLoadingContent(false);
-                setIsLoadingComments(false);
-                return;
+    const fetchChapterData = async () => {
+        if (!novel?.id || !chapter?.id) return;
+
+        // Сбрасываем состояния перед новой загрузкой
+        setIsLoadingContent(true);
+        setIsLoadingComments(true);
+        setChapterContent('');
+        setComments([]);
+
+        // Проверяем подписку
+        if (chapter.isPaid && !hasActiveSubscription) {
+            setChapterContent('### 🔒 Для доступа к этой главе необходима премиум-подписка.');
+            setIsLoadingContent(false);
+            setIsLoadingComments(false);
+            return;
+        }
+
+        try {
+            console.log("--- Начало загрузки данных главы ---");
+            console.log("Параметры:", { novelId: novel.id, chapterId: chapter.id, content_path: chapter.content_path });
+
+            // --- ШАГ 1: ЗАГРУЗКА ТЕКСТА ГЛАВЫ ---
+            console.log("1. Запрос на получение signedUrl для:", chapter.content_path);
+            const { data: urlData, error: urlError } = await supabase
+                .storage
+                .from('chapter_content')
+                .createSignedUrl(chapter.content_path, 60);
+
+            if (urlError) {
+                // Если ошибка уже здесь, дальше не идем
+                throw new Error(`Ошибка получения signedUrl: ${urlError.message}`);
             }
 
-            setIsLoadingContent(true);
-            setIsLoadingComments(true);
-            
-            if (chapter.isPaid && !hasActiveSubscription) {
-                setChapterContent('### 🔒 Для доступа к этой главе необходима премиум-подписка.');
-                setIsLoadingContent(false);
-                setIsLoadingComments(false);
-                setComments([]);
-                setLikeCount(0);
-                setUserHasLiked(false);
-                return;
+            console.log("1.1. SignedUrl получен, загрузка файла...");
+            const res = await fetch(urlData.signedUrl);
+            if (!res.ok) {
+                throw new Error(`Не удалось загрузить файл главы: ${res.statusText} (статус: ${res.status})`);
             }
+            const textContent = await res.text();
+            console.log("1.2. ✅ Текст главы успешно загружен.");
+            setChapterContent(textContent || 'Глава пуста.');
 
-            // --- ОПТИМИЗАЦИЯ: ЗАГРУЗКА В 2 ПОТОКА ---
 
-            // 1. Promise для загрузки ВСЕХ ДИНАМИЧЕСКИХ ДАННЫХ (1 запрос)
-            // (Лайки главы + Комментарии + Лайки комментов - всё в 1 запросе)
-            const dynamicDataPromise = supabase.rpc('get_full_chapter_data', { // <-- НОВАЯ ФУНКЦИЯ
+            // --- ШАГ 2: ЗАГРУЗКА ДИНАМИЧЕСКИХ ДАННЫХ (RPC) ---
+            console.log("2. Вызов RPC 'get_full_chapter_data'...");
+            const { data: dynamicData, error: rpcError } = await supabase.rpc('get_full_chapter_data', {
                 p_novel_id: novel.id,
                 p_chapter_number: chapter.id
             });
 
-            // 2. Promise для загрузки ТЕКСТА ГЛАВЫ (Storage) (1 запрос)
-            const contentPromise = (async () => {
-                const { data, error } = await supabase
-                    .storage
-                    .from('chapter_content') 
-                    .createSignedUrl(chapter.content_path, 60); 
-                
-                if (error) {
-                    throw new Error(`Доступ к главе запрещен: ${error.message}`);
-                }
-                
-                const res = await fetch(data.signedUrl);
-                if (!res.ok) throw new Error(`Не удалось загрузить файл: ${res.statusText}`);
-                return res.text();
-            })();
-
-            // 'commentsPromise' (старый) больше не нужен, он объединен с 'dynamicDataPromise'
-
-            try {
-                // Ждем ВСЕГО ДВА ответа
-                const [
-                    textContent, 
-                    { data: dynamicData, error: rpcError } // <-- dynamicData теперь содержит ВСЁ
-                ] = await Promise.all([
-                    contentPromise,     // [0] - Текст
-                    dynamicDataPromise  // [1] - Все данные (лайки + комменты)
-                ]);
-
-                if (rpcError) throw rpcError;
-
-                // Устанавливаем текст
-                setChapterContent(textContent || 'Глава пуста.');
-                
-                // Устанавливаем лайки ГЛАВЫ (из RPC)
-                setLikeCount(dynamicData.like_count || 0);
-                setUserHasLiked(dynamicData.user_has_liked || false);
-
-                // --- ИСПОЛЬЗУЕМ 'dynamicData.comments' ---
-                // 'userHasLiked' УЖЕ рассчитан на сервере!
-                const newComments = dynamicData.comments.map(c => ({
-                    ...c,
-                    // 'userHasLiked' уже пришел в объекте 'c'
-                    timestamp: new Date(c.created_at) // Просто преобразуем дату
-                }));
-                
-                setComments(newComments);
-                
-                const COMMENTS_PER_PAGE = 20; // Константа осталась
-                setHasMoreComments(newComments.length === COMMENTS_PER_PAGE);
-                setCommentsPage(0);
-
-            } catch (error) {
-                console.error("Ошибка загрузки данных главы:", error);
-                
-                if (error.message.includes('Доступ к главе запрещен') || error.message.includes('object_not_found')) {
-                     setChapterContent('### 🔒 Для доступа к этой главе необходима премиум-подписка.');
-                } else {
-                     setChapterContent('## Ошибка\n\nНе удалось загрузить данные главы.');
-                }
-                setComments([]);
+            if (rpcError) {
+                // Если RPC вернул ошибку, выбрасываем её
+                throw new Error(`Ошибка RPC: ${rpcError.message}`);
             }
-            
+
+            if (!dynamicData) {
+                 console.warn("RPC 'get_full_chapter_data' не вернул данные (data is null).");
+                 // Можно либо выбросить ошибку, либо установить значения по умолчанию
+                 // throw new Error("RPC не вернул данные.");
+            }
+
+            console.log("2.1. ✅ RPC успешно выполнен. Получены данные:", dynamicData);
+
+            // Устанавливаем лайки ГЛАВЫ
+            setLikeCount(dynamicData.like_count || 0);
+            setUserHasLiked(dynamicData.user_has_liked || false);
+
+            // Устанавливаем комментарии
+            const newComments = (dynamicData.comments || []).map(c => ({
+                ...c,
+                timestamp: new Date(c.created_at)
+            }));
+            setComments(newComments);
+
+            const COMMENTS_PER_PAGE = 20;
+            setHasMoreComments(newComments.length === COMMENTS_PER_PAGE);
+            setCommentsPage(0);
+
+            console.log("--- ✅ Все данные успешно загружены и установлены. ---");
+
+        } catch (error) {
+            // --- ЛОВИМ ЛЮБУЮ ОШИБКУ ИЗ TRY ---
+            console.error("🔴 ПРОИЗОШЛА КРИТИЧЕСКАЯ ОШИБКА ЗАГРУЗКИ:", error);
+            setChapterContent('## Ошибка\n\nНе удалось загрузить данные главы. Подробности в консоли разработчика.');
+            setComments([]);
+        } finally {
+            // Этот блок выполнится всегда, даже если была ошибка
             setIsLoadingContent(false);
             setIsLoadingComments(false);
-        };
-        
-        fetchChapterData();
-    }, [novel?.id, chapter?.id, userId, hasActiveSubscription, chapter.content_path]); // Зависимости не меняются
+            console.log("--- Загрузка завершена (блок finally) ---");
+        }
+    };
+
+    fetchChapterData();
+}, [novel?.id, chapter?.id, userId, hasActiveSubscription, chapter.content_path]);
+
 
     // --- Применение стилей отступа параграфа (prose-override) ---
     useEffect(() => {

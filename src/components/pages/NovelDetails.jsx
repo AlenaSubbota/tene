@@ -62,10 +62,17 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
     // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
 
-    useEffect(() => {
-        const timer = setTimeout(() => setIsMounted(true), 50);
-        return () => clearTimeout(timer);
-    }, []);
+   useEffect(() => {
+        // Мы запускаем таймер, ТОЛЬКО ЕСЛИ 'novel' уже существует
+        if (novel) {
+            const timer = setTimeout(() => setIsMounted(true), 50);
+            return () => clearTimeout(timer);
+        } else {
+            // Если 'novel' вдруг исчезнет (например, при переходе),
+            // мы сбрасываем 'isMounted'
+            setIsMounted(false);
+        }
+    }, [novel]); // <-- Добавляем 'novel' в список зависимостей
 
     const novelGenres = Array.isArray(novel?.genres) ? novel.genres : [];
     const hasActiveSubscription = subscription?.expires_at && new Date(subscription.expires_at) > new Date();

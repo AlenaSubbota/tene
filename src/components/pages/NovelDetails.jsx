@@ -5,10 +5,8 @@ import { Header } from '../Header.jsx';
 import { SubscriptionModal } from '../SubscriptionModal.jsx';
 import { PaymentMethodModal } from '../PaymentMethodModal.jsx';
 import { useAuth } from '../../Auth.jsx';
-// --- ИМПОРТ ХУКА, КОТОРЫЙ МЫ ТЕПЕРЬ БУДЕМ ИСПОЛЬЗОВАТЬ ---
 import LoadingSpinner from '../LoadingSpinner.jsx';
  
-
 const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -16,8 +14,8 @@ const formatDate = (dateString) => {
 };
 
 // --- ОСНОВНОЙ КОМПОНЕНТ С ИСПРАВЛЕНИЯМИ ---
-// !! Мы УБРАЛИ 'bookmarks' и 'onToggleBookmark' из props, так как они нам больше не нужны
-export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack }) => {
+// !! МЫ ВЕРНУЛИ 'bookmarks' и 'onToggleBookmark' в props !!
+export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack, bookmarks, onToggleBookmark }) => {
     const { user } = useAuth();
 
     // --- ВАШ ФУНКЦИОНАЛ ОСТАЕТСЯ БЕЗ ИЗМЕНЕНИЙ ---
@@ -45,34 +43,23 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
 
     // --- НАЧАЛО ИЗМЕНЕНИЙ ---
 
-    // 1. Получаем состояние закладок НАПРЯМУЮ из глобального хука
-    //    Он вернет 'bookmarks' (как массив ОБЪЕКТОВ новелл), 'addBookmark' и 'removeBookmark'
-    const { bookmarks, addBookmark, removeBookmark } = useBookmarks(user ? user.id : null);
-
-    // 2. Логика 'isBookmarked' теперь проверяет массив ОБЪЕКТОВ
+    // 1. Убираем сложную логику с 'useBookmarks'
+    // 2. Логика 'isBookmarked' теперь (ПРАВИЛЬНО) проверяет массив ID из props
     const isBookmarked = useMemo(() => {
         if (!novel?.id || !bookmarks) return false;
-        // Мы проверяем, есть ли в массиве объектов-закладок объект с ID, 
-        // совпадающим с ID текущей новеллы.
-        return bookmarks.some(bookmark => bookmark.id === novel.id);
+        // 'bookmarks' - это массив ID, как и в NovelList
+        return bookmarks.includes(novel.id);
     }, [bookmarks, novel]);
 
-    // 3. 'handleBookmarkToggle' теперь использует функции из хука
+    // 3. 'handleBookmarkToggle' теперь (ПРАВИЛЬНО) использует 'onToggleBookmark' из props
     const handleBookmarkToggle = (e) => {
         e.stopPropagation(); // Предотвращаем другие клики
         if (!novel) return;
-
-        if (isBookmarked) {
-            // removeBookmark ожидает ID
-            removeBookmark(novel.id);
-        } else {
-            // addBookmark ожидает весь ОБЪЕКТ новеллы
-            addBookmark(novel);
-        }
+        // onToggleBookmark ожидает ID новеллы
+        onToggleBookmark(novel.id);
     };
 
     // --- КОНЕЦ ИЗМЕНЕНИЙ ---
-
 
     useEffect(() => {
         const timer = setTimeout(() => setIsMounted(true), 50);
@@ -105,8 +92,6 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
     const handlePaymentMethodSelect = async (method) => { console.log({ selectedPlan, method }); setSelectedPlan(null);};
     
     if (!novel) {
-        // Просто показываем полноэкранный спиннер,
-        // который вы уже создали
         return <LoadingSpinner />;
     }
 
@@ -129,7 +114,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                                         Читать
                                     </button>
                                )}
-                                {/* Эта кнопка теперь использует новую логику */}
+                                {/* Эта кнопка теперь использует ПРАВИЛЬНУЮ логику */}
                                 <button onClick={handleBookmarkToggle} className={`w-full py-3 rounded-lg font-semibold transition-colors ${isBookmarked ? 'bg-accent/20 text-accent border border-accent' : 'bg-component-bg text-text-main hover:bg-border-color'}`}>
                                     {isBookmarked ? 'В закладках' : 'Добавить в закладки'}
                                 </button>

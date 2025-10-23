@@ -7,6 +7,7 @@ import { PaymentMethodModal } from '../PaymentMethodModal.jsx';
 import { useAuth } from '../../Auth.jsx';
 // --- ИМПОРТ ХУКА, КОТОРЫЙ МЫ ТЕПЕРЬ БУДЕМ ИСПОЛЬЗОВАТЬ ---
 import { useBookmarks } from './BookmarksPage';
+import LoadingSpinner from '../LoadingSpinner.jsx';
  
 
 const formatDate = (dateString) => {
@@ -105,12 +106,9 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
     const handlePaymentMethodSelect = async (method) => { console.log({ selectedPlan, method }); setSelectedPlan(null);};
     
     if (!novel) {
-        return (
-            <div className="bg-background text-text-main min-h-screen">
-                <Header title="Загрузка..." onBack={onBack} />
-                <p className="text-center p-4">Загрузка данных...</p>
-            </div>
-        );
+        // Просто показываем полноэкранный спиннер,
+        // который вы уже создали
+        return <LoadingSpinner />;
     }
 
     return (

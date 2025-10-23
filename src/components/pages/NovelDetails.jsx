@@ -5,6 +5,8 @@ import { Header } from '../Header.jsx';
 import { SubscriptionModal } from '../SubscriptionModal.jsx';
 import { PaymentMethodModal } from '../PaymentMethodModal.jsx';
 import { useAuth } from '../../Auth.jsx';
+// --- ИМПОРТ ХУКА, КОТОРЫЙ МЫ ТЕПЕРЬ БУДЕМ ИСПОЛЬЗОВАТЬ ---
+import { useBookmarks } from './BookmarksPage'; 
 
 const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -13,7 +15,8 @@ const formatDate = (dateString) => {
 };
 
 // --- ОСНОВНОЙ КОМПОНЕНТ С ИСПРАВЛЕНИЯМИ ---
-export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack, bookmarks, onToggleBookmark }) => {
+// !! Мы УБРАЛИ 'bookmarks' и 'onToggleBookmark' из props, так как они нам больше не нужны
+export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack }) => {
     const { user } = useAuth();
 
     // --- ВАШ ФУНКЦИОНАЛ ОСТАЕТСЯ БЕЗ ИЗМЕНЕНИЙ ---
@@ -39,18 +42,36 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
     const [isLongDescription, setIsLongDescription] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
 
-    const isBookmarked = useMemo(() => {
-    if (!novel?.id || !bookmarks) return false;
-    return bookmarks.includes(novel.id);
-}, [bookmarks, novel]);
+    // --- НАЧАЛО ИЗМЕНЕНИЙ ---
 
-const handleBookmarkToggle = (e) => {
-    e.stopPropagation(); // Предотвращаем другие клики
-    if (novel?.id) {
-        // Эта функция приходит из App.jsx и сохраняет закладку в базу данных
-        onToggleBookmark(novel.id);
-    }
-};
+    // 1. Получаем состояние закладок НАПРЯМУЮ из глобального хука
+    //    Он вернет 'bookmarks' (как массив ОБЪЕКТОВ новелл), 'addBookmark' и 'removeBookmark'
+    const { bookmarks, addBookmark, removeBookmark } = useBookmarks(user ? user.id : null);
+
+    // 2. Логика 'isBookmarked' теперь проверяет массив ОБЪЕКТОВ
+    const isBookmarked = useMemo(() => {
+        if (!novel?.id || !bookmarks) return false;
+        // Мы проверяем, есть ли в массиве объектов-закладок объект с ID, 
+        // совпадающим с ID текущей новеллы.
+        return bookmarks.some(bookmark => bookmark.id === novel.id);
+    }, [bookmarks, novel]);
+
+    // 3. 'handleBookmarkToggle' теперь использует функции из хука
+    const handleBookmarkToggle = (e) => {
+        e.stopPropagation(); // Предотвращаем другие клики
+        if (!novel) return;
+
+        if (isBookmarked) {
+            // removeBookmark ожидает ID
+            removeBookmark(novel.id);
+        } else {
+            // addBookmark ожидает весь ОБЪЕКТ новеллы
+            addBookmark(novel);
+        }
+    };
+
+    // --- КОНЕЦ ИЗМЕНЕНИЙ ---
+
 
     useEffect(() => {
         const timer = setTimeout(() => setIsMounted(true), 50);
@@ -93,13 +114,10 @@ const handleBookmarkToggle = (e) => {
 
     return (
         <div className="bg-background min-h-screen text-text-main font-sans">
-            {/* ++ ВОЗВРАЩЕН ВАШ HEADER */}
             <Header title={novel.title} onBack={onBack} />
 
             <div className={`transition-opacity duration-700 ease-in ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
-                {/* ++ Вся контентная часть теперь обернута для центрирования */}
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
-                    {/* Верхний блок: обложка и информация */}
                     <div className="md:grid md:grid-cols-12 md:gap-8 lg:gap-12 items-start">
                         <div className="md:col-span-4 text-center">
                             <img src={`/${novel.cover_url}`} alt={novel.title} className="w-full max-w-[280px] mx-auto rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4]"/>
@@ -113,7 +131,7 @@ const handleBookmarkToggle = (e) => {
                                         Читать
                                     </button>
                                )}
-                                {/* ++ ИЗМЕНЕННАЯ КНОПКА ЗАКЛАДКИ */}
+                                {/* Эта кнопка теперь использует новую логику */}
                                 <button onClick={handleBookmarkToggle} className={`w-full py-3 rounded-lg font-semibold transition-colors ${isBookmarked ? 'bg-accent/20 text-accent border border-accent' : 'bg-component-bg text-text-main hover:bg-border-color'}`}>
                                     {isBookmarked ? 'В закладках' : 'Добавить в закладки'}
                                 </button>
@@ -147,7 +165,6 @@ const handleBookmarkToggle = (e) => {
                         </div>
                     </div>
 
-                    {/* ++ Нижний блок: Главы (теперь он отдельный и центрированный) */}
                     <div className="mt-10 border-t border-border-color pt-6">
                         <div className="bg-component-bg border border-border-color rounded-lg p-4">
                             <div className="flex justify-between items-center mb-4">
@@ -188,6 +205,3 @@ const handleBookmarkToggle = (e) => {
         </div>
     );
 };
-
-
-

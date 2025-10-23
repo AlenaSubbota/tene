@@ -6,7 +6,8 @@ import { SubscriptionModal } from '../SubscriptionModal.jsx';
 import { PaymentMethodModal } from '../PaymentMethodModal.jsx';
 import { useAuth } from '../../Auth.jsx';
 // --- ИМПОРТ ХУКА, КОТОРЫЙ МЫ ТЕПЕРЬ БУДЕМ ИСПОЛЬЗОВАТЬ ---
-import { useBookmarks } from './BookmarksPage'; 
+import { useBookmarks } from './BookmarksPage';
+ 
 
 const formatDate = (dateString) => {
     if (!dateString) return '';

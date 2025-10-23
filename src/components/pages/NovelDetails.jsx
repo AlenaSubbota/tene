@@ -61,6 +61,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
 
     // --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
+
     useEffect(() => {
         const timer = setTimeout(() => setIsMounted(true), 50);
         return () => clearTimeout(timer);

@@ -91,7 +91,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                         
                         {/* --- НАЧАЛО ИЗМЕНЕНИЙ --- */}
 
-                        {/* Блок с обложкой (теперь слева / первый) */}
+                        {/* Блок с обложкой (слева) */}
                         <div className="col-span-5 md:col-span-4 text-center">
                             <img 
                                 src={`/${novel.cover_url}`} 
@@ -99,38 +99,54 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                                 className="w-full rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4] cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
                                 onClick={() => setIsCoverModalOpen(true)}
                             />
-                            <div className="mt-6 flex flex-col gap-3 w-full">
+                            
+                            {/* --- ИЗМЕНЕНИЕ: Контейнер кнопок --- */}
+                            {/* Убрал 'flex-col' и 'w-full' с кнопок, добавил 'flex' и 'gap-3' в контейнер.
+                                Кнопкам добавил 'flex-1' (чтобы они были одной ширины), 'py-2' (уменьшил высоту) и 'text-sm' (уменьшил шрифт).
+                                'whitespace-nowrap' не дает тексту переноситься на вторую строку.
+                            */}
+                            <div className="mt-4 flex gap-2 md:gap-3 w-full">
                                {lastReadChapterId ? (
-                                    <button onClick={handleContinueReading} className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover">
-                                        Продолжить чтение
+                                    <button 
+                                        onClick={handleContinueReading} 
+                                        className="flex-1 whitespace-nowrap py-2 px-3 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
+                                    >
+                                        Продолжить
                                     </button>
                                ) : (
-                                   <button onClick={() => sortedChapters.length > 0 && handleChapterClick(sortedChapters[sortedChapters.length - 1])} className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover">
+                                   <button 
+                                        onClick={() => sortedChapters.length > 0 && handleChapterClick(sortedChapters[sortedChapters.length - 1])} 
+                                        className="flex-1 whitespace-nowrap py-2 px-3 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
+                                    >
                                         Читать
                                     </button>
                                )}
-                                <button onClick={handleBookmarkToggle} className={`w-full py-3 rounded-lg font-semibold transition-colors ${isBookmarked ? 'bg-accent/20 text-accent border border-accent' : 'bg-component-bg text-text-main hover:bg-border-color'}`}>
-                                    {isBookmarked ? 'В закладках' : 'Добавить в закладки'}
+                                <button 
+                                    onClick={handleBookmarkToggle} 
+                                    className={`flex-1 whitespace-nowrap py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${isBookmarked ? 'bg-accent/20 text-accent border border-accent' : 'bg-component-bg text-text-main hover:bg-border-color'}`}
+                                >
+                                    {isBookmarked ? 'В закладках' : 'В закладки'}
                                 </button>
                             </div>
                         </div>
 
-                        {/* Блок с описанием (теперь справа / второй) */}
+                        {/* Блок с описанием (справа) */}
                         <div className="col-span-7 md:col-span-8">
                             <h1 className="text-4xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
                             <p className="text-lg text-text-secondary mt-1">{novel.author}</p>
                             
-                            <div className="flex flex-wrap gap-2 my-6">
-                               {novelGenres.map(genre => {
-                                    const isHighlighted = genre === '16+' || genre === '18+';
-                                    const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
-                                    return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
-                                })}
-                            </div>
-
-                            <div className="border-t border-border-color pt-6">
+                            {/* --- ИЗМЕНЕНИЕ: Блок Описания (переехал вверх) --- */}
+                            {/*
+                                1. Переместил этот блок ПЕРЕД жанрами.
+                                2. Убрал 'border-t' и 'pt-6', заменив их на 'mt-4' для более мягкого отступа.
+                                3. Внутри 'prose-sm' заменен на 'text-sm' и 'leading-normal' для более мелкого и плотного текста.
+                            */}
+                            <div className="mt-4">
                                  <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Описание</h2>
-                                 <div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-700 ease-in-out prose prose-invert prose-sm text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}>
+                                 <div 
+                                    ref={descriptionRef} 
+                                    className={`relative overflow-hidden transition-all duration-700 ease-in-out prose prose-invert text-sm leading-normal text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}
+                                >
                                     <div dangerouslySetInnerHTML={{ __html: novel.description }} />
                                     {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
                                 </div>
@@ -140,12 +156,25 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                                     </button>
                                 )}
                             </div>
+
+                            {/* --- ИЗМЕНЕНИЕ: Блок Жанров (переехал вниз) --- */}
+                            {/* 1. Переместил этот блок ПОСЛЕ описания.
+                                2. Заменил 'my-6' (большой отступ) на 'mt-4 pt-4 border-t' — теперь он отделен от описания линией.
+                            */}
+                            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border-color">
+                               {novelGenres.map(genre => {
+                                    const isHighlighted = genre === '16+' || genre === '18+';
+                                    const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
+                                    return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
+                                })}
+                            </div>
+
                         </div>
                         
                         {/* --- КОНЕЦ ИЗМЕНЕНИЙ --- */}
                     </div>
 
-                    {/* Блок со списком глав */}
+                    {/* Блок со списком глав (без изменений) */}
                     <div className="mt-10 border-t border-border-color pt-6">
                         <div className="bg-component-bg border border-border-color rounded-lg p-4">
                             <div className="flex justify-between items-center mb-4">
@@ -181,11 +210,10 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                 </div>
             </div>
 
-            {/* Модальные окна подписки */}
+            {/* Модальные окна (без изменений) */}
             {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
             {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
         
-            {/* Модальное окно обложки */}
             {isCoverModalOpen && (
                 <div 
                     className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 transition-opacity duration-300"

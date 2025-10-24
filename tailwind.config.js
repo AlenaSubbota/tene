@@ -30,6 +30,19 @@ export default {
           '50%': { transform: 'scale(1.2)', opacity: '0.7', },
         },
       },
+      theme: {
+     extend: {
+       keyframes: {
+         'fade-in': {
+           '0%': { opacity: '0' },
+           '100%': { opacity: '1' },
+         },
+       },
+       animation: {
+         'fade-in': 'fade-in 0.3s ease-out',
+       },
+     },
+   },
       animation: {
         'pulse-heart': 'pulse-heart 1.5s ease-in-out infinite',
       },

@@ -93,7 +93,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                         - `md:w-1/3`: На десктопе - занимает 1/3 ширины
                         - `md:mr-8`: На десктопе - отступ справа, чтобы текст не прилипал
                     */}
-                    <div className="w-full max-w-xs mx-auto mb-4 md:float-left md:w-1/3 md:mr-8 md:max-w-none">
+                    <div className="float-left w-1/3 mr-4">
                         <img 
                             src={`/${novel.cover_url}`} 
                             alt={novel.title} 

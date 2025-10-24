@@ -98,23 +98,28 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
             <div className={`transition-opacity duration-700 ease-in ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
                     
-                    {/* --- НАЧАЛО ИЗМЕНЕНИЙ (СЕТКА 5/7) --- */}
+                    {/* --- НАЧАЛО ИЗМЕНЕНИЙ (НОВАЯ СТРУКТУРА) --- */}
                     
-                    {/* БЛОК 1: Обложка + Заголовок */}
-                    {/* Сетка 5/7 на мобильных, 4/8 на десктопе */}
+                    {/* БЛОК 1: Обложка + Заголовок/Кнопки */}
                     <div className="grid grid-cols-12 gap-4 md:gap-8 lg:gap-12 items-start">
                         
-                        {/* Левая колонка: Обложка и Кнопки */}
+                        {/* Левая колонка: Обложка */}
                         <div className="col-span-5 md:col-span-4 text-center"> 
-                            {/* Обложка w-full, чтобы занять всю колонку */}
                             <img 
                                 src={`/${novel.cover_url}`} 
                                 alt={novel.title} 
                                 className="w-full mx-auto rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4] cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
                                 onClick={() => setIsCoverModalOpen(true)}
                             />
-                            {/* Кнопки w-full, чтобы занять всю колонку */}
-                            <div className="mt-4 md:mt-6 flex flex-col gap-3 w-full mx-auto">
+                        </div>
+
+                        {/* Правая колонка: Заголовок, Автор, Кнопки */}
+                        <div className="col-span-7 md:col-span-8"> 
+                            <h1 className="text-xl md:text-4xl font-bold text-text-main text-left">{novel.title}</h1>
+                            <p className="text-sm md:text-lg text-text-secondary mt-1 text-left">{novel.author}</p>
+                            
+                            {/* Кнопки "Читать" и "В закладки" - ПЕРЕМЕЩЕНЫ СЮДА */}
+                            <div className="mt-4 md:mt-6 flex flex-col gap-3 w-full">
                                {lastReadChapterId ? (
                                     <button onClick={handleContinueReading} className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover text-sm md:text-base">
                                         Продолжить
@@ -129,25 +134,21 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                                 </button>
                             </div>
                         </div>
+                    </div>
 
-                        {/* Правая колонка: Заголовок, Автор, Жанры */}
-                        <div className="col-span-7 md:col-span-8"> 
-                            {/* Уменьшен текст для мобильных и убрано центрирование */}
-                            <h1 className="text-xl md:text-4xl font-bold text-text-main text-left">{novel.title}</h1>
-                            <p className="text-sm md:text-lg text-text-secondary mt-1 text-left">{novel.author}</p>
-                            
-                            {/* Жанры */}
-                            <div className="flex flex-wrap gap-2 my-3 md:my-6 justify-start">
-                               {novelGenres.map(genre => {
-                                    const isHighlighted = genre === '16+' || genre === '18+';
-                                    const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
-                                    return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
-                                })}
-                            </div>
+                    {/* БЛОК 2: Жанры (Новый отдельный блок) */}
+                    <div className="mt-8 md:mt-10 border-t border-border-color pt-6">
+                         <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Жанры</h2>
+                         <div className="flex flex-wrap gap-2 justify-start">
+                           {novelGenres.map(genre => {
+                                const isHighlighted = genre === '16+' || genre === '18+';
+                                const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
+                                return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
+                            })}
                         </div>
                     </div>
 
-                    {/* БЛОК 2: Описание (Отдельный блок) */}
+                    {/* БЛОК 3: Описание */}
                     <div className="mt-8 md:mt-10 border-t border-border-color pt-6">
                         <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Описание</h2>
                         <div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-700 ease-in-out prose prose-invert prose-sm text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}>
@@ -162,8 +163,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                     </div>
                     {/* --- КОНЕЦ ИЗМЕНЕНИЙ --- */}
 
-
-                    {/* БЛОК 3: Главы (Отдельный блок) */}
+                    {/* БЛОК 4: Главы */}
                     <div className="mt-8 md:mt-10 border-t border-border-color pt-6">
                         <div className="bg-component-bg border border-border-color rounded-lg p-4">
                             <div className="flex justify-between items-center mb-4">

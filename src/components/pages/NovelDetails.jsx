@@ -82,6 +82,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
                     
                     {/* --- Блок [Обложка + Кнопки] (Плавает справа) --- */}
+                    {/* Этот блок ПЕРВЫЙ в DOM, это важно */}
                     <div className="float-right w-2/5 ml-4 mb-4">
                         <img 
                             src={`/${novel.cover_url}`} 
@@ -116,6 +117,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                     </div>
 
                     {/* --- Блок с контентом, который ОБТЕКАЕТ обложку --- */}
+                    {/* Эти элементы идут ПОСЛЕ float-блока, поэтому они его обтекают */}
                     
                     <h1 className="text-4xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
                     <p className="text-lg text-text-secondary mt-1">{novel.author}</p>
@@ -137,19 +139,23 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                         )}
                     </div>
 
-                    {/* --- ИСПРАВЛЕНИЕ: "Очистка" обтекания ПЕРЕМЕЩЕНА СЮДА --- */}
+                    {/* --- ВОТ ПРАВИЛЬНОЕ РЕШЕНИЕ --- */}
+                    {/* Этот div "очищает" обтекание. Все, что идет ПОСЛЕ него,
+                        будет рендериться на всю ширину, ПОД обложкой. */}
                     <div className="clear-both"></div>
 
-                    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border-color flow-root">
-   {novelGenres.map(genre => {
-        const isHighlighted = genre === '16+' || '18+';
-        const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
-        return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
-    })}
-</div>
+                    {/* --- Блок с жанрами --- */}
+                    {/* Я УБРАЛ `flow-root` отсюда, чтобы `flex` снова заработал */}
+                    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border-color">
+                       {novelGenres.map(genre => {
+                            const isHighlighted = genre === '16+' || genre === '18+';
+                            const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
+                            return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
+                        })}
+                    </div>
 
 
-                    {/* Блок со списком глав (он и так был ниже) */}
+                    {/* Блок со списком глав (теперь он тоже будет на всю ширину) */}
                     <div className="mt-10 border-t border-border-color pt-6">
                         {/* ... (код списка глав без изменений) ... */}
                         <div className="bg-component-bg border border-border-color rounded-lg p-4">

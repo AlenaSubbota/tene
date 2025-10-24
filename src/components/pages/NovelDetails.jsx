@@ -13,6 +13,8 @@ const formatDate = (dateString) => {
     return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
+// --- ОСНОВНОЙ КОМПОНЕНТ С ИСПРАВЛЕНИЯМИ ---
+// !! МЫ ВЕРНУЛИ 'bookmarks' и 'onToggleBookmark' в props !!
 export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack, bookmarks, onToggleBookmark }) => {
     const { user } = useAuth();
 
@@ -39,11 +41,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
     const [isLongDescription, setIsLongDescription] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
     
-    // --- НАЧАЛО ИЗМЕНЕНИЙ (МОДАЛЬНОЕ ОКНО ОБЛОЖКИ) ---
-    const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
-    // --- КОНЕЦ ИЗМЕНЕНИЙ (МОДАЛЬНОЕ ОКНО ОБЛОЖКИ) ---
-
-    
+    // Логика закладок (из вашего примера)
     const isBookmarked = useMemo(() => {
         if (!novel?.id || !bookmarks) return false;
         return bookmarks.includes(novel.id);
@@ -54,6 +52,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
         if (!novel) return;
         onToggleBookmark(novel.id);
     };
+    // --- КОНЕЦ ЛОГИКИ ЗАКЛАДОК ---
 
 
    useEffect(() => {
@@ -100,18 +99,13 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
 
             <div className={`transition-opacity duration-700 ease-in ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
-                    
-                    {/* --- НАЧАЛО ИЗМЕНЕНИЙ (СЕТКА) --- */}
-                    {/* 1. 'md:grid' -> 'grid' (сетка всегда)
-                      2. 'md:grid-cols-12' -> 'grid-cols-12' (12 колонок всегда)
-                      3. Добавлен 'gap-4' для мобильных
-                    */}
-                    <div className="grid grid-cols-12 gap-4 md:gap-8 lg:gap-12 items-start">
+                    <div className="md:grid md:grid-cols-12 md:gap-8 lg:gap-12 items-start">
                         
-                        {/* 1. 'md:col-span-8' -> 'col-span-7 md:col-span-8' 
-                             (7/12 на мобильных, 8/12 на десктопе)
-                        */}
-                        <div className="col-span-7 md:col-span-8">
+                        {/* --- НАЧАЛО ИЗМЕНЕНИЙ --- */}
+                        
+                        {/* Блок с описанием (теперь слева / первый) */}
+                        {/* Мы убрали 'mt-8 md:mt-0' отсюда */}
+                        <div className="md:col-span-8">
                             <h1 className="text-4xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
                             <p className="text-lg text-text-secondary mt-1">{novel.author}</p>
                             
@@ -137,23 +131,11 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                             </div>
                         </div>
 
-                        {/* 1. 'md:col-span-4' -> 'col-span-5 md:col-span-4' 
-                             (5/12 на мобильных, 4/12 на десктопе)
-                          2. Убран 'mt-8 md:mt-0', так как он больше не нужен
-                        */}
-                        <div className="col-span-5 md:col-span-4 text-center">
-                            {/* 1. Убраны 'max-w-[280px]' и 'mx-auto'
-                              2. Добавлен 'cursor-pointer' и 'onClick'
-                            */}
-                            <img 
-                                src={`/${novel.cover_url}`} 
-                                alt={novel.title} 
-                                className="w-full rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4] cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
-                                onClick={() => setIsCoverModalOpen(true)}
-                            />
-                            {/* 1. Убраны 'max-w-[280px]' и 'mx-auto'
-                            */}
-                            <div className="mt-6 flex flex-col gap-3 w-full">
+                        {/* Блок с обложкой (теперь справа / второй) */}
+                        {/* Мы добавили 'mt-8 md:mt-0' сюда для правильного отступа на мобильных */}
+                        <div className="md:col-span-4 text-center mt-8 md:mt-0">
+                            <img src={`/${novel.cover_url}`} alt={novel.title} className="w-full max-w-[280px] mx-auto rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4]"/>
+                            <div className="mt-6 flex flex-col gap-3 max-w-[280px] mx-auto">
                                {lastReadChapterId ? (
                                     <button onClick={handleContinueReading} className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover">
                                         Продолжить чтение
@@ -169,7 +151,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                             </div>
                         </div>
                         
-                        {/* --- КОНЕЦ ИЗМЕНЕНИЙ (СЕТКА) --- */}
+                        {/* --- КОНЕЦ ИЗМЕНЕНИЙ --- */}
                     </div>
 
                     {/* Блок со списком глав остается без изменений */}
@@ -208,35 +190,9 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                 </div>
             </div>
 
-            {/* Модальные окна подписки */}
+            {/* Модальные окна остаются без изменений */}
             {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
             {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
-        
-            {/* --- НАЧАЛО ИЗМЕНЕНИЙ (МОДАЛЬНОЕ ОКНО ОБЛОЖКИ) --- */}
-            {isCoverModalOpen && (
-                <div 
-                    className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 transition-opacity duration-300"
-                    onClick={() => setIsCoverModalOpen(false)} 
-                >
-                    {/* Кнопка закрытия */}
-                    <button 
-                        onClick={() => setIsCoverModalOpen(false)}
-                        className="absolute top-4 right-4 bg-white/20 text-white rounded-full w-10 h-10 font-bold text-2xl leading-none backdrop-blur-sm z-50"
-                        aria-label="Закрыть"
-                    >
-                        &times;
-                    </button>
-                    
-                    {/* Изображение */}
-                    <img 
-                        src={`/${novel.cover_url}`} 
-                        alt={novel.title} 
-                        className="max-w-full max-h-[90vh] w-auto h-auto rounded-lg object-contain"
-                        onClick={(e) => e.stopPropagation()} // Остановка клика, чтобы не закрыть модалку
-                    />
-                </div>
-            )}
-            {/* --- КОНЕЦ ИЗМЕНЕНИЙ (МОДАЛЬНОЕ ОКНО ОБЛОЖКИ) --- */}
         </div>
     );
 };

@@ -82,8 +82,10 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
                     
                     {/* --- Блок [Обложка + Кнопки] (Плавает справа) --- */}
-                    {/* Этот блок ПЕРВЫЙ в DOM, это важно */}
-                    <div className="w-full mb-4 md:float-right md:w-2/5 md:ml-4 md:mb-4">
+                    {/* --- ИЗМЕНЕНО --- */}
+                    {/* Уменьшаем ширину и отступы на мобильных (w-1/3) */}
+                    {/* На md: (десктоп) возвращаем как было (w-2/5) */}
+                    <div className="float-right w-1/3 ml-3 mb-3 md:w-2/5 md:ml-4 md:mb-4">
                         <img 
                             src={`/${novel.cover_url}`} 
                             alt={novel.title} 
@@ -119,8 +121,13 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                     {/* --- Блок с контентом, который ОБТЕКАЕТ обложку --- */}
                     {/* Эти элементы идут ПОСЛЕ float-блока, поэтому они его обтекают */}
                     
-                    <h1 className="text-4xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
-                    <p className="text-lg text-text-secondary mt-1">{novel.author}</p>
+                    {/* --- ИЗМЕНЕНО --- */}
+                    {/* Уменьшаем шрифт на мобильных (text-3xl), чтобы он поместился */}
+                    <h1 className="text-3xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
+                    
+                    {/* --- ИЗМЕНЕНО --- */}
+                    {/* Уменьшаем шрифт на мобильных (text-base) */}
+                    <p className="text-base md:text-lg text-text-secondary mt-1">{novel.author}</p>
                     
                     <div className="mt-4">
                          <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Описание</h2>
@@ -128,7 +135,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                             ref={descriptionRef} 
                             className={`relative overflow-hidden transition-all duration-700 ease-in-out text-sm leading-normal text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}
                         >
-                            <div dangerouslySetInnerHTML={{ __html: novel.description }} />
+                            <div dangerouslySetInnerHTML={{ __ html: novel.description }} />
                             {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
                         </div>
                         

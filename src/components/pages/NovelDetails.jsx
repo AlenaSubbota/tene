@@ -83,7 +83,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                     
                     {/* --- Блок [Обложка + Кнопки] (Плавает справа) --- */}
                     {/* Этот блок ПЕРВЫЙ в DOM, это важно */}
-                    <div className="float-right w-2/5 ml-4 mb-4">
+                    <div className="w-full mb-4 md:float-right md:w-2/5 md:ml-4 md:mb-4">
                         <img 
                             src={`/${novel.cover_url}`} 
                             alt={novel.title} 

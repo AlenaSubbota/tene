@@ -140,14 +140,13 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                     {/* --- ИСПРАВЛЕНИЕ: "Очистка" обтекания ПЕРЕМЕЩЕНА СЮДА --- */}
                     <div className="clear-both"></div>
 
-                    {/* --- Блок с жанрами (теперь он НЕ обтекает) --- */}
-                    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border-color">
-                       {novelGenres.map(genre => {
-                            const isHighlighted = genre === '16+' || genre === '18+';
-                            const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
-                            return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
-                        })}
-                    </div>
+                    <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border-color flow-root">
+   {novelGenres.map(genre => {
+        const isHighlighted = genre === '16+' || '18+';
+        const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
+        return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
+    })}
+</div>
 
 
                     {/* Блок со списком глав (он и так был ниже) */}

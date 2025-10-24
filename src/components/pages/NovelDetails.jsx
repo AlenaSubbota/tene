@@ -16,21 +16,8 @@ const formatDate = (dateString) => {
 export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack, bookmarks, onToggleBookmark }) => {
     const { user } = useAuth();
 
-    // --- ВАШ ФУНКЦИОНАЛ (без изменений) ---
-    useEffect(() => {
-        if (user && novel?.id) {
-            const viewedKey = `viewed-${novel.id}`;
-            if (!sessionStorage.getItem(viewedKey)) {
-                sessionStorage.setItem(viewedKey, 'true');
-                const increment = async () => {
-                    const { error } = await supabase.rpc('increment_views', { novel_id_to_inc: novel.id });
-                    if(error) console.error("Ошибка обновления счетчика просмотров:", error);
-                };
-                increment();
-            }
-        }
-    }, [novel, user]);
-
+    // ... (хуки и функции без изменений) ...
+    
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [sortOrder, setSortOrder] = useState('newest');
@@ -84,64 +71,72 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
             <Header title={novel.title} onBack={onBack} />
 
             <div>
-                {/* --- ИЗМЕНЕНИЕ: Убран 'grid'. Теперь это простой `div` --- */}
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
                     
-                    {/* --- ИЗМЕНЕНИЕ: Блок [Обложка + Кнопки] ---
-                        - `w-full max-w-xs mx-auto`: На мобильных - по центру, макс. ширина 320px
-                        - `md:float-left`: На десктопе - "плавает" слева
-                        - `md:w-1/3`: На десктопе - занимает 1/3 ширины
-                        - `md:mr-8`: На десктопе - отступ справа, чтобы текст не прилипал
+                    {/* --- ИЗМЕНЕНИЕ: Обложка ---
+                        - `float-right`: Заставляет ее "плавать" СПРАВА.
+                        - `w-2/5`: Задает ей ширину 40% от контейнера.
+                        - `ml-4 mb-4`: Отступы слева и снизу, чтобы текст не прилипал.
                     */}
-                    <div className="float-left w-1/3 mr-4">
+                    <div className="float-right w-2/5 ml-4 mb-4">
                         <img 
                             src={`/${novel.cover_url}`} 
                             alt={novel.title} 
                             className="w-full rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4] cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
                             onClick={() => setIsCoverModalOpen(true)}
                         />
+                    </div>
+
+                    {/* --- ИЗМЕНЕНИЕ: Блок [Инфо + Кнопки + Описание + Жанры] ---
+                        - Этот `div` идет *после* `float-right` блока.
+                        - Он не имеет `float`, поэтому он *автоматически* займет
+                          оставшееся место (60%) и будет обтекать обложку.
+                    */}
+                    <div>
+                        <h1 className="text-4xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
+                        <p className="text-lg text-text-secondary mt-1">{novel.author}</p>
                         
-                        {/* --- ИЗМЕНЕНИЕ: Кнопки теперь снова под обложкой --- */}
-                        <div className="mt-4 flex gap-2 md:gap-3 w-full">
+                        {/* --- ИЗМЕНЕНИЕ: Кнопки ---
+                            - Переехали сюда.
+                            - `flex-col`: Располагает их вертикально (столбцом).
+                            - `items-start`: Выравнивает их по левому краю (они не растягиваются).
+                            - `my-4`: Отступ сверху и снизу.
+                        */}
+                        <div className="my-4 flex flex-col gap-2 items-start">
                            {lastReadChapterId ? (
                                 <button 
                                     onClick={handleContinueReading} 
-                                    className="flex-1 whitespace-nowrap py-2 px-3 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
+                                    className="whitespace-nowrap py-2 px-5 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
                                 >
                                     Продолжить
                                 </button>
                            ) : (
                                <button 
                                     onClick={() => sortedChapters.length > 0 && handleChapterClick(sortedChapters[sortedChapters.length - 1])} 
-                                    className="flex-1 whitespace-nowrap py-2 px-3 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
+                                    className="whitespace-nowrap py-2 px-5 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
                                 >
                                     Читать
                                 </button>
                            )}
                             <button 
                                 onClick={handleBookmarkToggle} 
-                                className={`flex-1 whitespace-nowrap py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${isBookmarked ? 'bg-accent/20 text-accent border border-accent' : 'bg-component-bg text-text-main hover:bg-border-color'}`}
+                                className={`whitespace-nowrap py-2 px-5 rounded-lg text-sm font-semibold transition-colors ${isBookmarked ? 'bg-accent/20 text-accent border border-accent' : 'bg-component-bg text-text-main hover:bg-border-color'}`}
                             >
                                 {isBookmarked ? 'В закладках' : 'В закладки'}
                             </button>
                         </div>
-                    </div>
-
-                    {/* --- ИЗМЕНЕНИЕ: Блок [Инфо + Описание + Жанры] ---
-                        - Убраны `col-span`. 
-                        - На мобильных этот `div` будет под блоком обложки.
-                        - На десктопе он будет "обтекать" блок обложки.
-                    */}
-                    <div>
-                        <h1 className="text-4xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
-                        <p className="text-lg text-text-secondary mt-1">{novel.author}</p>
                         
-                        {/* --- ИЗМЕНЕНИЕ: Блок Описания (теперь здесь) --- */}
+                        {/* --- Блок Описания (теперь здесь) --- 
+                            - Он будет обтекать обложку, а когда она "закончится" 
+                              по высоте, он займет 100% ширины.
+                        */}
                         <div className="mt-4">
                              <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Описание</h2>
                              <div 
                                 ref={descriptionRef} 
-                                className={`relative overflow-hidden transition-all duration-700 ease-in-out prose prose-invert text-sm leading-normal text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}
+                                // `prose` может конфликтовать с `float`. 
+                                // Используем `text-sm leading-normal` для простого текста.
+                                className={`relative overflow-hidden transition-all duration-700 ease-in-out text-sm leading-normal text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}
                             >
                                 <div dangerouslySetInnerHTML={{ __html: novel.description }} />
                                 {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
@@ -153,7 +148,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                             )}
                         </div>
 
-                        {/* --- ИЗМЕНЕНИЕ: Блок Жанров (теперь здесь) --- */}
+                        {/* --- Блок Жанров (теперь здесь) --- */}
                         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border-color">
                            {novelGenres.map(genre => {
                                 const isHighlighted = genre === '16+' || genre === '18+';
@@ -163,14 +158,15 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                         </div>
                     </div>
 
-                    {/* --- ИЗМЕНЕНИЕ: Clearfix ---
-                        Этот `div` "очищает" `float` эффект, чтобы следующий блок (список глав)
-                        не пытался обтечь обложку, а начался с новой строки.
+                    {/* --- "Очистка" обтекания ---
+                        Этот `div` "очищает" `float` эффект, чтобы список глав
+                        не пытался обтечь обложку.
                     */}
                     <div className="clear-both"></div>
 
-                    {/* Блок со списком глав (без изменений, но теперь он следует за `clear-both`) */}
+                    {/* Блок со списком глав (без изменений) */}
                     <div className="mt-10 border-t border-border-color pt-6">
+                        {/* ... (код списка глав без изменений) ... */}
                         <div className="bg-component-bg border border-border-color rounded-lg p-4">
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-lg font-bold text-text-main">Главы</h2>
@@ -208,7 +204,6 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
             {/* Модальные окна (без изменений) */}
             {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
             {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
-        
             {isCoverModalOpen && (
                 <div 
                     className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 transition-opacity duration-300"

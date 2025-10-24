@@ -40,23 +40,16 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
 
     const lastReadChapterId = useMemo(() => (lastReadData && novel && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null), [lastReadData, novel]);
 
-    // --- ИЗМЕНЕНИЕ: Упрощенный и исправленный useEffect ---
     useEffect(() => {
         const checkHeight = () => {
             if (descriptionRef.current) {
-                // Просто сравниваем полную высоту (scrollHeight)
-                // с видимой высотой (clientHeight)
                 const isOverflowing = descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight;
-                
-                // Мы устанавливаем `true` если оно переполняется,
-                // и НИКОГДА не устанавливаем `false`, чтобы кнопка не исчезла.
                 if (isOverflowing) {
                     setIsLongDescription(true);
                 }
             }
         };
 
-        // Задержка, чтобы React/CSS (max-h-28) успели примениться
         const timer = setTimeout(checkHeight, 150);
         window.addEventListener('resize', checkHeight);
 
@@ -64,7 +57,6 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
             clearTimeout(timer);
             window.removeEventListener('resize', checkHeight);
         };
-    // Запускаем ТОЛЬКО при смене новеллы (или описания)
     }, [novel?.description]); 
 
     const sortedChapters = useMemo(() => {
@@ -123,9 +115,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                         </div>
                     </div>
 
-                    {/* --- ИЗМЕНЕНИЕ: Убрана лишняя `div`-обертка --- */}
-                    {/* Теперь `h1`, `p`, `div` (описание) и `div` (жанры) 
-                        напрямую обтекают плавающий блок */}
+                    {/* --- Блок с контентом, который ОБТЕКАЕТ обложку --- */}
                     
                     <h1 className="text-4xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
                     <p className="text-lg text-text-secondary mt-1">{novel.author}</p>
@@ -147,6 +137,10 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                         )}
                     </div>
 
+                    {/* --- ИСПРАВЛЕНИЕ: "Очистка" обтекания ПЕРЕМЕЩЕНА СЮДА --- */}
+                    <div className="clear-both"></div>
+
+                    {/* --- Блок с жанрами (теперь он НЕ обтекает) --- */}
                     <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border-color">
                        {novelGenres.map(genre => {
                             const isHighlighted = genre === '16+' || genre === '18+';
@@ -155,10 +149,8 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                         })}
                     </div>
 
-                    {/* --- "Очистка" обтекания --- */}
-                    <div className="clear-both"></div>
 
-                    {/* Блок со списком глав */}
+                    {/* Блок со списком глав (он и так был ниже) */}
                     <div className="mt-10 border-t border-border-color pt-6">
                         {/* ... (код списка глав без изменений) ... */}
                         <div className="bg-component-bg border border-border-color rounded-lg p-4">

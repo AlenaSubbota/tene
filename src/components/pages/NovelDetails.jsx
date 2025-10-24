@@ -86,98 +86,85 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
             <div>
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
                     
-                    {/* --- ИЗМЕНЕНИЕ: Сетка Mobile-First --- */}
-                    {/* - `grid-cols-1` (по-умолчанию): Все элементы в 1 колонку (стеком) на мобильных.
-                        - `md:grid-cols-12` (на `md` экранах): Переключаемся на 12-колоночную сетку.
-                        - `gap-4`: Добавляем отступ между блоками (на мобильных это будет Y-отступ).
-                    */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-8 lg:gap-12 items-start">
+                    {/* --- ИЗМЕНЕНИЕ: Сетка теперь 12 колонок ВСЕГДА --- */}
+                    {/* `gap-4` используется для мобильных, `md:gap-8` для десктопа */}
+                    <div className="grid grid-cols-12 gap-4 md:gap-8 lg:gap-12 items-start">
                         
-                        {/* --- ИЗМЕНЕНИЕ: Блок обложки --- */}
-                        {/* - `col-span-1` (по-умолчанию): Занимает всю ширину (1 колонка).
-                            - `md:col-span-4` (на `md` экранах): Занимает 4 колонки.
-                        */}
-                        <div className="col-span-1 md:col-span-4 text-center">
-                            
-                            {/* --- ИЗМЕНЕНИЕ: Обертка для центрирования и ограничения ширины на мобильных --- */}
-                            {/* - `max-w-xs` (320px): Ограничиваем макс. ширину на мобильных.
-                                - `mx-auto`: Центрируем этот блок.
-                                - `md:max-w-none`: Сбрасываем ограничение на `md` экранах.
-                            */}
-                            <div className="w-full max-w-xs mx-auto md:max-w-none">
-                                <img 
-                                    src={`/${novel.cover_url}`} 
-                                    alt={novel.title} 
-                                    className="w-full rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4] cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
-                                    onClick={() => setIsCoverModalOpen(true)}
-                                />
-                                
-                                {/* Эти кнопки теперь будут `w-full` внутри `max-w-xs`,
-                                    что не даст им "сломаться" на маленьком экране.
-                                */}
-                                <div className="mt-4 flex gap-2 md:gap-3 w-full">
-                                {lastReadChapterId ? (
-                                        <button 
-                                            onClick={handleContinueReading} 
-                                            className="flex-1 whitespace-nowrap py-2 px-3 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
-                                        >
-                                            Продолжить
-                                        </button>
-                                ) : (
-                                    <button 
-                                            onClick={() => sortedChapters.length > 0 && handleChapterClick(sortedChapters[sortedChapters.length - 1])} 
-                                            className="flex-1 whitespace-nowrap py-2 px-3 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
-                                        >
-                                            Читать
-                                        </button>
-                                )}
-                                    <button 
-                                        onClick={handleBookmarkToggle} 
-                                        className={`flex-1 whitespace-nowrap py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${isBookmarked ? 'bg-accent/20 text-accent border border-accent' : 'bg-component-bg text-text-main hover:bg-border-color'}`}
-                                    >
-                                        {isBookmarked ? 'В закладках' : 'В закладки'}
-                                    </button>
-                                </div>
-                            </div>
+                        {/* --- ИЗМЕНЕНИЕ: Левая колонка --- */}
+                        {/* Уменьшена до `col-span-4` (1/3) и содержит ТОЛЬКО обложку */}
+                        <div className="col-span-4">
+                            <img 
+                                src={`/${novel.cover_url}`} 
+                                alt={novel.title} 
+                                className="w-full rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4] cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
+                                onClick={() => setIsCoverModalOpen(true)}
+                            />
                         </div>
 
-                        {/* --- ИЗМЕНЕНИЕ: Блок с описанием --- */}
-                        {/* - `col-span-1` (по-умолчанию): Занимает всю ширину (1 колонка), окажется ПОД обложкой.
-                            - `md:col-span-8` (на `md` экранах): Занимает 8 колонок.
-                        */}
-                        <div className="col-span-1 md:col-span-8">
-                            <h1 className="text-4xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
-                            <p className="text-lg text-text-secondary mt-1">{novel.author}</p>
+                        {/* --- ИЗМЕНЕНИЕ: Правая колонка --- */}
+                        {/* Увеличена до `col-span-8` (2/3) и содержит Заголовок, Автора и Жанры */}
+                        <div className="col-span-8">
+                            {/* Шрифты `text-2xl` (моб.) / `md:text-4xl` (деск.) */}
+                            <h1 className="text-2xl md:text-4xl font-bold text-text-main">{novel.title}</h1>
+                            <p className="text-base md:text-lg text-text-secondary mt-1">{novel.author}</p>
                             
-                            <div className="mt-4">
-                                 <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Описание</h2>
-                                 <div 
-                                    ref={descriptionRef} 
-                                    className={`relative overflow-hidden transition-all duration-700 ease-in-out prose prose-invert text-sm leading-normal text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}
-                                >
-                                    <div dangerouslySetInnerHTML={{ __html: novel.description }} />
-                                    {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
-                                </div>
-                                {isLongDescription && (
-                                    <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent hover:text-accent-hover mt-2 hover:underline">
-                                        {isDescriptionExpanded ? 'Свернуть' : 'Развернуть...'}
-                                    </button>
-                                )}
-                            </div>
-
-                            <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border-color">
+                            {/* Жанры переехали сюда, `mt-4` для отступа */}
+                            <div className="flex flex-wrap gap-2 mt-4">
                                {novelGenres.map(genre => {
                                     const isHighlighted = genre === '16+' || genre === '18+';
                                     const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
                                     return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
                                 })}
                             </div>
-
                         </div>
                     </div>
 
-                    {/* Блок со списком глав (без изменений) */}
-                    <div className="mt-10 border-t border-border-color pt-6">
+                    {/* --- ИЗМЕНЕНИЕ: Блок Кнопок --- */}
+                    {/* Вынесен из левой колонки и размещен ПОД сеткой (cover+info) */}
+                    <div className="mt-4 flex gap-2 md:gap-3 w-full">
+                       {lastReadChapterId ? (
+                            <button 
+                                onClick={handleContinueReading} 
+                                className="flex-1 whitespace-nowrap py-2 px-3 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
+                            >
+                                Продолжить
+                            </button>
+                       ) : (
+                           <button 
+                                onClick={() => sortedChapters.length > 0 && handleChapterClick(sortedChapters[sortedChapters.length - 1])} 
+                                className="flex-1 whitespace-nowrap py-2 px-3 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
+                            >
+                                Читать
+                            </button>
+                       )}
+                        <button 
+                            onClick={handleBookmarkToggle} 
+                            className={`flex-1 whitespace-nowrap py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${isBookmarked ? 'bg-accent/20 text-accent border border-accent' : 'bg-component-bg text-text-main hover:bg-border-color'}`}
+                        >
+                            {isBookmarked ? 'В закладках' : 'В закладки'}
+                        </button>
+                    </div>
+
+                    {/* --- ИЗМЕНЕНИЕ: Блок Описания --- */}
+                    {/* Вынесен из правой колонки и размещен ПОД кнопками */}
+                    <div className="mt-6 border-t border-border-color pt-6">
+                         <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Описание</h2>
+                         <div 
+                            ref={descriptionRef} 
+                            className={`relative overflow-hidden transition-all duration-700 ease-in-out prose prose-invert text-sm leading-normal text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}
+                        >
+                            <div dangerouslySetInnerHTML={{ __html: novel.description }} />
+                            {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
+                        </div>
+                        {isLongDescription && (
+                            <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent hover:text-accent-hover mt-2 hover:underline">
+                                {isDescriptionExpanded ? 'Свернуть' : 'Развернуть...'}
+                            </button>
+                        )}
+                    </div>
+
+                    {/* --- ИЗМЕНЕНИЕ: Уменьшен отступ для блока глав --- */}
+                    <div className="mt-6 border-t border-border-color pt-6">
                         <div className="bg-component-bg border border-border-color rounded-lg p-4">
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-lg font-bold text-text-main">Главы</h2>

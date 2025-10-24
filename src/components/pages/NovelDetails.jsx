@@ -44,22 +44,38 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
     // Убрана зависимость [isDescriptionExpanded]. Теперь хук
     // запускается только при загрузке (novel.description) и ресайзе.
     useEffect(() => {
-        if (descriptionRef.current) {
-            const checkHeight = () => {
-                // Проверяем, "скрыта" ли сейчас часть текста
-                const isOverflowing = descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight;
-                setIsLongDescription(isOverflowing);
-            };
-            
-            // Проверяем после рендера и при изменении размера окна
-            const timer = setTimeout(checkHeight, 150);
-            window.addEventListener('resize', checkHeight);
+        const checkHeight = () => {
+            if (descriptionRef.current) {
+                // Временно "разворачиваем" текст, чтобы измерить его полную высоту
+                // (на случай, если он был "свернут" по умолчанию)
+                const originalMaxHeight = descriptionRef.current.style.maxHeight;
+                descriptionRef.current.style.maxHeight = 'none';
+                
+                const scrollHeight = descriptionRef.current.scrollHeight;
+                
+                // Возвращаем как было
+                descriptionRef.current.style.maxHeight = originalMaxHeight;
 
-            return () => {
-                clearTimeout(timer);
-                window.removeEventListener('resize', checkHeight);
-            };
-        }
+                // Сравниваем полную высоту с высотой *свернутого* контейнера (max-h-28 ~ 7rem)
+                // 1rem = 16px, 7rem = 112px.
+                const collapsedHeight = 112; 
+                
+                if (scrollHeight > collapsedHeight) {
+                    setIsLongDescription(true);
+                } else {
+                    setIsLongDescription(false);
+                }
+            }
+        };
+
+        // Небольшая задержка, чтобы React успел отрендерить
+        const timer = setTimeout(checkHeight, 100);
+        window.addEventListener('resize', checkHeight);
+
+        return () => {
+            clearTimeout(timer);
+            window.removeEventListener('resize', checkHeight);
+        };
     }, [novel?.description]); // Зависимость только от текста
 
     const sortedChapters = useMemo(() => {
@@ -84,9 +100,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
             <div>
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
                     
-                    {/* --- ИЗМЕНЕНИЕ: Блок [Обложка + Кнопки] ---
-                        - Этот блок "плавает" справа.
-                    */}
+                    {/* --- Блок [Обложка + Кнопки] (Плавает справа) --- */}
                     <div className="float-right w-2/5 ml-4 mb-4">
                         <img 
                             src={`/${novel.cover_url}`} 
@@ -95,12 +109,10 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                             onClick={() => setIsCoverModalOpen(true)}
                         />
                         
-                        {/* --- ИЗМЕНЕНИЕ: Кнопки теперь здесь, ПОД обложкой --- */}
                         <div className="mt-2 flex flex-col gap-2 w-full">
                            {lastReadChapterId ? (
                                 <button 
                                     onClick={handleContinueReading} 
-                                    // Убрал `px-5` и `whitespace-nowrap`, чтобы текст мог переноситься
                                     className="py-2 px-3 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
                                 >
                                     Продолжить
@@ -122,27 +134,22 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                         </div>
                     </div>
 
-                    {/* --- Блок [Инфо + Описание + Жанры] ---
-                        - Он будет обтекать "плавающий" блок.
-                    */}
+                    {/* --- Блок [Инфо + Описание + Жанры] (Обтекает) --- */}
                     <div>
                         <h1 className="text-4xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
                         <p className="text-lg text-text-secondary mt-1">{novel.author}</p>
-                        
-                        {/* --- КНОПКИ ОТСЮДА УБРАНЫ --- */}
                         
                         <div className="mt-4">
                              <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Описание</h2>
                              <div 
                                 ref={descriptionRef} 
+                                // Убраны классы `prose`, чтобы не конфликтовать с float
                                 className={`relative overflow-hidden transition-all duration-700 ease-in-out text-sm leading-normal text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}
                             >
                                 <div dangerouslySetInnerHTML={{ __html: novel.description }} />
-                                {/* Этот градиент будет виден, только если текст сжат И он длинный */}
                                 {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
                             </div>
                             
-                            {/* --- ИЗМЕНЕНИЕ: Кнопка "Развернуть" теперь не исчезнет --- */}
                             {isLongDescription && (
                                 <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent hover:text-accent-hover mt-2 hover:underline">
                                     {isDescriptionExpanded ? 'Свернуть' : 'Развернуть...'}
@@ -152,7 +159,8 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
 
                         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border-color">
                            {novelGenres.map(genre => {
-                                const isHighlighted = genre === '16+' || '18+';
+                                // --- ИЗМЕНЕНИЕ: Исправлен баг с || '18+' ---
+                                const isHighlighted = genre === '16+' || genre === '18+';
                                 const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
                                 return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
                             })}

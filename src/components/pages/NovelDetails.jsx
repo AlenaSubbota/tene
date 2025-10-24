@@ -15,8 +15,6 @@ const formatDate = (dateString) => {
 
 export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack, bookmarks, onToggleBookmark }) => {
     const { user } = useAuth();
-
-    // ... (хуки и функции без изменений) ...
     
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
@@ -42,14 +40,27 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
 
     const lastReadChapterId = useMemo(() => (lastReadData && novel && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null), [lastReadData, novel]);
 
+    // --- ИЗМЕНЕНИЕ: Исправлен баг с кнопкой "Развернуть" ---
+    // Убрана зависимость [isDescriptionExpanded]. Теперь хук
+    // запускается только при загрузке (novel.description) и ресайзе.
     useEffect(() => {
         if (descriptionRef.current) {
-            const checkHeight = () => setIsLongDescription(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
+            const checkHeight = () => {
+                // Проверяем, "скрыта" ли сейчас часть текста
+                const isOverflowing = descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight;
+                setIsLongDescription(isOverflowing);
+            };
+            
+            // Проверяем после рендера и при изменении размера окна
             const timer = setTimeout(checkHeight, 150);
             window.addEventListener('resize', checkHeight);
-            return () => { clearTimeout(timer); window.removeEventListener('resize', checkHeight); };
+
+            return () => {
+                clearTimeout(timer);
+                window.removeEventListener('resize', checkHeight);
+            };
         }
-    }, [novel?.description, isDescriptionExpanded]);
+    }, [novel?.description]); // Зависимость только от текста
 
     const sortedChapters = useMemo(() => {
         if (!Array.isArray(chapters)) return [];
@@ -73,10 +84,8 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
             <div>
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
                     
-                    {/* --- ИЗМЕНЕНИЕ: Обложка ---
-                        - `float-right`: Заставляет ее "плавать" СПРАВА.
-                        - `w-2/5`: Задает ей ширину 40% от контейнера.
-                        - `ml-4 mb-4`: Отступы слева и снизу, чтобы текст не прилипал.
+                    {/* --- ИЗМЕНЕНИЕ: Блок [Обложка + Кнопки] ---
+                        - Этот блок "плавает" справа.
                     */}
                     <div className="float-right w-2/5 ml-4 mb-4">
                         <img 
@@ -85,62 +94,55 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                             className="w-full rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4] cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
                             onClick={() => setIsCoverModalOpen(true)}
                         />
-                    </div>
-
-                    {/* --- ИЗМЕНЕНИЕ: Блок [Инфо + Кнопки + Описание + Жанры] ---
-                        - Этот `div` идет *после* `float-right` блока.
-                        - Он не имеет `float`, поэтому он *автоматически* займет
-                          оставшееся место (60%) и будет обтекать обложку.
-                    */}
-                    <div>
-                        <h1 className="text-4xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
-                        <p className="text-lg text-text-secondary mt-1">{novel.author}</p>
                         
-                        {/* --- ИЗМЕНЕНИЕ: Кнопки ---
-                            - Переехали сюда.
-                            - `flex-col`: Располагает их вертикально (столбцом).
-                            - `items-start`: Выравнивает их по левому краю (они не растягиваются).
-                            - `my-4`: Отступ сверху и снизу.
-                        */}
-                        <div className="my-4 flex flex-col gap-2 items-start">
+                        {/* --- ИЗМЕНЕНИЕ: Кнопки теперь здесь, ПОД обложкой --- */}
+                        <div className="mt-2 flex flex-col gap-2 w-full">
                            {lastReadChapterId ? (
                                 <button 
                                     onClick={handleContinueReading} 
-                                    className="whitespace-nowrap py-2 px-5 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
+                                    // Убрал `px-5` и `whitespace-nowrap`, чтобы текст мог переноситься
+                                    className="py-2 px-3 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
                                 >
                                     Продолжить
                                 </button>
                            ) : (
                                <button 
                                     onClick={() => sortedChapters.length > 0 && handleChapterClick(sortedChapters[sortedChapters.length - 1])} 
-                                    className="whitespace-nowrap py-2 px-5 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
+                                    className="py-2 px-3 rounded-lg bg-accent text-white text-sm font-semibold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover"
                                 >
                                     Читать
                                 </button>
                            )}
                             <button 
                                 onClick={handleBookmarkToggle} 
-                                className={`whitespace-nowrap py-2 px-5 rounded-lg text-sm font-semibold transition-colors ${isBookmarked ? 'bg-accent/20 text-accent border border-accent' : 'bg-component-bg text-text-main hover:bg-border-color'}`}
+                                className={`py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${isBookmarked ? 'bg-accent/20 text-accent border border-accent' : 'bg-component-bg text-text-main hover:bg-border-color'}`}
                             >
                                 {isBookmarked ? 'В закладках' : 'В закладки'}
                             </button>
                         </div>
+                    </div>
+
+                    {/* --- Блок [Инфо + Описание + Жанры] ---
+                        - Он будет обтекать "плавающий" блок.
+                    */}
+                    <div>
+                        <h1 className="text-4xl md:text-5xl font-bold text-text-main">{novel.title}</h1>
+                        <p className="text-lg text-text-secondary mt-1">{novel.author}</p>
                         
-                        {/* --- Блок Описания (теперь здесь) --- 
-                            - Он будет обтекать обложку, а когда она "закончится" 
-                              по высоте, он займет 100% ширины.
-                        */}
+                        {/* --- КНОПКИ ОТСЮДА УБРАНЫ --- */}
+                        
                         <div className="mt-4">
                              <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Описание</h2>
                              <div 
                                 ref={descriptionRef} 
-                                // `prose` может конфликтовать с `float`. 
-                                // Используем `text-sm leading-normal` для простого текста.
                                 className={`relative overflow-hidden transition-all duration-700 ease-in-out text-sm leading-normal text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}
                             >
                                 <div dangerouslySetInnerHTML={{ __html: novel.description }} />
+                                {/* Этот градиент будет виден, только если текст сжат И он длинный */}
                                 {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
                             </div>
+                            
+                            {/* --- ИЗМЕНЕНИЕ: Кнопка "Развернуть" теперь не исчезнет --- */}
                             {isLongDescription && (
                                 <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent hover:text-accent-hover mt-2 hover:underline">
                                     {isDescriptionExpanded ? 'Свернуть' : 'Развернуть...'}
@@ -148,23 +150,19 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                             )}
                         </div>
 
-                        {/* --- Блок Жанров (теперь здесь) --- */}
                         <div className="flex flex-wrap gap-2 mt-4 pt-4 border-t border-border-color">
                            {novelGenres.map(genre => {
-                                const isHighlighted = genre === '16+' || genre === '18+';
+                                const isHighlighted = genre === '16+' || '18+';
                                 const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
                                 return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
                             })}
                         </div>
                     </div>
 
-                    {/* --- "Очистка" обтекания ---
-                        Этот `div` "очищает" `float` эффект, чтобы список глав
-                        не пытался обтечь обложку.
-                    */}
+                    {/* --- "Очистка" обтекания --- */}
                     <div className="clear-both"></div>
 
-                    {/* Блок со списком глав (без изменений) */}
+                    {/* Блок со списком глав */}
                     <div className="mt-10 border-t border-border-color pt-6">
                         {/* ... (код списка глав без изменений) ... */}
                         <div className="bg-component-bg border border-border-color rounded-lg p-4">

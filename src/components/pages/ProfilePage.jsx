@@ -5,7 +5,7 @@ import { supabase } from '../../supabase-config'; // Импортируем supa
 import { Header } from "../Header.jsx";
 import { LogOutIcon } from "../icons.jsx";
 
-export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, onThemeToggle, currentTheme, onShowHelp }) => {
+export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, onThemeChange, currentTheme, onShowHelp }) => {
     
     // Новая функция выхода
     const handleLogout = async () => {
@@ -53,15 +53,44 @@ export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId
           
             {/* ... остальной JSX остается без изменений ... */}
             <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4 mb-4">
-                 <h3 className="font-bold mb-2">Настройки</h3>
-                 <div className="flex items-center justify-between">
-                     <span>Тёмная тема</span>
-                     <button 
-                         onClick={onThemeToggle}
-                         className="w-14 h-7 rounded-full bg-background flex items-center transition-colors p-1"
-                     >
-                         <div className={`w-5 h-5 rounded-full bg-accent shadow-md transform transition-transform ${currentTheme === 'dark' ? 'translate-x-7' : ''}`} />
-                     </button>
+                 <h3 className="font-bold mb-2">Тема оформления</h3>
+                 <div className="flex flex-col space-y-2">
+                    {/* Опция 1: Светлая */}
+                     <label className="flex items-center justify-between">
+                         <span>Светлая</span>
+                         <input
+                             type="radio"
+                             name="theme"
+                             value="light"
+                             checked={currentTheme === 'light'}
+                             onChange={() => onThemeChange('light')}
+                             className="form-radio text-accent focus:ring-accent"
+                         />
+                     </label>
+                     {/* Опция 2: Темная (Бирюза) */}
+                     <label className="flex items-center justify-between">
+                         <span>Тёмная (Бирюза)</span>
+                         <input
+                             type="radio"
+                             name="theme"
+                             value="dark"
+                             checked={currentTheme === 'dark'}
+                             onChange={() => onThemeChange('dark')}
+                             className="form-radio text-accent focus:ring-accent"
+                         />
+                     </label>
+                     {/* Опция 3: Темная (Золото) */}
+                     <label className="flex items-center justify-between">
+                         <span>Тёмная (Золото)</span>
+                         <input
+                             type="radio"
+                             name="theme"
+                             value="dark-amber"
+                             checked={currentTheme === 'dark-amber'}
+                             onChange={() => onThemeChange('dark-amber')}
+                             className="form-radio text-accent focus:ring-accent"
+                         />
+                     </label>
                  </div>
              </div>
              <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4 mb-4">

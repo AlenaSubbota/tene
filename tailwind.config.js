@@ -11,6 +11,7 @@ export default {
       colors: {
         background: 'rgb(var(--background) / <alpha-value>)',
         'text-main': 'rgb(var(--text-main) / <alpha-value>)',
+        'text-secondary': 'rgb(var(--text-secondary) / <alpha-value>)',
         'component-bg': 'rgb(var(--component-bg) / <alpha-value>)',
         accent: 'rgb(var(--accent) / <alpha-value>)',
         'accent-hover': 'rgb(var(--accent-hover) / <alpha-value>)',
@@ -48,5 +49,7 @@ export default {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    require('@tailwindcss/forms'),
+  ],
 }

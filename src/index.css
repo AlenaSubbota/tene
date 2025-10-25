@@ -23,27 +23,56 @@ font-weight: bold;
 
 @layer base {
   :root {
-    /* Конвертируем HEX в RGB */
-    --background: 245 241 237; /* #F5F1ED */
-    --text-main: 44 58 71;    /* #2C3A47 */
-    --component-bg: 255 255 255; /* #FFFFFF */
-    --accent: 154 123 102;   /* #9A7B66 */
-    --accent-hover: 138 107 86; /* #8A6B56 */
-    --border-color: 234 229 224; /* #EAE5E0 */
-    --genre-highlight-border: 239 62 44; /* #EF3E2C */
-    --genre-highlight-text: 239 62 44;   /* #EF3E2C */
+    /* ЗАДАЧА 1: Новая СВЕТЛАЯ палитра 
+    */
+    --background: 236 236 236;   /* #ECECEC */
+    --text-main: 59 59 59;       /* #3B3B3B */
+    --component-bg: 252 250 250; /* #FCFAFA */
+    --accent: 236 202 203;       /* #ECCACB */
+    --accent-hover: 224 184 185; /* #E0B8B9 */
+    --border-color: 236 236 236; /* #ECECEC */
+    
+    /* КОРРЕКЦИЯ: Я заменил ваш светло-розовый (#ECCACB) 
+      на читаемый темно-розовый (#B26A7A) для текста.
+    */
+    --genre-highlight-border: 178 106 122; /* #B26A7A */
+    --genre-highlight-text: 178 106 122;   /* #B26A7A */
+    
+    /* Добавляем пустую переменную для вторичного текста, 
+       чтобы не было ошибок 
+    */
+    --text-secondary: 59 59 59; /* #3B3B3B */
   }
 
+  /* ЗАДАЧА 2 (Тема 1): "Синяя с бирюзовым" (Slate/Teal)
+    Это будет ваша темная тема ПО УМОЛЧАНИЮ (класс .dark)
+  */
   .dark {
-    /* И для тёмной темы тоже */
-    --background: 49 39 39;     /* #312727 */
-    --text-main: 255 255 255;   /* #FFFFFF */
-    --component-bg: 49 39 39;     /* #312727 */
-    --accent: 239 62 44;      /* #EF3E2C */
-    --accent-hover: 217 52 34;   /* #D93422 */
-    --border-color: 74 74 74;      /* #4a4a4a */
-    --genre-highlight-border: 239 62 44; /* #EF3E2C */
-    --genre-highlight-text: 239 62 44;   /* #EF3E2C */
+    --background: 26 32 44;         /* #1A202C */
+    --component-bg: 45 55 72;       /* #2D3748 */
+    --border-color: 74 85 104;      /* #4A5568 */
+    --text-main: 247 250 252;       /* #F7FAFC */
+    --text-secondary: 160 174 192;  /* #A0AEC0 */
+    --accent: 56 178 172;           /* #38B2AC */
+    --accent-hover: 49 151 149;     /* #319795 */
+    --genre-highlight-border: 56 178 172; /* #38B2AC */
+    --genre-highlight-text: 56 178 172;   /* #38B2AC */
+  }
+
+  /* ЗАДАЧА 2 (Тема 2): "Золото/Янтарь" (Amber/Gold)
+    Этот селектор (.dark.theme-amber) ПЕРЕОПРЕДЕЛИТ 
+    цвета по умолчанию, если он будет добавлен.
+  */
+  .dark.theme-amber {
+    --background: 16 16 18;         /* #101012 */
+    --component-bg: 24 24 27;       /* #18181B */
+    --border-color: 39 39 42;       /* #27272A */
+    --text-main: 244 244 245;       /* #F4F4F5 */
+    --text-secondary: 161 161 170;  /* #A1A1AA */
+    --accent: 251 191 36;           /* #FBBF24 */
+    --accent-hover: 245 158 11;     /* #F59E0B */
+    --genre-highlight-border: 251 191 36; /* #FBBF24 */
+    --genre-highlight-text: 251 191 36;   /* #FBBF24 */
   }
 }
 

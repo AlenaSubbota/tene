@@ -50,11 +50,20 @@ export default function App() {
   const BOT_USERNAME = "tenebrisverbot";
   const userId = user?.id;
 
-  // Эффект для применения темы
-  useEffect(() => {
+useEffect(() => {
     const root = window.document.documentElement;
-    root.classList.remove('light', 'dark');
-    root.classList.add(theme);
+
+    // Сначала удаляем все классы тем
+    root.classList.remove('dark', 'theme-amber');
+
+    // Применяем классы в зависимости от состояния
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else if (theme === 'dark-amber') {
+      root.classList.add('dark', 'theme-amber');
+    }
+    // Если theme === 'light', никакие классы не добавляются
+
     localStorage.setItem('theme', theme);
   }, [theme]);
 
@@ -207,8 +216,6 @@ export default function App() {
     }
   }, [userId]);
 
-  const handleThemeToggle = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
-
   const handleTextSizeChange = useCallback((amount) => {
     setFontSize(prevSize => {
       const newSize = Math.max(12, Math.min(32, prevSize + amount));
@@ -304,7 +311,7 @@ export default function App() {
         </>);
       case 'search': return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
       case 'bookmarks': return <BookmarksPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
-      case 'profile': return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={() => setIsSubModalOpen(true)} userId={userId} onThemeToggle={handleThemeToggle} currentTheme={theme} onShowHelp={() => setShowHelp(true)} />;
+      case 'profile': return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={() => setIsSubModalOpen(true)} userId={userId} onThemeChange={setTheme} currentTheme={theme} onShowHelp={() => setShowHelp(true)} />;
       default: return <Header title="Библиотека" />;
     }
   };

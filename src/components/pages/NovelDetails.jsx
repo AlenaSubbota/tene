@@ -13,10 +13,13 @@ const formatDate = (dateString) => {
     return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
+// [ИЗМЕНЕНО] Устанавливаем, сколько жанров показывать сразу
+const VISIBLE_GENRES_COUNT = 4;
+
 export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack, bookmarks, onToggleBookmark }) => {
     const { user } = useAuth();
 
-    // ... (весь ваш код хуков остается без изменений) ...
+    // ... (хук для просмотров без изменений) ...
     useEffect(() => {
         if (user && novel?.id) {
             const viewedKey = `viewed-${novel.id}`;
@@ -31,49 +34,27 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
         }
     }, [novel, user]);
 
+    // Состояния
     const [isSubModalOpen, setIsSubModalOpen] = useState(false);
     const [selectedPlan, setSelectedPlan] = useState(null);
     const [sortOrder, setSortOrder] = useState('newest');
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const descriptionRef = useRef(null);
     const [isLongDescription, setIsLongDescription] = useState(false);
-    const [isMounted, setIsMounted] = useState(false);
-    
     const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
     
+    // [ИЗМЕНЕНО] Новое состояние для спойлера жанров
+    const [showAllGenres, setShowAllGenres] = useState(false);
+    
+    // Мемоизированные значения
     const isBookmarked = useMemo(() => {
         if (!novel?.id || !bookmarks) return false;
         return bookmarks.includes(novel.id);
     }, [bookmarks, novel]);
 
-    const handleBookmarkToggle = (e) => {
-        e.stopPropagation(); 
-        if (!novel) return;
-        onToggleBookmark(novel.id);
-    };
-
-    useEffect(() => {
-        if (novel) {
-            const timer = setTimeout(() => setIsMounted(true), 50);
-            return () => clearTimeout(timer);
-        } else {
-            setIsMounted(false);
-        }
-    }, [novel]); 
-
     const novelGenres = Array.isArray(novel?.genres) ? novel.genres : [];
     const hasActiveSubscription = subscription?.expires_at && new Date(subscription.expires_at) > new Date();
-
     const lastReadChapterId = useMemo(() => (lastReadData && novel && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null), [lastReadData, novel]);
-
-    useEffect(() => {
-        if (descriptionRef.current) {
-            const checkHeight = () => setIsLongDescription(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
-            const timer = setTimeout(checkHeight, 150);
-            window.addEventListener('resize', checkHeight);
-            return () => { clearTimeout(timer); window.removeEventListener('resize', checkHeight); };
-        }
-    }, [novel?.description, isDescriptionExpanded]);
 
     const sortedChapters = useMemo(() => {
         if (!Array.isArray(chapters)) return [];
@@ -81,6 +62,36 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
         return sortOrder === 'newest' ? chaptersCopy.sort((a, b) => b.id - a.id) : chaptersCopy.sort((a, b) => a.id - b.id);
     }, [chapters, sortOrder]);
 
+    // [ИЗМЕНЕНО] Логика для отображения жанров
+    const genresToShow = useMemo(() => {
+        if (showAllGenres) {
+            return novelGenres;
+        }
+        return novelGenres.slice(0, VISIBLE_GENRES_COUNT);
+    }, [novelGenres, showAllGenres]);
+    
+    const hiddenGenresCount = novelGenres.length - genresToShow.length;
+
+    // ... (useEffect для описания без изменений) ...
+    useEffect(() => {
+        if (descriptionRef.current) {
+            const checkHeight = () => {
+                 if (descriptionRef.current) {
+                    setIsLongDescription(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
+                 }
+            }
+            const timer = setTimeout(checkHeight, 150);
+            window.addEventListener('resize', checkHeight);
+            
+            return () => { 
+                clearTimeout(timer); 
+                window.removeEventListener('resize', checkHeight); 
+            };
+        }
+    }, [novel?.description]);
+
+    // Обработчики
+    const handleBookmarkToggle = (e) => { e.stopPropagation(); if (!novel) return; onToggleBookmark(novel.id); };
     const handleChapterClick = (chapter) => { if (!hasActiveSubscription && chapter.isPaid) setIsSubModalOpen(true); else onSelectChapter(chapter); };
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
     const handlePlanSelect = (plan) => { setSelectedPlan(plan); setIsSubModalOpen(false); };
@@ -95,31 +106,24 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
         <div className="bg-background min-h-screen text-text-main font-sans">
             <Header title={novel.title} onBack={onBack} />
 
-            <div className={`transition-opacity duration-700 ease-in ${isMounted ? 'opacity-100' : 'opacity-0'}`}>
+            <div key={novel.id} className="animate-fade-in"> 
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
                     
-                    {/* --- НАЧАЛО ИЗМЕНЕНИЙ (НОВАЯ СТРУКТУРА) --- */}
+                    {/* --- [ИЗМЕНЕНО] НОВАЯ СТРУКТУРА БЛОКА 1 --- */}
                     
-                    {/* БЛОК 1: Обложка + Заголовок/Кнопки */}
                     <div className="grid grid-cols-12 gap-4 md:gap-8 lg:gap-12 items-start">
                         
-                        {/* Левая колонка: Обложка */}
-                        <div className="col-span-5 md:col-span-4 text-center"> 
+                        {/* Левая колонка: Обложка + Кнопки */}
+                        <div className="col-span-5 md:col-span-4"> 
                             <img 
                                 src={`/${novel.cover_url}`} 
                                 alt={novel.title} 
                                 className="w-full mx-auto rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4] cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
                                 onClick={() => setIsCoverModalOpen(true)}
                             />
-                        </div>
-
-                        {/* Правая колонка: Заголовок, Автор, Кнопки */}
-                        <div className="col-span-7 md:col-span-8"> 
-                            <h1 className="text-xl md:text-4xl font-bold text-text-main text-left">{novel.title}</h1>
-                            <p className="text-sm md:text-lg text-text-secondary mt-1 text-left">{novel.author}</p>
                             
-                            {/* Кнопки "Читать" и "В закладки" - ПЕРЕМЕЩЕНЫ СЮДА */}
-                            <div className="mt-4 md:mt-6 flex flex-col gap-3 w-full">
+                            {/* [ИЗМЕНЕНО] Кнопки "Читать" и "В закладки" ПЕРЕМЕЩЕНЫ СЮДА */}
+                            <div className="mt-4 flex flex-col gap-3 w-full">
                                {lastReadChapterId ? (
                                     <button onClick={handleContinueReading} className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover text-sm md:text-base">
                                         Продолжить
@@ -134,24 +138,42 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                                 </button>
                             </div>
                         </div>
-                    </div>
 
-                    {/* БЛОК 2: Жанры (Новый отдельный блок) */}
-                    <div className="mt-8 md:mt-10 border-t border-border-color pt-6">
-                         <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Жанры</h2>
-                         <div className="flex flex-wrap gap-2 justify-start">
-                           {novelGenres.map(genre => {
-                                const isHighlighted = genre === '16+' || genre === '18+';
-                                const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
-                                return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
-                            })}
+                        {/* Правая колонка: Заголовок, Автор, ЖАНРЫ */}
+                        <div className="col-span-7 md:col-span-8"> 
+                            <h1 className="text-xl md:text-4xl font-bold text-text-main text-left">{novel.title}</h1>
+                            <p className="text-sm md:text-lg text-text-secondary mt-1 text-left">{novel.author}</p>
+                            
+                            {/* [ИЗМЕНЕНО] Блок жанров ПЕРЕМЕЩЕН СЮДА */}
+                            <div className="mt-4 md:mt-6">
+                                <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Жанры</h2>
+                                <div className="flex flex-wrap gap-2 justify-start">
+                                  {genresToShow.map(genre => {
+                                      const isHighlighted = genre === '16+' || genre === '18+';
+                                      const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
+                                      return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
+                                  })}
+                                  
+                                  {/* [ИЗМЕНЕНО] Кнопка спойлера "+ еще" */}
+                                  {hiddenGenresCount > 0 && (
+                                      <button 
+                                          onClick={() => setShowAllGenres(true)} 
+                                          className="text-xs font-semibold px-3 py-1 rounded-md text-accent bg-accent/10 hover:bg-accent/20"
+                                      >
+                                          + {hiddenGenresCount} еще
+                                      </button>
+                                  )}
+                                </div>
+                            </div>
                         </div>
                     </div>
 
-                    {/* БЛОК 3: Описание */}
+                    {/* [ИЗМЕНЕНО] БЛОК 2 (Жанры) теперь удален отсюда */}
+
+                    {/* БЛОК 3: Описание (теперь это Блок 2) */}
                     <div className="mt-8 md:mt-10 border-t border-border-color pt-6">
                         <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Описание</h2>
-                        <div ref={descriptionRef} className={`relative overflow-hidden transition-all duration-700 ease-in-out prose prose-invert prose-sm text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[9999px]' : 'max-h-28'}`}>
+                        <div ref={descriptionRef} className={`relative overflow-hidden transition-[max-height] duration-500 ease-in-out prose prose-invert prose-sm text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[2000px]' : 'max-h-28'}`}>
                             <div dangerouslySetInnerHTML={{ __html: novel.description }} />
                             {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
                         </div>
@@ -161,10 +183,10 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                             </button>
                         )}
                     </div>
-                    {/* --- КОНЕЦ ИЗМЕНЕНИЙ --- */}
 
-                    {/* БЛОК 4: Главы */}
+                    {/* БЛОК 4: Главы (теперь это Блок 3) */}
                     <div className="mt-8 md:mt-10 border-t border-border-color pt-6">
+                        {/* ... (Содержимое блока глав остается без изменений) ... */}
                         <div className="bg-component-bg border border-border-color rounded-lg p-4">
                             <div className="flex justify-between items-center mb-4">
                                 <h2 className="text-lg font-bold text-text-main">Главы</h2>

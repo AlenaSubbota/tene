@@ -401,24 +401,55 @@ const handleDelete = useCallback(async (commentId) => {
     
     const handlePlanSelect = (plan) => { setSelectedPlan(plan); setIsSubModalOpen(false); };
     
-    const handlePaymentMethodSelect = async (method) => { 
+
+    // --- [ИСПРАВЛЕНИЕ УЯЗВИМОСТИ 7] ---
+    // Мы полностью меняем эту функцию
+    const handlePaymentMethodSelect = async (method) => {
         const tg = window.Telegram?.WebApp;
         if (!tg || !userId || !selectedPlan) {
           tg?.showAlert("Произошла ошибка.");
           return;
         }
+        
+        // --- [ИСПРАВЛЕНИЕ - Шаг 1] Показываем подтверждение *до* запроса в базу ---
         tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты...", async (confirmed) => {
           if (!confirmed) return;
-          const { error } = await supabase.from('profiles').upsert({ 
-              id: userId, 
-              pending_subscription: { ...selectedPlan, method, date: new Date().toISOString() } 
-          });
-          if(error) console.error("Ошибка обновления pending_subscription:", error);
-          
-          tg.openTelegramLink(`https://t.me/${botUsername}?start=${userId}`);
-          tg.close();
+
+          // --- [ИСПРАВЛЕНИЕ - Шаг 2] Выполняем действия *после* подтверждения ---
+          try {
+              // 1. Генерируем секретный одноразовый токен
+              const telegramToken = crypto.randomUUID();
+              console.log('Generated Telegram Token:', telegramToken); // Логируем токен
+
+              // 2. Сохраняем токен и pending_subscription в профиль пользователя
+              //    !!! ДОЖИДАЕМСЯ ЗАВЕРШЕНИЯ ЗАПИСИ В БАЗУ !!!
+              const { data, error } = await supabase.from('profiles').upsert({
+                  id: userId,
+                  pending_subscription: { ...selectedPlan, method, date: new Date().toISOString() },
+                  telegram_link_token: telegramToken // <-- ДОБАВЛЕНО НОВОЕ ПОЛЕ
+              }).select().single(); // Добавили select().single() для проверки
+              
+              if(error) {
+                  console.error("Ошибка обновления профиля токеном:", error);
+                  tg?.showAlert(`Не удалось сгенерировать безопасную ссылку: ${error.message}`);
+                  return; // Прерываем выполнение, если не удалось сохранить
+              }
+
+              console.log('Profile updated successfully with token:', data); // Логируем успешное обновление
+
+              // 3. Используем СЕКРЕТНЫЙ ТОКЕН, а не userId, в ссылке
+              //    !!! ТОЛЬКО ПОСЛЕ УСПЕШНОГО СОХРАНЕНИЯ !!!
+              tg.openTelegramLink(`https://t.me/${botUsername}?start=${telegramToken}`); // <-- ИЗМЕНЕНО
+              tg.close();
+
+          } catch (e) {
+               console.error("Критическая ошибка в handlePaymentMethodSelect:", e);
+               tg?.showAlert("Произошла непредвиденная ошибка. Попробуйте снова.");
+          }
         });
     };
+    // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+
     
     const renderMarkdown = (markdownText) => {
         if (window.marked) return window.marked.parse(markdownText || "");

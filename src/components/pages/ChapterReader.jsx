@@ -36,7 +36,7 @@ const usePersistentState = (key, defaultValue) => {
 
 
 export const ChapterReader = ({
-    chapter, novel, userId, userName, subscription, botUsername, onBack, isUserAdmin,
+    chapter, novel, userId, userName, fontClass, onFontChange, subscription, botUsername, onBack, isUserAdmin,
     allChapters, onSelectChapter,
     fontSize, onFontSizeChange // fontSize и onFontSizeChange приходят из App.jsx
 }) => {
@@ -60,7 +60,6 @@ export const ChapterReader = ({
     const [isLoadingContent, setIsLoadingContent] = useState(true);
     
     // --- ИСПРАВЛЕНИЕ: Состояния для Настроек теперь используют localStorage ---
-    const [fontFamily, setFontFamily] = usePersistentState("reader_fontFamily", "'Montserrat', sans-serif");
     const [lineHeight, setLineHeight] = usePersistentState("reader_lineHeight", 1.7);
     const [textAlign, setTextAlign] = usePersistentState("reader_textAlign", 'left');
     const [textIndent, setTextIndent] = usePersistentState("reader_textIndent", 1.5);
@@ -430,9 +429,6 @@ const handleDelete = useCallback(async (commentId) => {
     const handleFontSizeChange = (amount) => {
         onFontSizeChange(amount); // Эта функция из App.jsx, она уже сохраняет
     };
-    const handleFontFamilyChange = (font) => {
-        setFontFamily(font); // Сохранит в localStorage
-    };
     const handleLineHeightChange = (amount) => {
         setLineHeight(prev => Math.max(1.2, Math.min(2.5, parseFloat((prev + amount).toFixed(1))))); // Сохранит в localStorage
     };
@@ -462,16 +458,15 @@ const handleDelete = useCallback(async (commentId) => {
             <h2 className="text-lg sm:text-xl mb-8 text-center opacity-80 font-sans">{chapter.title}</h2>
             
             <div 
-                className="whitespace-normal chapter-content prose dark:prose-invert max-w-none" 
-                style={{ 
-                    fontSize: `${fontSize}px`,
-                    fontFamily: fontFamily,
-                    lineHeight: lineHeight,
-                    textAlign: textAlign,
-                    textIndent: `${textIndent}em`
-                }} 
-                dangerouslySetInnerHTML={{ __html: isLoadingContent ? '<p class="text-center">Загрузка...</p>' : renderMarkdown(chapterContent) }} 
-            />
+            className={`whitespace-normal chapter-content prose dark:prose-invert max-w-none ${fontClass}`} 
+            style={{ 
+                fontSize: `${fontSize}px`,
+                lineHeight: lineHeight,
+                textAlign: textAlign,
+                textIndent: `${textIndent}em`
+            }} 
+            dangerouslySetInnerHTML={{ __html: isLoadingContent ? '<p class="text-center">Загрузка...</p>' : renderMarkdown(chapterContent) }} 
+        />
             
             <div className="text-center my-8 text-accent font-bold text-2xl tracking-widest">╚══ ≪ °❈° ≫ ══╝</div>
             
@@ -550,14 +545,60 @@ const handleDelete = useCallback(async (commentId) => {
                               <button onClick={() => handleFontSizeChange(1)} className="w-10 h-10 rounded-full bg-background flex items-center justify-center text-xl font-bold">+</button>
                           </div>
                       </div>
-                      <div className="flex items-center justify-between">
-                          <span>Шрифт</span>
-                          <div className="flex gap-2 flex-wrap">
-                              <button onClick={() => handleFontFamilyChange("'JetBrains Mono', monospace")} className={`px-3 py-1 rounded-md text-sm ${fontFamily.includes('JetBrains Mono') ? 'bg-accent text-white' : 'bg-background'}`}>Стандарт</button>
-                              <button onClick={() => handleFontFamilyChange("'Montserrat', sans-serif")} className={`px-3 py-1 rounded-md text-sm ${fontFamily.includes('Montserrat') ? 'bg-accent text-white' : 'bg-background'}`}>Montserrat</button>
-                              <button onClick={() => handleFontFamilyChange("'Lora', serif")} className={`px-3 py-1 rounded-md text-sm ${fontFamily.includes('Lora') ? 'bg-accent text-white' : 'bg-background'}`}>Lora</button>
-                          </div>
+                     {/* --- Блок выбора шрифта (теперь использует пропсы) --- */}
+                  <div>
+                      <h4 className="text-sm font-bold mb-3">Шрифт</h4>
+                      <div className="flex flex-col space-y-2">
+
+                          <label className="flex items-center justify-between">
+                              <span className="font-sans">JetBrains Mono (По умолч.)</span>
+                              <input
+                                  type="radio"
+                                  name="font"
+                                  value="font-sans"
+                                  checked={fontClass === 'font-sans'}
+                                  onChange={() => onFontChange('font-sans')}
+                                  className="form-radio text-accent focus:ring-accent"
+                              />
+                          </label>
+
+                          <label className="flex items-center justify-between">
+                              <span className="font-roboto">Roboto</span>
+                              <input
+                                  type="radio"
+                                  name="font"
+                                  value="font-roboto"
+                                  checked={fontClass === 'font-roboto'}
+                                  onChange={() => onFontChange('font-roboto')}
+                                  className="form-radio text-accent focus:ring-accent"
+                              />
+                          </label>
+
+                          <label className="flex items-center justify-between">
+                              <span className="font-serif-lora">Lora (Книжный)</span>
+                              <input
+                                  type="radio"
+                                  name="font"
+                                  value="font-serif-lora"
+                                  checked={fontClass === 'font-serif-lora'}
+                                  onChange={() => onFontChange('font-serif-lora')}
+                                  className="form-radio text-accent focus:ring-accent"
+                              />
+                          </label>
+
+                          <label className="flex items-center justify-between">
+                              <span className="font-serif-merriweather">Merriweather (Книжный)</span>
+                              <input
+                                  type="radio"
+                                  name="font"
+                                  value="font-serif-merriweather"
+                                  checked={fontClass === 'font-serif-merriweather'}
+                                  onChange={() => onFontChange('font-serif-merriweather')}
+                                  className="form-radio text-accent focus:ring-accent"
+                              />
+                          </label>
                       </div>
+                  </div>
                        <div className="flex items-center justify-between">
                           <span>Интервал</span>
                           <div className="flex items-center gap-2">

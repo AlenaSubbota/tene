@@ -21,6 +21,10 @@ export default {
       },
       fontFamily: {
         'sans': ['JetBrains Mono', 'monospace'],
+        // Мы добавляем НОВЫЕ классы для опций в читалке
+        'roboto': ['Roboto', 'system-ui', 'sans-serif'],
+        'serif-lora': ['Lora', 'serif'],
+        'serif-merriweather': ['Merriweather', 'serif'],
       },
       dropShadow: {
         'accent': '0 1px 2px rgba(154, 123, 102, 0.7)',

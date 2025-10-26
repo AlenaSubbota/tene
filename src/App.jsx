@@ -27,7 +27,7 @@ export default function App() {
   // Все состояния приложения
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [fontSize, setFontSize] = useState(16);
-  const [fontClass, setFontClass] = useState('font-sans');
+  const [fontClass, setFontClass] = useState(() => localStorage.getItem('fontClass') || 'font-sans');
   const [page, setPage] = useState('list');
   const [activeTab, setActiveTab] = useState('library');
   const [novels, setNovels] = useState([]);
@@ -66,6 +66,10 @@ useEffect(() => {
 
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+  localStorage.setItem('fontClass', fontClass);
+}, [fontClass]);
 
   // Этот useEffect отвечает ТОЛЬКО за профиль и политику
   useEffect(() => {
@@ -224,6 +228,12 @@ useEffect(() => {
     });
   }, [fontClass, updateUserData]);
 
+const handleFontChange = (newFontClass) => {
+  setFontClass(newFontClass);
+  // Обновляем настройки в БД, сохраняя текущий fontSize
+  updateUserData({ settings: { fontSize: fontSize, fontClass: newFontClass } });
+};
+
   const handleSelectChapter = useCallback(async (chapter) => {
     setSelectedChapter(chapter);
     setPage('reader');
@@ -296,7 +306,7 @@ useEffect(() => {
                         'Аноним';
     // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
                         
-    return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} userId={userId} userName={displayName} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} />;
+    return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} fontClass={fontClass} onFontChange={handleFontChange} userId={userId} userName={displayName} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} />;
   }
     switch (activeTab) {
       case 'library':

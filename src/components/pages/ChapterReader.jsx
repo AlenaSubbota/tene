@@ -402,40 +402,63 @@ const handleDelete = useCallback(async (commentId) => {
     const handlePlanSelect = (plan) => { setSelectedPlan(plan); setIsSubModalOpen(false); };
     
 
-    // --- [ИСПРАВЛЕНИЕ УЯЗВИМОСТИ 7] ---
-    // Мы полностью меняем эту функцию
+    // --- [ИСПРАВЛЕНИЕ УЯЗВИМОСТИ 7 - с УЛУЧШЕННЫМ ЛОГИРОВАНИЕМ] ---
     const handlePaymentMethodSelect = async (method) => {
         const tg = window.Telegram?.WebApp;
         if (!tg || !userId || !selectedPlan) {
-          tg?.showAlert("Произошла ошибка.");
+          console.error('handlePaymentMethodSelect: Missing tg, userId, or selectedPlan'); // Лог
+          tg?.showAlert("Произошла ошибка (нет данных).");
           return;
         }
-        
-        // --- [ИСПРАВЛЕНИЕ - Шаг 1] Показываем подтверждение *до* запроса в базу ---
-        tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты...", async (confirmed) => {
-          if (!confirmed) return;
+        console.log('handlePaymentMethodSelect: Starting process for method:', method, 'Plan:', selectedPlan); // Лог
 
-          // --- [ИСПРАВЛЕНИЕ - Шаг 2] Выполняем действия *после* подтверждения ---
+        // --- Шаг 1: Показываем подтверждение *до* запроса в базу ---
+        tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты...", async (confirmed) => {
+          if (!confirmed) {
+              console.log('handlePaymentMethodSelect: User cancelled.'); // Лог
+              setSelectedPlan(null); // Сбрасываем выбранный план, если пользователь отменил
+              return;
+          }
+          console.log('handlePaymentMethodSelect: User confirmed.'); // Лог
+
+          // --- Шаг 2: Выполняем действия *после* подтверждения ---
           try {
               // 1. Генерируем секретный одноразовый токен
               const telegramToken = crypto.randomUUID();
-              console.log('Generated Telegram Token:', telegramToken); // Логируем токен
+              console.log('handlePaymentMethodSelect: Generated Telegram Token:', telegramToken); // Лог
 
-              // 2. Сохраняем токен и pending_subscription в профиль пользователя
-              //    !!! ДОЖИДАЕМСЯ ЗАВЕРШЕНИЯ ЗАПИСИ В БАЗУ !!!
-              const { data, error } = await supabase.from('profiles').upsert({
-                  id: userId,
+              // 2. Готовим данные для сохранения
+              const profileUpdateData = {
+                  id: userId, // Убедимся, что ID передается
                   pending_subscription: { ...selectedPlan, method, date: new Date().toISOString() },
-                  telegram_link_token: telegramToken // <-- ДОБАВЛЕНО НОВОЕ ПОЛЕ
-              }).select().single(); // Добавили select().single() для проверки
+                  telegram_link_token: telegramToken
+              };
+              console.log('handlePaymentMethodSelect: Attempting to upsert profile with data:', profileUpdateData); // Лог
+
+              //    !!! ДОЖИДАЕМСЯ ЗАВЕРШЕНИЯ ЗАПИСИ В БАЗУ !!!
+              const { data, error, status } = await supabase
+                  .from('profiles')
+                  .upsert(profileUpdateData)
+                  .select() // Добавляем select, чтобы убедиться, что запись вернулась
+                  .single(); // Используем single, так как обновляем одну запись
               
-              if(error) {
-                  console.error("Ошибка обновления профиля токеном:", error);
-                  tg?.showAlert(`Не удалось сгенерировать безопасную ссылку: ${error.message}`);
+              console.log('handlePaymentMethodSelect: Upsert result - Status:', status, 'Error:', error, 'Data:', data); // Лог результата
+
+              if (error) {
+                  // Если есть ошибка ИЛИ если статус не успешный (на всякий случай)
+                  console.error("handlePaymentMethodSelect: Ошибка обновления профиля токеном:", error, 'Status:', status);
+                  tg?.showAlert(`Не удалось сохранить токен: ${error.message} (Статус: ${status})`);
                   return; // Прерываем выполнение, если не удалось сохранить
               }
 
-              console.log('Profile updated successfully with token:', data); // Логируем успешное обновление
+              // Проверяем, что data не null (хотя .single() должен был бы выдать ошибку, если запись не найдена/обновлена)
+              if (!data) {
+                    console.error("handlePaymentMethodSelect: Upsert successful but returned no data.");
+                    tg?.showAlert(`Не удалось подтвердить сохранение токена.`);
+                    return;
+              }
+
+              console.log('handlePaymentMethodSelect: Profile updated successfully. Opening Telegram link...'); // Лог
 
               // 3. Используем СЕКРЕТНЫЙ ТОКЕН, а не userId, в ссылке
               //    !!! ТОЛЬКО ПОСЛЕ УСПЕШНОГО СОХРАНЕНИЯ !!!
@@ -443,7 +466,7 @@ const handleDelete = useCallback(async (commentId) => {
               tg.close();
 
           } catch (e) {
-               console.error("Критическая ошибка в handlePaymentMethodSelect:", e);
+               console.error("handlePaymentMethodSelect: Критическая ошибка в try-catch:", e);
                tg?.showAlert("Произошла непредвиденная ошибка. Попробуйте снова.");
           }
         });

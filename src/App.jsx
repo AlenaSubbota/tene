@@ -219,8 +219,8 @@ useEffect(() => {
 
       const { error } = await supabase
         .from('profiles')
-        .update(dataToUpdate) // <--- ИСПОЛЬЗУЕМ UPDATE
-        .eq('id', userId);    // <--- И УКАЗЫВАЕМ ID ЗДЕСЬ
+        .update(dataToUpdate) // <--- МЕНЯЕМ НА UPDATE
+        .eq('id', userId);    // <--- УКАЗЫВАЕМ ID ЗДЕСЬ
         
       if (error) console.error("Ошибка обновления профиля (update):", error);
       // --- КОНЕЦ ИСПРАВЛЕНИЯ ---

@@ -1,9 +1,8 @@
-// src/App.jsx (ФИНАЛЬНАЯ ИСПРАВЛЕННАЯ ВЕРСИЯ V2)
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase-config.js';
 import { useAuth } from './Auth';
 import { v4 as uuidv4 } from 'uuid';
+import { BrowserRouter as Router, Route, Routes, useNavigate, useLocation } from 'react-router-dom';
 
 // Импорты всех ваших компонентов (остаются без изменений)
 import { AuthScreen } from './AuthScreen.jsx';
@@ -24,6 +23,7 @@ import { SearchPage } from './components/pages/SearchPage.jsx';
 
 export default function App() {
   const { user, loading: authLoading } = useAuth();
+  const location = useLocation();
 
   // Все состояния приложения
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
@@ -47,24 +47,21 @@ export default function App() {
   const [selectedNews, setSelectedNews] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [needsPolicyAcceptance, setNeedsPolicyAcceptance] = useState(false);
+  
+  // --- ИСПРАВЛЕНИЕ 1: Добавляем состояние для принудительного обновления профиля ---
+  const [refreshProfile, setRefreshProfile] = useState(0);
 
   const BOT_USERNAME = "tenebrisverbot";
   const userId = user?.id;
 
 useEffect(() => {
     const root = window.document.documentElement;
-
-    // Сначала удаляем все классы тем
     root.classList.remove('dark', 'theme-amber');
-
-    // Применяем классы в зависимости от состояния
     if (theme === 'dark') {
       root.classList.add('dark');
     } else if (theme === 'dark-amber') {
       root.classList.add('dark', 'theme-amber');
     }
-    // Если theme === 'light', никакие классы не добавляются
-
     localStorage.setItem('theme', theme);
   }, [theme]);
 
@@ -90,17 +87,14 @@ useEffect(() => {
     const checkProfileAndPolicy = async () => {
       const { data: profileData, error } = await supabase
         .from('profiles')
-        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
         .select('policy_accepted, subscription, last_read, bookmarks, is_admin') 
         .eq('id', user.id)
         .single();
 
       if (error && error.code !== 'PGRST116') {
         console.error("Ошибка загрузки профиля:", error);
-      } else if (profileData) { // <-- Убрали ?.policy_accepted
-        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-        setIsUserAdmin(profileData.is_admin || false); // Устанавливаем статус админа
-        // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+      } else if (profileData) {
+        setIsUserAdmin(profileData.is_admin || false);
         
         if (profileData.policy_accepted) {
           setSubscription(profileData.subscription || null);
@@ -127,7 +121,7 @@ useEffect(() => {
 // return () => {
 //   supabase.removeChannel(channel);
 // };
-  }, [user?.id, authLoading]); // Зависимость от user.id решает проблему перезагрузки
+}, [user?.id, authLoading, refreshProfile]); // Зависимость от user.id и refreshProfile
 
   // Этот useEffect отвечает ТОЛЬКО за загрузку новелл
   useEffect(() => {
@@ -137,7 +131,6 @@ useEffect(() => {
         const { data: novelsData, error: novelsError } = await supabase
           .from('novels')
           .select(`*, novel_stats ( views )`);
-          // .order('views', { ascending: false, foreignTable: 'novel_stats' }); // <-- УБРАЛИ ЭТУ СТРОКУ
 
         if (novelsError) {
           console.error("Ошибка загрузки новелл:", novelsError);
@@ -157,8 +150,7 @@ useEffect(() => {
       setNovels([]);
       setIsLoadingContent(false);
     }
-    // 👇 --КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ЗДЕСЬ --- 👇
-  }, [user?.id, needsPolicyAcceptance]); // Зависимость от user.id вместо user
+  }, [user?.id, needsPolicyAcceptance]); 
 
   // Загрузка глав для выбранной новеллы
   useEffect(() => {
@@ -167,20 +159,20 @@ useEffect(() => {
     const fetchChapters = async () => {
       const { data, error } = await supabase
       .from('chapters') 
-      .select('chapter_number, is_paid, published_at, content_path') // <-- ИСПРАВЛЕНО
+      .select('chapter_number, is_paid, published_at, content_path') 
       .eq('novel_id', selectedNovel.id)
-      .order('chapter_number', { ascending: true }); // <-- ИСПРАВЛЕНО
+      .order('chapter_number', { ascending: true }); 
 
       if (error) {
         console.error("Ошибка загрузки глав:", error);
         setChapters([]);
       } else {
         const chaptersArray = data.map(chapter => ({
-      id: chapter.chapter_number, // <-- ИСПРАВЛЕНО
+      id: chapter.chapter_number, 
       title: `Глава ${chapter.chapter_number}`,
           isPaid: chapter.is_paid || false,
           published_at: chapter.published_at,
-          content_path: chapter.content_path // <-- ИСПРАВЛЕНО
+          content_path: chapter.content_path 
         }));
         setChapters(chaptersArray);
       }
@@ -211,19 +203,14 @@ useEffect(() => {
 
   const updateUserData = useCallback(async (dataToUpdate) => {
     if (userId) {
-      // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-      // .upsert() не работает с column-level security.
-      // Используем .update() и .eq()
-      // dataToUpdate НЕ должен содержать 'id'
       console.log('User ID перед обновлением:', userId);
 
       const { error } = await supabase
         .from('profiles')
-        .update(dataToUpdate) // <--- МЕНЯЕМ НА UPDATE
-        .eq('id', userId);    // <--- УКАЗЫВАЕМ ID ЗДЕСЬ
+        .update(dataToUpdate) 
+        .eq('id', userId);    
         
       if (error) console.error("Ошибка обновления профиля (update):", error);
-      // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
     }
   }, [userId]);
 
@@ -237,7 +224,6 @@ useEffect(() => {
 
 const handleFontChange = (newFontClass) => {
   setFontClass(newFontClass);
-  // Обновляем настройки в БД, сохраняя текущий fontSize
   updateUserData({ settings: { fontSize: fontSize, fontClass: newFontClass } });
 };
 
@@ -270,7 +256,7 @@ const handleFontChange = (newFontClass) => {
     const tg = window.Telegram?.WebApp;
     if (!tg) {
       console.error("Telegram WebApp не инициализирован.");
-      alert("Не удалось инициализировать Telegram WebApp."); // Используем alert вместо tg.showAlert
+      alert("Не удалось инициализировать Telegram WebApp."); 
       return;
     }
      if (!userId) {
@@ -284,42 +270,36 @@ const handleFontChange = (newFontClass) => {
        return;
      }
 
-    // Показываем подтверждение *перед* генерацией токена
     tg.showConfirm(`Вы будете перенаправлены в бот для способа оплаты: ${method}. Продолжить?`, async (confirmed) => {
       if (!confirmed) {
         console.log("Пользователь отменил перенаправление в бот.");
         return;
       }
 
-      // --- ДОБАВЛЕННЫЕ ЛОГИ ---
-      console.log('User ID перед обновлением токена:', userId); // Лог ID пользователя
-
-      const token = uuidv4(); // Генерируем НОВЫЙ токен
-      console.log('Новый сгенерированный токен:', token); // Лог нового токена
+      console.log('User ID перед обновлением токена:', userId); 
+      const token = uuidv4(); 
+      console.log('Новый сгенерированный токен:', token); 
 
       try {
-        // Сохраняем НОВЫЙ токен и выбранный метод в pending_subscription
         const { error: updateError } = await supabase
           .from('profiles')
           .update({
             pending_subscription: { ...selectedPlan, method, date: new Date().toISOString() },
-            telegram_link_token: token // <--- Обновляем токен в базе
+            telegram_link_token: token 
           })
           .eq('id', userId);
 
-        console.log('Результат обновления токена в Supabase:', { updateError }); // Лог результата обновления
+        console.log('Результат обновления токена в Supabase:', { updateError }); 
 
         if (updateError) {
           console.error("Ошибка обновления профиля в Supabase:", updateError);
           tg.showAlert(`Ошибка при сохранении данных: ${updateError.message}`);
-          return; // Прерываем выполнение, если не удалось сохранить токен
+          return; 
         }
 
-        // Формируем ссылку с НОВЫМ токеном
         const link = `https://t.me/${BOT_USERNAME}?start=${token}`;
-        console.log('Формируемая ссылка для Telegram:', link); // Лог формируемой ссылки
+        console.log('Формируемая ссылка для Telegram:', link); 
 
-        // Перенаправляем пользователя с НОВЫМ токеном
         tg.openTelegramLink(link);
         tg.close();
 
@@ -330,10 +310,13 @@ const handleFontChange = (newFontClass) => {
     });
   };
 
+  // --- ИСПРАВЛЕНИЕ 3: Меняем логику обработчика ---
   const handleAcceptPolicy = async () => {
     if (userId) {
       await updateUserData({ policy_accepted: true });
-      setNeedsPolicyAcceptance(false);
+      // Вместо setNeedsPolicyAcceptance(false), мы принудительно запускаем
+      // useEffect для профиля, чтобы он сам обновил состояние
+      setRefreshProfile(p => p + 1);
     }
   };
 
@@ -355,13 +338,10 @@ const handleFontChange = (newFontClass) => {
       return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chapters={chapters} isLoadingChapters={isLoadingChapters} lastReadData={lastReadData} onBack={handleBack} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark}/>;
     }
     if (page === 'reader') {
-    // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-    // Ищем имя в нескольких полях, которые может вернуть Telegram
     const displayName = user?.user_metadata?.full_name || 
                         user?.user_metadata?.user_name || 
                         user?.user_metadata?.display_name || 
                         'Аноним';
-    // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
                         
     return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} fontClass={fontClass} onFontChange={handleFontChange} userId={userId} userName={displayName} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} />;
   }

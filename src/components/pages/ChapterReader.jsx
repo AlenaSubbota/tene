@@ -10,7 +10,7 @@ import { Comment, groupComments } from '../Comment.jsx';
 import { Header } from '../Header.jsx';
 import LoadingSpinner from '../LoadingSpinner.jsx';
 
-// --- НОВАЯ ХЕЛПЕР-ФУНКЦИЯ для чтения из localStorage ---
+// --- НОВАЯ ХЕЛПЕР-  ФУНКЦИЯ для чтения из localStorage ---
 // Она безопасно читает JSON или возвращает значение по умолчанию
 const usePersistentState = (key, defaultValue) => {
     const [state, setState] = useState(() => {

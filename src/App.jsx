@@ -212,6 +212,8 @@ useEffect(() => {
       // Для .upsert() важно, чтобы 'id' был частью самого объекта
       const dataToUpsert = { ...dataToUpdate, id: userId };
 
+      console.log('User ID перед обновлением токена:', userId);
+
       const { error } = await supabase
         .from('profiles')
         .upsert(dataToUpsert); // <--- ИСПОЛЬЗУЕМ UPSERT

@@ -211,16 +211,19 @@ useEffect(() => {
 
   const updateUserData = useCallback(async (dataToUpdate) => {
     if (userId) {
-      // Для .upsert() важно, чтобы 'id' был частью самого объекта
-      const dataToUpsert = { ...dataToUpdate, id: userId };
-
-      console.log('User ID перед обновлением токена:', userId);
+      // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+      // .upsert() не работает с column-level security.
+      // Используем .update() и .eq()
+      // dataToUpdate НЕ должен содержать 'id'
+      console.log('User ID перед обновлением:', userId);
 
       const { error } = await supabase
         .from('profiles')
-        .upsert(dataToUpsert); // <--- ИСПОЛЬЗУЕМ UPSERT
+        .update(dataToUpdate) // <--- ИСПОЛЬЗУЕМ UPDATE
+        .eq('id', userId);    // <--- И УКАЗЫВАЕМ ID ЗДЕСЬ
         
-      if (error) console.error("Ошибка обновления профиля (upsert):", error);
+      if (error) console.error("Ошибка обновления профиля (update):", error);
+      // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
     }
   }, [userId]);
 

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase-config.js';
 import { useAuth } from './Auth';
+import { v4 as uuidv4 } from 'uuid';
 
 // Импорты всех ваших компонентов (остаются без изменений)
 import { AuthScreen } from './AuthScreen.jsx';
@@ -261,17 +262,67 @@ const handleFontChange = (newFontClass) => {
     setIsSubModalOpen(false);
   };
 
-  const handlePaymentMethodSelect = async (method) => {
+ const handlePaymentMethodSelect = async (method) => {
     const tg = window.Telegram?.WebApp;
-    if (!tg || !userId || !selectedPlan) {
-      tg?.showAlert("Произошла ошибка.");
+    if (!tg) {
+      console.error("Telegram WebApp не инициализирован.");
+      alert("Не удалось инициализировать Telegram WebApp."); // Используем alert вместо tg.showAlert
       return;
     }
-    tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты...", async (confirmed) => {
-      if (!confirmed) return;
-      await updateUserData({ pending_subscription: { ...selectedPlan, method, date: new Date().toISOString() } });
-      tg.openTelegramLink(`https://t.me/${BOT_USERNAME}?start=${userId}`);
-      tg.close();
+     if (!userId) {
+       console.error("User ID не найден.");
+       tg.showAlert("Ошибка: ID пользователя не найден. Попробуйте перезагрузить приложение.");
+       return;
+     }
+     if (!selectedPlan) {
+       console.error("План подписки не выбран.");
+       tg.showAlert("Ошибка: План подписки не выбран.");
+       return;
+     }
+
+    // Показываем подтверждение *перед* генерацией токена
+    tg.showConfirm(`Вы будете перенаправлены в бот для способа оплаты: ${method}. Продолжить?`, async (confirmed) => {
+      if (!confirmed) {
+        console.log("Пользователь отменил перенаправление в бот.");
+        return;
+      }
+
+      // --- ДОБАВЛЕННЫЕ ЛОГИ ---
+      console.log('User ID перед обновлением токена:', userId); // Лог ID пользователя
+
+      const token = uuidv4(); // Генерируем НОВЫЙ токен
+      console.log('Новый сгенерированный токен:', token); // Лог нового токена
+
+      try {
+        // Сохраняем НОВЫЙ токен и выбранный метод в pending_subscription
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            pending_subscription: { ...selectedPlan, method, date: new Date().toISOString() },
+            telegram_link_token: token // <--- Обновляем токен в базе
+          })
+          .eq('id', userId);
+
+        console.log('Результат обновления токена в Supabase:', { updateError }); // Лог результата обновления
+
+        if (updateError) {
+          console.error("Ошибка обновления профиля в Supabase:", updateError);
+          tg.showAlert(`Ошибка при сохранении данных: ${updateError.message}`);
+          return; // Прерываем выполнение, если не удалось сохранить токен
+        }
+
+        // Формируем ссылку с НОВЫМ токеном
+        const link = `https://t.me/${BOT_USERNAME}?start=${token}`;
+        console.log('Формируемая ссылка для Telegram:', link); // Лог формируемой ссылки
+
+        // Перенаправляем пользователя с НОВЫМ токеном
+        tg.openTgLink(link);
+        tg.close();
+
+      } catch (e) {
+         console.error("Критическая ошибка в handlePaymentMethodSelect:", e);
+         tg.showAlert("Произошла непредвиденная ошибка.");
+      }
     });
   };
 

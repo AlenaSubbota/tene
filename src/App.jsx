@@ -196,6 +196,7 @@ useEffect(() => {
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
+    console.log('Проверка объекта Telegram WebApp (tg):', tg);
     if (!tg) return;
     tg.ready();
     tg.expand();

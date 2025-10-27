@@ -317,7 +317,7 @@ const handleFontChange = (newFontClass) => {
         console.log('Формируемая ссылка для Telegram:', link); // Лог формируемой ссылки
 
         // Перенаправляем пользователя с НОВЫМ токеном
-        tg.openTgLink(link);
+        tg.openTelegramLink(link);
         tg.close();
 
       } catch (e) {

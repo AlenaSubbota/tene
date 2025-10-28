@@ -73,12 +73,11 @@ useEffect(() => {
   // Этот useEffect отвечает ТОЛЬКО за профиль и политику
   // Файл: src/App.jsx
 
-  // --- ИЗМЕНЕНИЕ 4 (ФИНАЛЬНАЯ ВЕРСИЯ): Устраняем гонку состояний ---
-  useEffect(() => {
+useEffect(() => {
     if (authLoading) return;
 
     if (!user) {
-      // Сброс состояний при выходе пользователя (логика остается)
+      // Сброс состояний при выходе (остается)
       setIsLoadingContent(false);
       setNeedsPolicyAcceptance(false);
       setNovels([]);
@@ -88,7 +87,7 @@ useEffect(() => {
       return; 
     }
 
-    // 1. Проверяем политику (логика остается)
+    // 1. Проверка политики (остается)
     if (user.user_metadata && !user.user_metadata.policy_accepted) {
       setNeedsPolicyAcceptance(true);
       setIsLoadingContent(false);
@@ -102,24 +101,33 @@ useEffect(() => {
     // --- Политика принята, продолжаем ---
     setNeedsPolicyAcceptance(false);
       
-    // 2. [ИЗМЕНЕНИЕ] Мы больше не вызываем loadProfileData() сразу.
-    //    Мы вызовем ее, когда Realtime будет готов.
+    // 2. Функция загрузки данных
     const loadProfileData = async () => {
-      // Эта функция та же, что и была
-      const { data: profileData, error } = await supabase
+      
+      // [ИСПРАВЛЕНИЕ] Используем .limit(1), чтобы ГАРАНТИРОВАННО получить массив, как в логах
+      const { data: profileDataArray, error } = await supabase
         .from('profiles')
         .select('subscription, last_read, bookmarks, is_admin')
         .eq('id', user.id)
-        .single();
+        .limit(1); // <-- Используем .limit(1) вместо .single()
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error("Ошибка загрузки профиля:", error);
-      } else if (profileData) {
-        console.log("Загружены свежие данные профиля:", profileData);
-        setIsUserAdmin(profileData.is_admin || false);
-        setSubscription(profileData.subscription || null);
-        setLastReadData(profileData.last_read || {});
-        setBookmarks(profileData.bookmarks || []);
+      } else if (profileDataArray && profileDataArray.length > 0) {
+        
+        // [ИСПРАВЛЕНИЕ] Извлекаем первый (и единственный) объект из массива
+        const userProfile = profileDataArray[0]; 
+        
+        console.log("Загружены свежие данные профиля (объект):", userProfile);
+        
+        // [ИСПРАВЛЕНИЕ] Используем 'userProfile', а не 'profileDataArray'
+        setIsUserAdmin(userProfile.is_admin || false);
+        setSubscription(userProfile.subscription || null); 
+        setLastReadData(userProfile.last_read || {});
+        setBookmarks(userProfile.bookmarks || []);
+        
+      } else {
+        console.warn("Профиль не найден или пуст.");
       }
     };
     
@@ -129,14 +137,15 @@ useEffect(() => {
       .on(
         'postgres_changes', 
         { 
-          event: 'UPDATE', // Слушаем обновления от бота
+          event: 'UPDATE', 
           schema: 'public',
           table: 'profiles',
           filter: `id=eq.${user.id}`
         }, 
         (payload) => {
-          // Когда бот обновляет...
           console.log('Realtime: Профиль пользователя обновлен!', payload.new);
+          
+          // Обновляем состояние из Realtime (здесь 'payload.new' - это ОБЪЕКТ, и это_правильно)
           const newProfile = payload.new;
           setSubscription(newProfile.subscription || null);
           setIsUserAdmin(newProfile.is_admin || false);
@@ -146,12 +155,8 @@ useEffect(() => {
       )
       .subscribe(async (status, err) => {
          if (status === 'SUBSCRIBED') {
-           // --- [ГЛАВНОЕ ИЗМЕНЕНИЕ] ---
-           // Как только мы успешно подписались,
-           // мы вручную загружаем самые свежие данные.
-           // Это устраняет гонку состояний.
            console.log('Успешно подписан на Realtime! Загружаю свежие данные...');
-           await loadProfileData();
+           await loadProfileData(); // Загружаем данные после подписки
          }
          if (status === 'CHANNEL_ERROR' || err) {
            console.error('Ошибка Realtime-подписки:', err);

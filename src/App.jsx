@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase-config.js';
+// --- ИЗМЕНЕНИЕ 1: Получаем setUser из useAuth ---
 import { useAuth } from './Auth';
 import { v4 as uuidv4 } from 'uuid';
 import { BrowserRouter as Router, Route, Routes, useNavigate, useLocation } from 'react-router-dom';
@@ -22,7 +23,8 @@ import { ProfilePage } from './components/pages/ProfilePage.jsx';
 import { SearchPage } from './components/pages/SearchPage.jsx';
 
 export default function App() {
-  const { user, loading: authLoading } = useAuth();
+  // --- ИЗМЕНЕНИЕ 2: Получаем setUser ---
+  const { user, setUser, loading: authLoading } = useAuth();
   const location = useLocation();
 
   // Все состояния приложения
@@ -48,8 +50,8 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [needsPolicyAcceptance, setNeedsPolicyAcceptance] = useState(false);
   
-  // --- ИСПРАВЛЕНИЕ 1: Добавляем состояние для принудительного обновления профиля ---
-  const [refreshProfile, setRefreshProfile] = useState(0);
+  // --- ИЗМЕНЕНИЕ 3: Состояние refreshProfile больше не нужно для этой логики ---
+  // const [refreshProfile, setRefreshProfile] = useState(0);
 
   const BOT_USERNAME = "tenebrisverbot";
   const userId = user?.id;
@@ -69,6 +71,7 @@ useEffect(() => {
   localStorage.setItem('fontClass', fontClass);
 }, [fontClass]);
 
+  // --- ИЗМЕНЕНИЕ 4: Полностью переписана логика проверки ---
   // Этот useEffect отвечает ТОЛЬКО за профиль и политику
   useEffect(() => {
     if (authLoading) return;
@@ -84,34 +87,42 @@ useEffect(() => {
       return;
     }
 
-    const checkProfileAndPolicy = async () => {
-      const { data: profileData, error } = await supabase
-        .from('profiles')
-        .select('policy_accepted, subscription, last_read, bookmarks, is_admin') 
-        .eq('id', user.id)
-        .single();
+    // 1. Проверяем политику НАПРЯМУЮ из объекта user (который из сессии)
+    // Убедимся, что user_metadata существует
+    if (user.user_metadata && !user.user_metadata.policy_accepted) {
+      setNeedsPolicyAcceptance(true);
+      // Если политика не принята, сбрасываем остальные данные и не загружаем их
+      setIsLoadingContent(false);
+      setSubscription(null);
+      setBookmarks([]);
+      setLastReadData({});
+      setIsUserAdmin(false);
+    } else {
+      // Политика принята (или объект metadata еще не создан, что равносильно принятию)
+      setNeedsPolicyAcceptance(false);
+      
+      // 2. Загружаем ОСТАЛЬНЫЕ данные из таблицы 'profiles'
+      const loadProfileData = async () => {
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('subscription, last_read, bookmarks, is_admin') // Убрали 'policy_accepted'
+          .eq('id', user.id)
+          .single();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error("Ошибка загрузки профиля:", error);
-      } else if (profileData) {
-        setIsUserAdmin(profileData.is_admin || false);
-        
-        if (profileData.policy_accepted) {
+        if (error && error.code !== 'PGRST116') {
+          console.error("Ошибка загрузки профиля:", error);
+        } else if (profileData) {
+          // Устанавливаем остальные данные
+          setIsUserAdmin(profileData.is_admin || false);
           setSubscription(profileData.subscription || null);
           setLastReadData(profileData.last_read || {});
           setBookmarks(profileData.bookmarks || []);
-          setNeedsPolicyAcceptance(false);
-        } else {
-          // Если профиль есть, но политика не принята
-          setNeedsPolicyAcceptance(true);
         }
-      } else {
-        setNeedsPolicyAcceptance(true);
-      }
-    };
-
-    checkProfileAndPolicy();
-
+      };
+      
+      loadProfileData();
+    }
+    
     // const channel = supabase
 //   .channel(`profiles_user_${user.id}`)
 //   .on('postgres_changes', ... )
@@ -121,7 +132,7 @@ useEffect(() => {
 // return () => {
 //   supabase.removeChannel(channel);
 // };
-}, [user?.id, authLoading, refreshProfile]); // Зависимость от user.id и refreshProfile
+}, [user, authLoading]); // <-- Зависимость меняется на 'user' и 'authLoading'
 
   // Этот useEffect отвечает ТОЛЬКО за загрузку новелл
   useEffect(() => {
@@ -146,11 +157,12 @@ useEffect(() => {
         setIsLoadingContent(false);
       };
       fetchNovels();
-    } else {
+    } else if (!user) {
+      // Если пользователя нет, тоже сбрасываем
       setNovels([]);
       setIsLoadingContent(false);
     }
-  }, [user?.id, needsPolicyAcceptance]); 
+  }, [user, needsPolicyAcceptance]); // <-- Зависимость от 'user' (а не user.id)
 
   // Загрузка глав для выбранной новеллы
   useEffect(() => {
@@ -313,13 +325,25 @@ const handleFontChange = (newFontClass) => {
     });
   };
 
-  // --- ИСПРАВЛЕНИЕ 3: Меняем логику обработчика ---
+  // --- ИЗМЕНЕНИЕ 5: Меняем логику обработчика ---
   const handleAcceptPolicy = async () => {
     if (userId) {
-      await updateUserData({ policy_accepted: true });
-      // Вместо setNeedsPolicyAcceptance(false), мы принудительно запускаем
-      // useEffect для профиля, чтобы он сам обновил состояние
-      setRefreshProfile(p => p + 1);
+      // 1. Обновляем данные в `auth.users` (это сохранится в сессии)
+      const { data, error } = await supabase.auth.updateUser({
+        data: { policy_accepted: true }
+      });
+
+      if (error) {
+        console.error('Ошибка обновления user_metadata:', error);
+      } else if (data.user) {
+        // 2. Обновляем локальное состояние 'user' в React
+        // Это вызовет повторный запуск useEffect, который скроет модальное окно
+        setUser(data.user);
+        
+        // 3. (Опционально) Обновляем также и таблицу 'profiles'
+        // Это полезно для RLS или если другие части приложения читают из profiles
+        await updateUserData({ policy_accepted: true });
+      }
     }
   };
 
@@ -338,7 +362,7 @@ const handleFontChange = (newFontClass) => {
 
   const renderContent = () => {
     if (page === 'details') {
-      return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chapters={chapters} isLoadingChapters={isLoadingChapters} lastReadData={lastReadData} onBack={handleBack} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark}/>;
+      return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleSelectGenre} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chapters={chapters} isLoadingChapters={isLoadingChapters} lastReadData={lastReadData} onBack={handleBack} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark}/>;
     }
     if (page === 'reader') {
     const displayName = user?.user_metadata?.full_name || 

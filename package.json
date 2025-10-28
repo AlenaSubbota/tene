@@ -18,6 +18,7 @@
     "lottie-react": "^2.4.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "react-router-dom": "^7.9.4",
     "uuid": "^13.0.0",
     "ydb-sdk": "^5.11.1"
   },

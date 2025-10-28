@@ -3,7 +3,6 @@ import { supabase } from './supabase-config.js';
 // --- ИЗМЕНЕНИЕ 1: Получаем setUser из useAuth ---
 import { useAuth } from './Auth';
 import { v4 as uuidv4 } from 'uuid';
-import { BrowserRouter as Router, Route, Routes, useNavigate, useLocation } from 'react-router-dom';
 
 // Импорты всех ваших компонентов (остаются без изменений)
 import { AuthScreen } from './AuthScreen.jsx';
@@ -25,7 +24,6 @@ import { SearchPage } from './components/pages/SearchPage.jsx';
 export default function App() {
   // --- ИЗМЕНЕНИЕ 2: Получаем setUser ---
   const { user, setUser, loading: authLoading } = useAuth();
-  const location = useLocation();
 
   // Все состояния приложения
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');

@@ -71,76 +71,72 @@ useEffect(() => {
 
   // --- ИЗМЕНЕНИЕ 4: Полностью переписана логика проверки ---
   // Этот useEffect отвечает ТОЛЬКО за профиль и политику
+  // Файл: src/App.jsx
+
+  // --- ИЗМЕНЕНИЕ 4 (ФИНАЛЬНАЯ ВЕРСИЯ): Устраняем гонку состояний ---
   useEffect(() => {
     if (authLoading) return;
 
     if (!user) {
-      // Сброс состояний при выходе пользователя
+      // Сброс состояний при выходе пользователя (логика остается)
       setIsLoadingContent(false);
       setNeedsPolicyAcceptance(false);
       setNovels([]);
       setSubscription(null);
       setBookmarks([]);
       setLastReadData({});
-      return; // Выходим, если пользователя нет
+      return; 
     }
 
-    // 1. Проверяем политику НАПРЯМУЮ из объекта user (который из сессии)
-    // Убедимся, что user_metadata существует
+    // 1. Проверяем политику (логика остается)
     if (user.user_metadata && !user.user_metadata.policy_accepted) {
       setNeedsPolicyAcceptance(true);
-      // Если политика не принята, сбрасываем остальные данные и не загружаем их
       setIsLoadingContent(false);
       setSubscription(null);
       setBookmarks([]);
       setLastReadData({});
       setIsUserAdmin(false);
-      return; // Выходим, не подписываемся на Realtime
-    } else {
-      // Политика принята (или объект metadata еще не создан, что равносильно принятию)
-      setNeedsPolicyAcceptance(false);
-      
-      // 2. Загружаем ОСТАЛЬНЫЕ данные из таблицы 'profiles'
-      const loadProfileData = async () => {
-        const { data: profileData, error } = await supabase
-          .from('profiles')
-          .select('subscription, last_read, bookmarks, is_admin') // Убрали 'policy_accepted'
-          .eq('id', user.id)
-          .single();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error("Ошибка загрузки профиля:", error);
-        } else if (profileData) {
-          // Устанавливаем остальные данные
-          setIsUserAdmin(profileData.is_admin || false);
-          setSubscription(profileData.subscription || null);
-          setLastReadData(profileData.last_read || {});
-          setBookmarks(profileData.bookmarks || []);
-        }
-      };
-      
-      loadProfileData();
+      return; 
     }
     
-    // --- [НАЧАЛО ИЗМЕНЕНИЯ] ---
-    // 3. Активируем Realtime-подписку
-    // Этот код заменил старый закомментированный блок
+    // --- Политика принята, продолжаем ---
+    setNeedsPolicyAcceptance(false);
+      
+    // 2. [ИЗМЕНЕНИЕ] Мы больше не вызываем loadProfileData() сразу.
+    //    Мы вызовем ее, когда Realtime будет готов.
+    const loadProfileData = async () => {
+      // Эта функция та же, что и была
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('subscription, last_read, bookmarks, is_admin')
+        .eq('id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error("Ошибка загрузки профиля:", error);
+      } else if (profileData) {
+        console.log("Загружены свежие данные профиля:", profileData);
+        setIsUserAdmin(profileData.is_admin || false);
+        setSubscription(profileData.subscription || null);
+        setLastReadData(profileData.last_read || {});
+        setBookmarks(profileData.bookmarks || []);
+      }
+    };
     
+    // 3. Активируем Realtime-подписку
     const channel = supabase
-      .channel(`profiles_user_${user.id}`) // Уникальное имя канала
+      .channel(`profiles_user_${user.id}`)
       .on(
         'postgres_changes', 
         { 
-          event: 'UPDATE', // Слушаем только обновления
+          event: 'UPDATE', // Слушаем обновления от бота
           schema: 'public',
           table: 'profiles',
-          filter: `id=eq.${user.id}` // Слушаем ИСКЛЮЧИТЕЛЬНО строку текущего пользователя
+          filter: `id=eq.${user.id}`
         }, 
         (payload) => {
-          // Эта функция вызовется, когда бот обновит профиль
+          // Когда бот обновляет...
           console.log('Realtime: Профиль пользователя обновлен!', payload.new);
-          
-          // Обновляем React state новыми данными из 'payload.new'
           const newProfile = payload.new;
           setSubscription(newProfile.subscription || null);
           setIsUserAdmin(newProfile.is_admin || false);
@@ -148,24 +144,27 @@ useEffect(() => {
           setBookmarks(newProfile.bookmarks || []);
         }
       )
-      .subscribe((status, err) => {
+      .subscribe(async (status, err) => {
          if (status === 'SUBSCRIBED') {
-           console.log('Успешно подписан на Realtime-канал profiles!');
+           // --- [ГЛАВНОЕ ИЗМЕНЕНИЕ] ---
+           // Как только мы успешно подписались,
+           // мы вручную загружаем самые свежие данные.
+           // Это устраняет гонку состояний.
+           console.log('Успешно подписан на Realtime! Загружаю свежие данные...');
+           await loadProfileData();
          }
          if (status === 'CHANNEL_ERROR' || err) {
            console.error('Ошибка Realtime-подписки:', err);
          }
       });
 
-    // 4. Функция очистки
-    // Обязательно отписываемся от канала, когда компонент размонтируется
+    // 4. Функция очистки (остается)
     return () => {
       console.log('Отписка от Realtime-канала profiles...');
       supabase.removeChannel(channel);
     };
-    // --- [КОНЕЦ ИЗМЕНЕНИЯ] ---
 
-}, [user, authLoading]); // <-- Зависимость меняется на 'user' и 'authLoading'
+}, [user, authLoading]);
 
   // Этот useEffect отвечает ТОЛЬКО за загрузку новелл
   useEffect(() => {

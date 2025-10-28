@@ -203,14 +203,17 @@ useEffect(() => {
 
   const updateUserData = useCallback(async (dataToUpdate) => {
     if (userId) {
-      console.log('User ID перед обновлением:', userId);
-
+      // ИСПОЛЬЗУЕМ UPSERT. Он создаст профиль, если его нет.
+      // Он требует, чтобы `id` был частью объекта.
       const { error } = await supabase
         .from('profiles')
-        .update(dataToUpdate) 
-        .eq('id', userId);    
-        
-      if (error) console.error("Ошибка обновления профиля (update):", error);
+        .upsert({ ...dataToUpdate, id: userId }) // <--- ГЛАВНОЕ ИСПРАВЛЕНИЕ
+        .select(); // Добавляем .select(), чтобы .upsert() вернул данные
+
+      if (error) {
+        console.error("Ошибка при upsert профиля:", error);
+        alert(`Не удалось сохранить данные. Ошибка RLS? См. консоль.`);
+      }
     }
   }, [userId]);
 

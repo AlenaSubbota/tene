@@ -360,7 +360,7 @@ const handleFontChange = (newFontClass) => {
 
   const renderContent = () => {
     if (page === 'details') {
-      return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleSelectGenre} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chapters={chapters} isLoadingChapters={isLoadingChapters} lastReadData={lastReadData} onBack={handleBack} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark}/>;
+      return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chapters={chapters} isLoadingChapters={isLoadingChapters} lastReadData={lastReadData} onBack={handleBack} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark}/>;
     }
     if (page === 'reader') {
     const displayName = user?.user_metadata?.full_name || 

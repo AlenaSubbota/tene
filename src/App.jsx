@@ -82,7 +82,7 @@ useEffect(() => {
       setSubscription(null);
       setBookmarks([]);
       setLastReadData({});
-      return;
+      return; // Выходим, если пользователя нет
     }
 
     // 1. Проверяем политику НАПРЯМУЮ из объекта user (который из сессии)
@@ -95,6 +95,7 @@ useEffect(() => {
       setBookmarks([]);
       setLastReadData({});
       setIsUserAdmin(false);
+      return; // Выходим, не подписываемся на Realtime
     } else {
       // Политика принята (или объект metadata еще не создан, что равносильно принятию)
       setNeedsPolicyAcceptance(false);
@@ -121,15 +122,49 @@ useEffect(() => {
       loadProfileData();
     }
     
-    // const channel = supabase
-//   .channel(`profiles_user_${user.id}`)
-//   .on('postgres_changes', ... )
-//   ...
-//   .subscribe();
-//
-// return () => {
-//   supabase.removeChannel(channel);
-// };
+    // --- [НАЧАЛО ИЗМЕНЕНИЯ] ---
+    // 3. Активируем Realtime-подписку
+    // Этот код заменил старый закомментированный блок
+    
+    const channel = supabase
+      .channel(`profiles_user_${user.id}`) // Уникальное имя канала
+      .on(
+        'postgres_changes', 
+        { 
+          event: 'UPDATE', // Слушаем только обновления
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${user.id}` // Слушаем ИСКЛЮЧИТЕЛЬНО строку текущего пользователя
+        }, 
+        (payload) => {
+          // Эта функция вызовется, когда бот обновит профиль
+          console.log('Realtime: Профиль пользователя обновлен!', payload.new);
+          
+          // Обновляем React state новыми данными из 'payload.new'
+          const newProfile = payload.new;
+          setSubscription(newProfile.subscription || null);
+          setIsUserAdmin(newProfile.is_admin || false);
+          setLastReadData(newProfile.last_read || {});
+          setBookmarks(newProfile.bookmarks || []);
+        }
+      )
+      .subscribe((status, err) => {
+         if (status === 'SUBSCRIBED') {
+           console.log('Успешно подписан на Realtime-канал profiles!');
+         }
+         if (status === 'CHANNEL_ERROR' || err) {
+           console.error('Ошибка Realtime-подписки:', err);
+         }
+      });
+
+    // 4. Функция очистки
+    // Обязательно отписываемся от канала, когда компонент размонтируется
+    return () => {
+      console.log('Отписка от Realtime-канала profiles...');
+      supabase.removeChannel(channel);
+    };
+    // --- [КОНЕЦ ИЗМЕНЕНИЯ] ---
+
 }, [user, authLoading]); // <-- Зависимость меняется на 'user' и 'authLoading'
 
   // Этот useEffect отвечает ТОЛЬКО за загрузку новелл

@@ -28,7 +28,8 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe();
   }, []);
 
-  const value = { user, loading };
+  // --- ИЗМЕНЕНИЕ: Добавляем setUser в value ---
+  const value = { user, setUser, loading };
 
   // Логика рендеринга остается той же
   return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
@@ -41,6 +42,7 @@ export const useAuth = () => {
 
 
 // --- 4. Компонент с формой авторизации переписан под Supabase ---
+// (Остальная часть файла без изменений)
 export const AuthForm = ({ onRegisterClick }) => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
@@ -66,6 +68,7 @@ export const AuthForm = ({ onRegisterClick }) => {
           // В Supabase дополнительные данные (имя) передаются так
           data: {
             display_name: displayName,
+            policy_accepted: false // --- ИЗМЕНЕНИЕ: Устанавливаем значение по умолчанию при регистрации
           }
         }
       });

@@ -38,7 +38,7 @@ const usePersistentState = (key, defaultValue) => {
 export const ChapterReader = ({
     chapter, novel, userId, userName, fontClass, onFontChange, subscription, botUsername, onBack, isUserAdmin,
     allChapters, onSelectChapter,
-    fontSize, onFontSizeChange // fontSize и onFontSizeChange приходят из App.jsx
+    fontSize, onFontSizeChange, onTriggerSubscription // fontSize и onFontSizeChange приходят из App.jsx
 }) => {
     // --- Состояния Компонента ---
     const [comments, setComments] = useState([]);
@@ -54,8 +54,6 @@ export const ChapterReader = ({
     const [userHasLiked, setUserHasLiked] = useState(false);
     const [showChapterList, setShowChapterList] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
-    const [isSubModalOpen, setIsSubModalOpen] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState(null);
     const [chapterContent, setChapterContent] = useState('');
     const [isLoadingContent, setIsLoadingContent] = useState(true);
     
@@ -392,80 +390,12 @@ const handleDelete = useCallback(async (commentId) => {
     
     const handleChapterClick = (chapterToSelect) => {
         if (chapterToSelect && (!hasActiveSubscription && chapterToSelect.isPaid)) {
-            setIsSubModalOpen(true);
+            onTriggerSubscription();
         } else if (chapterToSelect) {
             onSelectChapter(chapterToSelect);
             window.scrollTo(0, 0); 
         }
     };
-    
-    const handlePlanSelect = (plan) => { setSelectedPlan(plan); setIsSubModalOpen(false); };
-    
-
-    // --- [ИЗМЕНЕНИЕ] Используем .update() вместо .upsert() ---
-    const handlePaymentMethodSelect = async (method) => {
-        const tg = window.Telegram?.WebApp;
-        if (!tg || !userId || !selectedPlan) {
-          console.error('handlePaymentMethodSelect: Missing tg, userId, or selectedPlan');
-          tg?.showAlert("Произошла ошибка (нет данных).");
-          return;
-        }
-        console.log('handlePaymentMethodSelect: Starting process for method:', method, 'Plan:', selectedPlan);
-
-        tg.showConfirm("Вы будете перенаправлены в бот для завершения оплаты...", async (confirmed) => {
-          if (!confirmed) {
-              console.log('handlePaymentMethodSelect: User cancelled.');
-              setSelectedPlan(null);
-              return;
-          }
-          console.log('handlePaymentMethodSelect: User confirmed.');
-
-          try {
-              const telegramToken = crypto.randomUUID();
-              console.log('handlePaymentMethodSelect: Generated Telegram Token:', telegramToken);
-
-              const profileUpdateData = {
-                  // НЕ передаем 'id' в .update(), он используется в .eq()
-                  pending_subscription: { ...selectedPlan, method, date: new Date().toISOString() },
-                  telegram_link_token: telegramToken
-              };
-              console.log('handlePaymentMethodSelect: Attempting to UPDATE profile with data:', profileUpdateData, 'for userId:', userId);
-
-              // !!! ИСПОЛЬЗУЕМ .update() и .eq() !!!
-              const { data, error, status } = await supabase
-                  .from('profiles')
-                  .update(profileUpdateData) // <-- ИЗМЕНЕНО на update
-                  .eq('id', userId)         // <-- Указываем какую строку обновить
-                  .select()
-                  .single();
-              
-              console.log('handlePaymentMethodSelect: Update result - Status:', status, 'Error:', error, 'Data:', data);
-
-              if (error) {
-                  console.error("handlePaymentMethodSelect: Ошибка обновления профиля токеном:", error, 'Status:', status);
-                  tg?.showAlert(`Не удалось сохранить токен: ${error.message} (Статус: ${status})`);
-                  return;
-              }
-
-              if (!data) {
-                    // Это может случиться, если RLS запретила UPDATE, но не вернула ошибку (маловероятно)
-                    console.error("handlePaymentMethodSelect: Update successful (status 200/204) but returned no data. RLS might be blocking without error?");
-                    tg?.showAlert(`Не удалось подтвердить сохранение токена (нет данных).`);
-                    return;
-              }
-
-              console.log('handlePaymentMethodSelect: Profile updated successfully. Opening Telegram link...');
-
-              tg.openTelegramLink(`https://t.me/${botUsername}?start=${telegramToken}`);
-              tg.close();
-
-          } catch (e) {
-               console.error("handlePaymentMethodSelect: Критическая ошибка в try-catch:", e);
-               tg?.showAlert("Произошла непредвиденная ошибка. Попробуйте снова.");
-          }
-        });
-    };
-    // --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
     
     const renderMarkdown = (markdownText) => {
@@ -682,9 +612,6 @@ const handleDelete = useCallback(async (commentId) => {
                </div>
            </div>
         )}
-        
-        {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
-        {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
-      </div>
+          </div>
     );
 };

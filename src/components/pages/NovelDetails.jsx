@@ -2,8 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from "../../supabase-config.js";
 import { LockIcon } from '../icons.jsx';
 import { Header } from '../Header.jsx';
-import { SubscriptionModal } from '../SubscriptionModal.jsx';
-import { PaymentMethodModal } from '../PaymentMethodModal.jsx';
+// Импорты модальных окон удалены, так как они больше не используются
 import { useAuth } from '../../Auth.jsx';
 import LoadingSpinner from '../LoadingSpinner.jsx';
  
@@ -16,7 +15,8 @@ const formatDate = (dateString) => {
 // [ИЗМЕНЕНО] Устанавливаем, сколько жанров показывать сразу
 const VISIBLE_GENRES_COUNT = 4;
 
-export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack, bookmarks, onToggleBookmark }) => {
+// Prop 'onTriggerSubscription' теперь принимается
+export const NovelDetails = ({ novel, onSelectChapter, onTriggerSubscription, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack, bookmarks, onToggleBookmark }) => {
     const { user } = useAuth();
 
     // ... (хук для просмотров без изменений) ...
@@ -35,8 +35,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
     }, [novel, user]);
 
     // Состояния
-    const [isSubModalOpen, setIsSubModalOpen] = useState(false);
-    const [selectedPlan, setSelectedPlan] = useState(null);
+    // Локальные состояния 'isSubModalOpen' и 'selectedPlan' удалены
     const [sortOrder, setSortOrder] = useState('newest');
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const descriptionRef = useRef(null);
@@ -92,10 +91,19 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
 
     // Обработчики
     const handleBookmarkToggle = (e) => { e.stopPropagation(); if (!novel) return; onToggleBookmark(novel.id); };
-    const handleChapterClick = (chapter) => { if (!hasActiveSubscription && chapter.isPaid) setIsSubModalOpen(true); else onSelectChapter(chapter); };
+    
+    // handleChapterClick теперь использует 'onTriggerSubscription'
+    const handleChapterClick = (chapter) => { 
+        if (!hasActiveSubscription && chapter.isPaid) {
+            onTriggerSubscription(); // <-- ИСПОЛЬЗУЕМ PROP
+        } else {
+            onSelectChapter(chapter); 
+        }
+    };
+    
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
-    const handlePlanSelect = (plan) => { setSelectedPlan(plan); setIsSubModalOpen(false); };
-    const handlePaymentMethodSelect = async (method) => { console.log({ selectedPlan, method }); setSelectedPlan(null);};
+    
+    // Локальные 'handlePlanSelect' и 'handlePaymentMethodSelect' удалены
 
     
     if (!novel) {
@@ -222,9 +230,7 @@ export const NovelDetails = ({ novel, onSelectChapter, onGenreSelect, subscripti
                 </div>
             </div>
 
-            {/* Модальные окна (без изменений) */}
-            {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
-            {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
+            {/* Модальные окна SubscriptionModal и PaymentMethodModal удалены */}
         
             {isCoverModalOpen && (
                 <div 

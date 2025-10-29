@@ -2,12 +2,15 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from "../../supabase-config.js";
-import { LockIcon, ChatBubbleIcon } from '../icons.jsx'; 
+import { LockIcon, ChatBubbleIcon } from '../icons.jsx';
 import { Header } from '../Header.jsx';
 import { useAuth } from '../../Auth.jsx';
 import LoadingSpinner from '../LoadingSpinner.jsx';
-import { NovelReviews } from '../NovelReviews.jsx'; 
- 
+import { NovelReviews } from '../NovelReviews.jsx';
+// --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ --- VVVV ---
+import { StarRating } from '../StarRating.jsx'; // Импортируем наш новый компонент
+// --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
+
 const formatDate = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -16,11 +19,14 @@ const formatDate = (dateString) => {
 
 const VISIBLE_GENRES_COUNT = 4;
 
-export const NovelDetails = ({ 
-    novel, onSelectChapter, onTriggerSubscription, onGenreSelect, 
-    subscription, botUsername, userId, chapters, isLoadingChapters, 
+export const NovelDetails = ({
+    novel, onSelectChapter, onTriggerSubscription, onGenreSelect,
+    subscription, botUsername, userId, chapters, isLoadingChapters,
     lastReadData, onBack, bookmarks, onToggleBookmark,
-    isUserAdmin, userName 
+    isUserAdmin, userName,
+    // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Принимаем props) --- VVVV ---
+    userRatings, setUserRatings
+    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
 }) => {
     const { user } = useAuth();
 
@@ -46,9 +52,9 @@ export const NovelDetails = ({
     const [isLongDescription, setIsLongDescription] = useState(false);
     const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
     const [showAllGenres, setShowAllGenres] = useState(false);
-    const [activeTab, setActiveTab] = useState('description'); 
+    const [activeTab, setActiveTab] = useState('description');
 
-    
+
     // ... (все useMemo без изменений) ...
     const isBookmarked = useMemo(() => {
         if (!novel?.id || !bookmarks) return false;
@@ -73,7 +79,7 @@ export const NovelDetails = ({
 
     // ... (useEffect для описания без изменений) ...
     useEffect(() => {
-        if (descriptionRef.current && activeTab === 'description') { 
+        if (descriptionRef.current && activeTab === 'description') {
             const checkHeight = () => {
                  if (descriptionRef.current) {
                     setIsLongDescription(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
@@ -81,47 +87,113 @@ export const NovelDetails = ({
             }
             const timer = setTimeout(checkHeight, 150);
             window.addEventListener('resize', checkHeight);
-            
-            return () => { 
-                clearTimeout(timer); 
-                window.removeEventListener('resize', checkHeight); 
+
+            return () => {
+                clearTimeout(timer);
+                window.removeEventListener('resize', checkHeight);
             };
         }
-    }, [novel?.description, activeTab]); 
+    }, [novel?.description, activeTab]);
 
-    // ... (все обработчики без изменений) ...
+    // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Обработчик рейтинга) --- VVVV ---
+    // Обработчик установки/изменения рейтинга
+    const handleSetRating = async (newRating) => {
+      if (!userId || !novel?.id) return;
+
+      const oldRating = userRatings[novel.id];
+
+      // 1. Оптимистичное обновление UI
+      setUserRatings(prev => ({ ...prev, [novel.id]: newRating }));
+
+      if (newRating === 0) {
+        // --- Логика УДАЛЕНИЯ рейтинга ---
+        const { error } = await supabase
+          .from('novel_ratings')
+          .delete()
+          .eq('novel_id', novel.id)
+          .eq('user_id', userId);
+
+        if (error) {
+          console.error("Ошибка удаления рейтинга:", error);
+          alert("Не удалось убрать оценку. Попробуйте снова.");
+          setUserRatings(prev => ({ ...prev, [novel.id]: oldRating })); // Откат
+        }
+      } else {
+        // --- Логика ДОБАВЛЕНИЯ/ОБНОВЛЕНИЯ рейтинга ---
+        const { error } = await supabase
+          .from('novel_ratings')
+          .upsert({ // upsert = insert or update
+              novel_id: novel.id,
+              user_id: userId,
+              rating: newRating
+          });
+
+        if (error) {
+          console.error("Ошибка сохранения рейтинга:", error);
+          alert("Не удалось сохранить вашу оценку. Попробуйте снова.");
+          setUserRatings(prev => ({ ...prev, [novel.id]: oldRating })); // Откат
+        }
+      }
+      // Триггер в базе данных (Шаг 1) сам пересчитает средний рейтинг
+    };
+    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
+
+    // ... (остальные обработчики без изменений) ...
     const handleBookmarkToggle = (e) => { e.stopPropagation(); if (!novel) return; onToggleBookmark(novel.id); };
-    const handleChapterClick = (chapter) => { 
+    const handleChapterClick = (chapter) => {
         if (!hasActiveSubscription && chapter.isPaid) {
-            onTriggerSubscription(); 
+            onTriggerSubscription();
         } else {
-            onSelectChapter(chapter); 
+            onSelectChapter(chapter);
         }
     };
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
-    
+
     if (!novel) {
         return <LoadingSpinner />;
     }
+
+    // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Переменные для рендера) --- VVVV ---
+    const myRating = userRatings[novel.id] || 0;
+    // Данные о новелле теперь приходят из App.jsx с рейтингом
+    const avgRating = novel.average_rating || 0.0;
+    const ratingCount = novel.rating_count || 0;
+    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
 
     return (
         <div className="bg-background min-h-screen text-text-main font-sans">
             <Header title={novel.title} onBack={onBack} />
 
-            <div key={novel.id} className="animate-fade-in"> 
+            <div key={novel.id} className="animate-fade-in">
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
-                    
-                    {/* ... (Блок 1: Обложка, Кнопки, Жанры - без изменений) ... */}
+
+                    {/* Блок 1: Обложка, Кнопки, Жанры */}
                     <div className="grid grid-cols-12 gap-4 md:gap-8 lg:gap-12 items-start">
                         {/* Левая колонка: Обложка + Кнопки */}
-                        <div className="col-span-5 md:col-span-4"> 
-                            <img 
-                                src={`/${novel.cover_url}`} 
-                                alt={novel.title} 
+                        <div className="col-span-5 md:col-span-4">
+                            <img
+                                src={`/${novel.cover_url}`}
+                                alt={novel.title}
                                 className="w-full mx-auto rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4] cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
                                 onClick={() => setIsCoverModalOpen(true)}
                             />
-                            
+
+                            {/* --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Добавляем блок рейтинга) --- VVVV --- */}
+                            <div className="mt-4 flex flex-col items-center gap-2">
+                              {/* Показываем виджет оценки */}
+                              <StarRating initialRating={myRating} onRatingSet={handleSetRating} />
+
+                              {/* Показываем среднюю оценку */}
+                              {ratingCount > 0 ? (
+                                <p className="text-xs text-text-secondary">
+                                  Средняя: <strong>{Number(avgRating).toFixed(1)}</strong> ({ratingCount} {ratingCount === 1 ? 'оценка' : (ratingCount > 1 && ratingCount < 5 ? 'оценки' : 'оценок')})
+                                </p>
+                              ) : (
+                                <p className="text-xs text-text-secondary">Оценок пока нет</p>
+                              )}
+                            </div>
+                            {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ --- */}
+
                             <div className="mt-4 flex flex-col gap-3 w-full">
                                {lastReadChapterId ? (
                                     <button onClick={handleContinueReading} className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover text-sm md:text-base">
@@ -139,10 +211,10 @@ export const NovelDetails = ({
                         </div>
 
                         {/* Правая колонка: Заголовок, Автор, ЖАНРЫ */}
-                        <div className="col-span-7 md:col-span-8"> 
+                        <div className="col-span-7 md:col-span-8">
                             <h1 className="text-xl md:text-4xl font-bold text-text-main text-left">{novel.title}</h1>
                             <p className="text-sm md:text-lg text-text-secondary mt-1 text-left">{novel.author}</p>
-                            
+
                             <div className="mt-4 md:mt-6">
                                 <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Жанры</h2>
                                 <div className="flex flex-wrap gap-2 justify-start">
@@ -151,10 +223,10 @@ export const NovelDetails = ({
                                       const genreClassName = `text-xs font-semibold px-3 py-1 rounded-md transition-colors duration-200 border ${isHighlighted ? 'border-genre-highlight-border text-genre-highlight-text bg-component-bg' : 'border-border-color text-text-secondary bg-component-bg hover:bg-border-color'}`;
                                       return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
                                   })}
-                                  
+
                                   {hiddenGenresCount > 0 && (
-                                      <button 
-                                          onClick={() => setShowAllGenres(true)} 
+                                      <button
+                                          onClick={() => setShowAllGenres(true)}
                                           className="text-xs font-semibold px-3 py-1 rounded-md text-accent bg-accent/10 hover:bg-accent/20"
                                       >
                                           + {hiddenGenresCount} еще
@@ -166,18 +238,18 @@ export const NovelDetails = ({
                     </div>
 
 
-                    {/* ... (Блок Описания и Отзывов с табами - без изменений) ... */}
+                    {/* Блок Описания и Отзывов с табами */}
                     <div className="mt-8 md:mt-10 border-t border-border-color">
                         {/* --- Таб-свитчер --- */}
                         <div className="flex border-b border-border-color">
-                            <button 
-                                onClick={() => setActiveTab('description')} 
+                            <button
+                                onClick={() => setActiveTab('description')}
                                 className={`flex-1 py-3 text-center font-bold transition-colors ${activeTab === 'description' ? 'text-accent border-b-2 border-accent' : 'text-text-secondary hover:text-text-main'}`}
                             >
                                 Описание
                             </button>
-                            <button 
-                                onClick={() => setActiveTab('reviews')} 
+                            <button
+                                onClick={() => setActiveTab('reviews')}
                                 className={`flex-1 py-3 text-center font-bold transition-colors ${activeTab === 'reviews' ? 'text-accent border-b-2 border-accent' : 'text-text-secondary hover:text-text-main'}`}
                             >
                                 <span className="flex items-center justify-center gap-2">
@@ -188,7 +260,7 @@ export const NovelDetails = ({
                         </div>
 
                         {/* --- Условный рендер контента табов --- */}
-                        
+
                         {/* Таб 1: Описание */}
                         {activeTab === 'description' && (
                             <div className="pt-6 animate-fade-in">
@@ -203,11 +275,11 @@ export const NovelDetails = ({
                                 )}
                             </div>
                         )}
-                        
+
                         {/* Таб 2: Отзывы */}
                         {activeTab === 'reviews' && (
                             <div className="animate-fade-in">
-                                <NovelReviews 
+                                <NovelReviews
                                     novelId={novel.id}
                                     userId={userId}
                                     userName={userName}
@@ -218,7 +290,6 @@ export const NovelDetails = ({
                     </div>
 
 
-                    {/* --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ --- VVVV --- */}
                     {/* Блок Главы теперь отображается только если активна вкладка "Описание" */}
                     {activeTab === 'description' && (
                         <div className="mt-8 md:mt-10 border-t border-border-color pt-6 animate-fade-in">
@@ -229,14 +300,14 @@ export const NovelDetails = ({
                                         {sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}
                                     </button>
                                 </div>
-                                
+
                                 {isLoadingChapters ? <div className="flex justify-center items-center py-4"><LoadingSpinner /></div> : (
                                     <div className="flex flex-col gap-2">
                                         {sortedChapters.map((chapter, index) => {
                                             const showLock = !hasActiveSubscription && chapter.isPaid;
                                             const isLastRead = lastReadChapterId === chapter.id;
                                             const chapterNumber = sortOrder === 'newest' ? chapters.length - index : index + 1;
-                                            
+
                                             return (
                                                 <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-3 rounded-lg cursor-pointer transition-all duration-300 border flex items-center justify-between hover:bg-background ${isLastRead ? 'bg-accent/10 border-accent/50' : 'border-transparent'}`}>
                                                     <div className="flex items-center gap-4">
@@ -255,30 +326,29 @@ export const NovelDetails = ({
                             </div>
                         </div>
                     )}
-                    {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ --- */}
 
                 </div>
             </div>
 
-        
+
             {isCoverModalOpen && (
-                <div 
+                <div
                     className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 transition-opacity duration-300 animate-fade-in"
-                    onClick={() => setIsCoverModalOpen(false)} 
+                    onClick={() => setIsCoverModalOpen(false)}
                 >
-                    <button 
+                    <button
                         onClick={() => setIsCoverModalOpen(false)}
                         className="absolute top-4 right-4 bg-white/20 text-white rounded-full w-10 h-10 font-bold text-2xl leading-none backdrop-blur-sm z-50 hover:bg-white/30 transition-colors"
                         aria-label="Закрыть"
                     >
                         &times;
                     </button>
-                    
-                    <img 
-                        src={`/${novel.cover_url}`} 
-                        alt={novel.title} 
+
+                    <img
+                        src={`/${novel.cover_url}`}
+                        alt={novel.title}
                         className="max-w-full max-h-[90vh] w-auto h-auto rounded-lg object-contain shadow-2xl shadow-black/50"
-                        onClick={(e) => e.stopPropagation()} 
+                        onClick={(e) => e.stopPropagation()}
                     />
                 </div>
             )}

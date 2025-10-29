@@ -1,3 +1,5 @@
+// src/App.jsx
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase-config.js';
 // --- ИЗМЕНЕНИЕ 1: Получаем setUser из useAuth ---
@@ -41,6 +43,7 @@ export default function App() {
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [lastReadData, setLastReadData] = useState({});
   const [bookmarks, setBookmarks] = useState([]);
+  const [userRatings, setUserRatings] = useState({}); // <-- Это состояние у вас уже есть
   const [isLoadingContent, setIsLoadingContent] = useState(true);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -84,6 +87,7 @@ useEffect(() => {
       setSubscription(null);
       setBookmarks([]);
       setLastReadData({});
+      setUserRatings({}); // <-- Этот сброс у вас уже есть
       return; 
     }
 
@@ -128,11 +132,32 @@ useEffect(() => {
       } else {
         console.warn("Профиль не найден или пуст.");
       }
+
+      // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Добавление загрузки рейтингов) --- VVVV ---
+      // Сразу после загрузки профиля, загружаем оценки этого пользователя
+      const { data: ratingsData, error: ratingsError } = await supabase
+        .from('novel_ratings')
+        .select('novel_id, rating')
+        .eq('user_id', user.id);
+
+      if (ratingsError) {
+        console.error("Ошибка загрузки оценок:", ratingsError);
+      } else if (ratingsData) {
+        // Преобразуем массив в { novel_id: rating } для быстрого доступа
+        const ratingsMap = ratingsData.reduce((acc, r) => {
+            acc[r.novel_id] = r.rating;
+            return acc;
+        }, {});
+        setUserRatings(ratingsMap);
+      }
+      // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
     };
+    
+
     
     // 3. Активируем Realtime-подписку
     const channel = supabase
-      .channel(`profiles_user_${user.id}`)
+      .channel(`app-realtime:${user.id}`) // Даем каналу более общее имя
       .on(
         'postgres_changes', 
         { 
@@ -151,6 +176,82 @@ useEffect(() => {
           setBookmarks(newProfile.bookmarks || []);
         }
       )
+      // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Realtime для рейтингов) --- VVVV ---
+      // Слушаем изменения в *своих* оценках
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'novel_ratings',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const { novel_id, rating } = payload.new;
+            setUserRatings(prev => ({ ...prev, [novel_id]: rating }));
+          } else if (payload.eventType === 'DELETE') {
+            const { novel_id } = payload.old;
+            setUserRatings(prev => {
+              const newRatings = { ...prev };
+              delete newRatings[novel_id];
+              return newRatings;
+            });
+          }
+        }
+      )
+      // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
+      
+      // --- VVVV --- ИЗМЕНЕНИЕ REALTIME-ОБРАБОТЧИКА --- VVVV ---
+      // Слушаем ЛЮБЫЕ обновления в таблице `novels`
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE', // Нас интересует только обновление
+          schema: 'public',
+          table: 'novels'
+          // Нет фильтра, слушаем все
+        },
+        (payload) => {
+          // Когда триггер (рейтинга) ИЛИ функция (просмотров) обновляет `novels`,
+          // мы получаем здесь `payload.new`.
+          // `payload.new` теперь содержит АКТУАЛЬНЫЕ `average_rating`, `rating_count` И `views`
+          const updatedNovel = payload.new;
+
+          // Обновляем наш локальный state `novels`
+          setNovels(currentNovels => {
+            const novelIndex = currentNovels.findIndex(n => n.id === updatedNovel.id);
+            if (novelIndex === -1) {
+              return currentNovels;
+            }
+            
+            const newNovels = [...currentNovels];
+            
+            // --- ГЛАВНОЕ ИСПРАВЛЕНИЕ ---
+            // Мы больше не сохраняем старые `views`.
+            // Мы просто берем *весь* новый объект из payload,
+            // потому что он теперь содержит ВСЕ актуальные статы.
+            newNovels[novelIndex] = {
+              ...currentNovels[novelIndex], // Сохраняем `genres` и т.д.
+              ...updatedNovel, // Перезаписываем `views`, `average_rating`, `rating_count`
+            };
+            
+            return newNovels;
+          });
+
+          // Также обновляем `selectedNovel`, если мы на странице деталей
+          setSelectedNovel(currentSelectedNovel => {
+            if (currentSelectedNovel && currentSelectedNovel.id === updatedNovel.id) {
+              return {
+                 ...currentSelectedNovel, // Сохраняем `genres` и т.д.
+                 ...updatedNovel, // Перезаписываем `views`, `average_rating`, `rating_count`
+              };
+            }
+            return currentSelectedNovel;
+          });
+        }
+      )
+      // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ REALTIME-ОБРАБОТЧИКА --- ^^^^ ---
       .subscribe(async (status, err) => {
          if (status === 'SUBSCRIBED') {
            await loadProfileData(); // Загружаем данные после подписки
@@ -167,45 +268,46 @@ useEffect(() => {
 
 }, [user, authLoading]);
 
-  // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ --- VVVV ---
+  // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Загрузка новелл) --- VVVV ---
   // Этот useEffect отвечает ТОЛЬКО за загрузку новелл
-  // (ПЕРЕПИСАН С ЛОГИКОЙ КЭШИРОВАНИЯ)
   useEffect(() => {
     const CACHE_KEY = 'novels_cache';
-    // Кэш "живет" 1 час. Можете поменять на 10 * 60 * 1000 (10 минут), если обновления частые.
     const MAX_CACHE_AGE_MS = 1000 * 60 * 60; // 1 час
 
     if (user && !needsPolicyAcceptance) {
 
       // Функция загрузки новелл
       const fetchNovels = async (isBackgroundFetch = false) => {
-        // Показываем спиннер, только если это НЕ фоновая загрузка
         if (!isBackgroundFetch) {
           setIsLoadingContent(true);
         }
 
+        // --- VVVV --- ИЗМЕНЕНИЕ 1: Убираем `novel_stats`, читаем `views` из `novels` --- VVVV ---
         const { data: novelsData, error: novelsError } = await supabase
           .from('novels')
-          .select(`*, novel_stats ( views )`);
+          .select(`*, average_rating, rating_count, views`); // <--- Упрощенный запрос
+        // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ --- ^^^^ ---
 
         if (novelsError) {
           console.error("Ошибка загрузки новелл:", novelsError);
-          // Не сбрасываем новеллы, если это была фоновая ошибка
           if (!isBackgroundFetch) {
             setNovels([]);
           }
         } else {
-          // Обрабатываем и сортируем
+          // --- VVVV --- ИЗМЕНЕНИЕ 2: Исправляем маппинг данных --- VVVV ---
           const formattedNovels = novelsData.map(novel => ({
             ...novel,
-            views: novel.novel_stats?.views || 0,
+            // 'views' теперь берем НАПРЯМУЮ из 'novel'
+            views: novel.views || 0,
+            average_rating: novel.average_rating || 0.0,
+            rating_count: novel.rating_count || 0,
           }));
+          // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ --- ^^^^ ---
+
           formattedNovels.sort((a, b) => b.views - a.views);
           
-          // 1. Устанавливаем свежие данные в React
           setNovels(formattedNovels);
           
-          // 2. Сохраняем свежие данные в localStorage
           try {
             const cacheData = {
               timestamp: Date.now(),
@@ -217,11 +319,10 @@ useEffect(() => {
           }
         }
         
-        // В любом случае убираем спиннер
         setIsLoadingContent(false);
       };
 
-      // --- Основная логика при монтировании ---
+      // --- (Логика кэширования остается без изменений) ---
       try {
         const cachedItem = localStorage.getItem(CACHE_KEY);
         if (cachedItem) {
@@ -229,31 +330,22 @@ useEffect(() => {
           const isCacheValid = (Date.now() - cache.timestamp) < MAX_CACHE_AGE_MS;
 
           if (isCacheValid) {
-            // 1. Кэш ЕСТЬ и он СВЕЖИЙ
-            // Показываем данные из кэша мгновенно, загрузку не запускаем
             setNovels(cache.data);
             setIsLoadingContent(false);
           } else {
-            // 2. Кэш ЕСТЬ, но он СТАРЫЙ
-            // Показываем старые данные мгновенно (БЕЗ спиннера)
             setNovels(cache.data);
             setIsLoadingContent(false);
-            // ...и запускаем фоновую загрузку
             fetchNovels(true); // true = фоновая загрузка
           }
         } else {
-          // 3. Кэша НЕТ
-          // Запускаем обычную загрузку со спиннером
           fetchNovels(false);
         }
       } catch (e) {
-        // Ошибка чтения кэша, просто грузим по-старому
         console.error("Ошибка чтения кэша новелл:", e);
         fetchNovels(false);
       }
 
     } else if (!user) {
-      // Если пользователя нет, сбрасываем состояние и чистим кэш
       setNovels([]);
       setIsLoadingContent(false);
       localStorage.removeItem(CACHE_KEY);
@@ -312,7 +404,7 @@ useEffect(() => {
 
   const updateUserData = useCallback(async (dataToUpdate) => {
     if (userId) {
-      // ИСПОЛЬЗУЕМ UPSERT. Он создаст профиль, если его нет.
+      // ИСПОЛЬЗUЕМ UPSERT. Он создаст профиль, если его нет.
       // Он требует, чтобы `id` был частью объекта.
       const { error } = await supabase
         .from('profiles')
@@ -474,6 +566,10 @@ const handleFontChange = (newFontClass) => {
                 onTriggerSubscription={() => setIsSubModalOpen(true)}
                 isUserAdmin={isUserAdmin}
                 userName={displayName}
+                // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Передача props) --- VVVV ---
+                userRatings={userRatings}
+                setUserRatings={setUserRatings}
+                // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
              />;
     }
     if (page === 'reader') {

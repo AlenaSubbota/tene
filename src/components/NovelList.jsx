@@ -1,65 +1,92 @@
-// src/components/NovelList.jsx (Исправленная версия)
+// src/components/NovelList.jsx
 
 import React from 'react';
-import { BookmarkIcon, EyeIcon } from './';
+// --- VVVV --- ИЗМЕНЕНИЕ: Возвращаем EyeIcon для просмотров --- VVVV ---
+import { BookmarkIcon, EyeIcon } from './icons.jsx';
+// --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
 
-// --- ИЗМЕНЕНИЕ: Мы ВЕРНУЛИ 'bookmarks' и 'onToggleBookmark' в props ---
 export const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => {
-        
+
     // Если новеллы еще не загрузились, показываем заглушку
     if (!novels) {
         return <div className="text-center p-4"><p>Загрузка новелл...</p></div>;
     }
-    
+
     // Если новелл нет (например, по фильтру)
     if (novels.length === 0) {
         return <p className="text-center opacity-70 p-4">Новеллы не найдены.</p>;
     }
 
+    // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Возвращаем функцию для просмотров) --- VVVV ---
     const formatViews = (num) => {
-      if (num === null || num === undefined) return '0';
-      try {
-        return new Intl.NumberFormat('en-US', {
-          notation: 'compact',
-          maximumFractionDigits: 1
-        }).format(num);
-      } catch (e) {
-        return num.toString();
-      }
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1) + 'M';
+        }
+        if (num >= 1000) {
+            return (num / 1000).toFixed(1) + 'K';
+        }
+        return num;
     };
-    
+    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
+
+    const handleBookmarkToggle = (e, novelId) => {
+        e.stopPropagation();
+        onToggleBookmark(novelId);
+    };
+
     return (
-        <div>
-            <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 p-4 text-text-main">
-              {novels.map((novel, index) => (
-                <div key={novel.id} onClick={() => onSelectNovel(novel)} className="cursor-pointer group animate-fade-in-down" style={{ animationDelay: `${index * 50}ms` }}>
-                  <div className="relative transition-all duration-300">
-                    
-                    {/* --- ИЗМЕНЕНИЕ: Мы используем 'onToggleBookmark' и 'bookmarks' из props --- */}
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); onToggleBookmark(novel.id); }} 
-                      className={`absolute top-2 right-2 z-10 p-1 rounded-full bg-black/30 backdrop-blur-sm text-white transition-colors ${bookmarks.includes(novel.id) ? 'text-accent' : ''}`}
-                    >
-                      <BookmarkIcon filled={bookmarks.includes(novel.id)} width="20" height="20" />
-                    </button>
-                    
-                    {/* --- Ваш остальной код --- */}
-                    <img src={`/${novel.coverUrl || novel.cover_url}`} alt={novel.title} className="w-full aspect-[2/3] object-cover rounded-lg shadow-md transition-transform duration-300 group-hover:scale-105 border border-border-color" />
-                    <div className="flex items-center justify-between mt-2 gap-2">
-                      <div className="flex-1 min-w-0">
-                          <h2 className="font-semibold text-xs truncate text-text-main">{novel.title}</h2>
-                      </div>
-                      {novel.views > 0 && (
-                        <div className="flex items-center gap-1 text-xs opacity-60 flex-shrink-0">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
+              {novels.map((novel, index) => {
+                const isBookmarked = bookmarks.includes(novel.id);
+
+                // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Получаем рейтинг и просмотры) --- VVVV ---
+                const avgRating = novel.average_rating || 0.0;
+                // Предполагаем, что просмотры приходят в поле 'views'
+                const views = novel.views || 0; 
+                // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
+
+                return (
+                  <div key={novel.id} onClick={() => onSelectNovel(novel)} className="relative group cursor-pointer animate-fade-in-down" style={{ animationDelay: `${index * 50}ms` }}>
+                    <div className="relative aspect-[3/4] rounded-lg overflow-hidden shadow-lg transition-transform duration-300 group-hover:scale-105 border border-border-color">
+                      <img src={`/${novel.cover_url}`} alt={novel.title} className="w-full h-full object-cover" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+
+                      <button
+                        onClick={(e) => handleBookmarkToggle(e, novel.id)}
+                        className={`absolute top-2 right-2 z-10 p-1.5 rounded-full transition-colors ${isBookmarked ? 'bg-accent/90 text-white' : 'bg-black/40 text-white/80 hover:bg-black/60'}`}
+                      >
+                        <BookmarkIcon filled={isBookmarked} className="w-5 h-5" />
+                      </button>
+
+                      {/* --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Плашка рейтинга - меняем цвет) --- VVVV --- */}
+{avgRating > 0 && (
+  <div className="absolute top-2 left-2 flex items-center gap-1 bg-accent backdrop-blur-sm text-white px-2 py-0.5 rounded-full text-xs font-bold">
+    {/* Иконка сердца УДАЛЕНА по вашему скриншоту */}
+    <span>{Number(avgRating).toFixed(1)}</span>
+  </div>
+)}
+{/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ --- */}
+                      
+
+                      {/* --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Добавляем просмотры) --- VVVV --- */}
+                      {views > 0 && (
+                        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/50 backdrop-blur-sm text-white px-2 py-0.5 rounded-full text-xs font-bold">
                           <EyeIcon className="w-4 h-4" />
-                          <span>{formatViews(novel.views)}</span>
+                          <span>{formatViews(views)}</span>
                         </div>
                       )}
+                      {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ --- */}
+
                     </div>
+                    {/* --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Убираем автора) --- VVVV --- */}
+                    <div className="mt-2">
+                      <h3 className="font-semibold text-sm text-text-main truncate group-hover:text-accent">{novel.title}</h3>
+                      {/* <p>{novel.author}</p> <-- Эта строка УДАЛЕНА по вашей просьбе */}
+                    </div>
+                    {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ --- */}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-        </div>
     );
 }

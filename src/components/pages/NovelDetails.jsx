@@ -1,10 +1,12 @@
+// src/components/pages/NovelDetails.jsx
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from "../../supabase-config.js";
-import { LockIcon } from '../icons.jsx';
+import { LockIcon, ChatBubbleIcon } from '../icons.jsx'; 
 import { Header } from '../Header.jsx';
-// Импорты модальных окон удалены, так как они больше не используются
 import { useAuth } from '../../Auth.jsx';
 import LoadingSpinner from '../LoadingSpinner.jsx';
+import { NovelReviews } from '../NovelReviews.jsx'; 
  
 const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -12,11 +14,14 @@ const formatDate = (dateString) => {
     return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
-// [ИЗМЕНЕНО] Устанавливаем, сколько жанров показывать сразу
 const VISIBLE_GENRES_COUNT = 4;
 
-// Prop 'onTriggerSubscription' теперь принимается
-export const NovelDetails = ({ novel, onSelectChapter, onTriggerSubscription, onGenreSelect, subscription, botUsername, userId, chapters, isLoadingChapters, lastReadData, onBack, bookmarks, onToggleBookmark }) => {
+export const NovelDetails = ({ 
+    novel, onSelectChapter, onTriggerSubscription, onGenreSelect, 
+    subscription, botUsername, userId, chapters, isLoadingChapters, 
+    lastReadData, onBack, bookmarks, onToggleBookmark,
+    isUserAdmin, userName 
+}) => {
     const { user } = useAuth();
 
     // ... (хук для просмотров без изменений) ...
@@ -35,45 +40,40 @@ export const NovelDetails = ({ novel, onSelectChapter, onTriggerSubscription, on
     }, [novel, user]);
 
     // Состояния
-    // Локальные состояния 'isSubModalOpen' и 'selectedPlan' удалены
     const [sortOrder, setSortOrder] = useState('newest');
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const descriptionRef = useRef(null);
     const [isLongDescription, setIsLongDescription] = useState(false);
     const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
-    
-    // [ИЗМЕНЕНО] Новое состояние для спойлера жанров
     const [showAllGenres, setShowAllGenres] = useState(false);
+    const [activeTab, setActiveTab] = useState('description'); 
+
     
-    // Мемоизированные значения
+    // ... (все useMemo без изменений) ...
     const isBookmarked = useMemo(() => {
         if (!novel?.id || !bookmarks) return false;
         return bookmarks.includes(novel.id);
     }, [bookmarks, novel]);
-
     const novelGenres = Array.isArray(novel?.genres) ? novel.genres : [];
     const hasActiveSubscription = subscription?.expires_at && new Date(subscription.expires_at) > new Date();
     const lastReadChapterId = useMemo(() => (lastReadData && novel && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null), [lastReadData, novel]);
-
     const sortedChapters = useMemo(() => {
         if (!Array.isArray(chapters)) return [];
         const chaptersCopy = [...chapters];
         return sortOrder === 'newest' ? chaptersCopy.sort((a, b) => b.id - a.id) : chaptersCopy.sort((a, b) => a.id - b.id);
     }, [chapters, sortOrder]);
-
-    // [ИЗМЕНЕНО] Логика для отображения жанров
     const genresToShow = useMemo(() => {
         if (showAllGenres) {
             return novelGenres;
         }
         return novelGenres.slice(0, VISIBLE_GENRES_COUNT);
     }, [novelGenres, showAllGenres]);
-    
     const hiddenGenresCount = novelGenres.length - genresToShow.length;
+
 
     // ... (useEffect для описания без изменений) ...
     useEffect(() => {
-        if (descriptionRef.current) {
+        if (descriptionRef.current && activeTab === 'description') { 
             const checkHeight = () => {
                  if (descriptionRef.current) {
                     setIsLongDescription(descriptionRef.current.scrollHeight > descriptionRef.current.clientHeight);
@@ -87,24 +87,18 @@ export const NovelDetails = ({ novel, onSelectChapter, onTriggerSubscription, on
                 window.removeEventListener('resize', checkHeight); 
             };
         }
-    }, [novel?.description]);
+    }, [novel?.description, activeTab]); 
 
-    // Обработчики
+    // ... (все обработчики без изменений) ...
     const handleBookmarkToggle = (e) => { e.stopPropagation(); if (!novel) return; onToggleBookmark(novel.id); };
-    
-    // handleChapterClick теперь использует 'onTriggerSubscription'
     const handleChapterClick = (chapter) => { 
         if (!hasActiveSubscription && chapter.isPaid) {
-            onTriggerSubscription(); // <-- ИСПОЛЬЗУЕМ PROP
+            onTriggerSubscription(); 
         } else {
             onSelectChapter(chapter); 
         }
     };
-    
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
-    
-    // Локальные 'handlePlanSelect' и 'handlePaymentMethodSelect' удалены
-
     
     if (!novel) {
         return <LoadingSpinner />;
@@ -117,10 +111,8 @@ export const NovelDetails = ({ novel, onSelectChapter, onTriggerSubscription, on
             <div key={novel.id} className="animate-fade-in"> 
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
                     
-                    {/* --- [ИЗМЕНЕНО] НОВАЯ СТРУКТУРА БЛОКА 1 --- */}
-                    
+                    {/* ... (Блок 1: Обложка, Кнопки, Жанры - без изменений) ... */}
                     <div className="grid grid-cols-12 gap-4 md:gap-8 lg:gap-12 items-start">
-                        
                         {/* Левая колонка: Обложка + Кнопки */}
                         <div className="col-span-5 md:col-span-4"> 
                             <img 
@@ -130,7 +122,6 @@ export const NovelDetails = ({ novel, onSelectChapter, onTriggerSubscription, on
                                 onClick={() => setIsCoverModalOpen(true)}
                             />
                             
-                            {/* [ИЗМЕНЕНО] Кнопки "Читать" и "В закладки" ПЕРЕМЕЩЕНЫ СЮДА */}
                             <div className="mt-4 flex flex-col gap-3 w-full">
                                {lastReadChapterId ? (
                                     <button onClick={handleContinueReading} className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/20 transition-all hover:scale-105 hover:shadow-xl hover:bg-accent-hover text-sm md:text-base">
@@ -152,7 +143,6 @@ export const NovelDetails = ({ novel, onSelectChapter, onTriggerSubscription, on
                             <h1 className="text-xl md:text-4xl font-bold text-text-main text-left">{novel.title}</h1>
                             <p className="text-sm md:text-lg text-text-secondary mt-1 text-left">{novel.author}</p>
                             
-                            {/* [ИЗМЕНЕНО] Блок жанров ПЕРЕМЕЩЕН СЮДА */}
                             <div className="mt-4 md:mt-6">
                                 <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Жанры</h2>
                                 <div className="flex flex-wrap gap-2 justify-start">
@@ -162,7 +152,6 @@ export const NovelDetails = ({ novel, onSelectChapter, onTriggerSubscription, on
                                       return <button key={genre} onClick={() => onGenreSelect(genre)} className={genreClassName}>{genre}</button>;
                                   })}
                                   
-                                  {/* [ИЗМЕНЕНО] Кнопка спойлера "+ еще" */}
                                   {hiddenGenresCount > 0 && (
                                       <button 
                                           onClick={() => setShowAllGenres(true)} 
@@ -176,61 +165,101 @@ export const NovelDetails = ({ novel, onSelectChapter, onTriggerSubscription, on
                         </div>
                     </div>
 
-                    {/* [ИЗМЕНЕНО] БЛОК 2 (Жанры) теперь удален отсюда */}
 
-                    {/* БЛОК 3: Описание (теперь это Блок 2) */}
-                    <div className="mt-8 md:mt-10 border-t border-border-color pt-6">
-                        <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Описание</h2>
-                        <div ref={descriptionRef} className={`relative overflow-hidden transition-[max-height] duration-500 ease-in-out prose prose-invert prose-sm text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[2000px]' : 'max-h-28'}`}>
-                            <div dangerouslySetInnerHTML={{ __html: novel.description }} />
-                            {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
-                        </div>
-                        {isLongDescription && (
-                            <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent hover:text-accent-hover mt-2 hover:underline">
-                                {isDescriptionExpanded ? 'Свернуть' : 'Развернуть...'}
+                    {/* ... (Блок Описания и Отзывов с табами - без изменений) ... */}
+                    <div className="mt-8 md:mt-10 border-t border-border-color">
+                        {/* --- Таб-свитчер --- */}
+                        <div className="flex border-b border-border-color">
+                            <button 
+                                onClick={() => setActiveTab('description')} 
+                                className={`flex-1 py-3 text-center font-bold transition-colors ${activeTab === 'description' ? 'text-accent border-b-2 border-accent' : 'text-text-secondary hover:text-text-main'}`}
+                            >
+                                Описание
                             </button>
+                            <button 
+                                onClick={() => setActiveTab('reviews')} 
+                                className={`flex-1 py-3 text-center font-bold transition-colors ${activeTab === 'reviews' ? 'text-accent border-b-2 border-accent' : 'text-text-secondary hover:text-text-main'}`}
+                            >
+                                <span className="flex items-center justify-center gap-2">
+                                    <ChatBubbleIcon className="w-5 h-5" />
+                                    Отзывы
+                                </span>
+                            </button>
+                        </div>
+
+                        {/* --- Условный рендер контента табов --- */}
+                        
+                        {/* Таб 1: Описание */}
+                        {activeTab === 'description' && (
+                            <div className="pt-6 animate-fade-in">
+                                <div ref={descriptionRef} className={`relative overflow-hidden transition-[max-height] duration-500 ease-in-out prose prose-invert prose-sm text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[2000px]' : 'max-h-28'}`}>
+                                    <div dangerouslySetInnerHTML={{ __html: novel.description }} />
+                                    {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
+                                </div>
+                                {isLongDescription && (
+                                    <button onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)} className="text-sm font-semibold text-accent hover:text-accent-hover mt-2 hover:underline">
+                                        {isDescriptionExpanded ? 'Свернуть' : 'Развернуть...'}
+                                    </button>
+                                )}
+                            </div>
+                        )}
+                        
+                        {/* Таб 2: Отзывы */}
+                        {activeTab === 'reviews' && (
+                            <div className="animate-fade-in">
+                                <NovelReviews 
+                                    novelId={novel.id}
+                                    userId={userId}
+                                    userName={userName}
+                                    isUserAdmin={isUserAdmin}
+                                />
+                            </div>
                         )}
                     </div>
 
-                    {/* БЛОК 4: Главы (теперь это Блок 3) */}
-                    <div className="mt-8 md:mt-10 border-t border-border-color pt-6">
-                        {/* ... (Содержимое блока глав остается без изменений) ... */}
-                        <div className="bg-component-bg border border-border-color rounded-lg p-4">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-lg font-bold text-text-main">Главы</h2>
-                                <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent hover:text-accent-hover hover:underline">
-                                    {sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}
-                                </button>
-                            </div>
-                            
-                            {isLoadingChapters ? <div className="flex justify-center items-center py-4"><LoadingSpinner /></div> : (
-                                <div className="flex flex-col gap-2">
-                                    {sortedChapters.map((chapter, index) => {
-                                        const showLock = !hasActiveSubscription && chapter.isPaid;
-                                        const isLastRead = lastReadChapterId === chapter.id;
-                                        const chapterNumber = sortOrder === 'newest' ? chapters.length - index : index + 1;
-                                        
-                                        return (
-                                            <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-3 rounded-lg cursor-pointer transition-all duration-300 border flex items-center justify-between hover:bg-background ${isLastRead ? 'bg-accent/10 border-accent/50' : 'border-transparent'}`}>
-                                                <div className="flex items-center gap-4">
-                                                    <span className={`font-mono text-sm ${isLastRead ? 'text-accent' : 'text-text-secondary'}`}>{String(chapterNumber).padStart(2, '0')}</span>
-                                                    <div>
-                                                        <p className={`font-semibold ${showLock ? 'text-text-secondary' : 'text-text-main'}`}>{chapter.title}</p>
-                                                        <p className="text-text-secondary text-xs mt-1">{formatDate(chapter.published_at)}</p>
-                                                    </div>
-                                                </div>
-                                                {showLock && <LockIcon className="text-text-secondary" />}
-                                            </div>
-                                        );
-                                    })}
+
+                    {/* --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ --- VVVV --- */}
+                    {/* Блок Главы теперь отображается только если активна вкладка "Описание" */}
+                    {activeTab === 'description' && (
+                        <div className="mt-8 md:mt-10 border-t border-border-color pt-6 animate-fade-in">
+                            <div className="bg-component-bg border border-border-color rounded-lg p-4">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h2 className="text-lg font-bold text-text-main">Главы</h2>
+                                    <button onClick={() => setSortOrder(prev => prev === 'newest' ? 'oldest' : 'newest')} className="text-sm font-semibold text-accent hover:text-accent-hover hover:underline">
+                                        {sortOrder === 'newest' ? 'Сначала новые' : 'Сначала старые'}
+                                    </button>
                                 </div>
-                            )}
+                                
+                                {isLoadingChapters ? <div className="flex justify-center items-center py-4"><LoadingSpinner /></div> : (
+                                    <div className="flex flex-col gap-2">
+                                        {sortedChapters.map((chapter, index) => {
+                                            const showLock = !hasActiveSubscription && chapter.isPaid;
+                                            const isLastRead = lastReadChapterId === chapter.id;
+                                            const chapterNumber = sortOrder === 'newest' ? chapters.length - index : index + 1;
+                                            
+                                            return (
+                                                <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-3 rounded-lg cursor-pointer transition-all duration-300 border flex items-center justify-between hover:bg-background ${isLastRead ? 'bg-accent/10 border-accent/50' : 'border-transparent'}`}>
+                                                    <div className="flex items-center gap-4">
+                                                        <span className={`font-mono text-sm ${isLastRead ? 'text-accent' : 'text-text-secondary'}`}>{String(chapterNumber).padStart(2, '0')}</span>
+                                                        <div>
+                                                            <p className={`font-semibold ${showLock ? 'text-text-secondary' : 'text-text-main'}`}>{chapter.title}</p>
+                                                            <p className="text-text-secondary text-xs mt-1">{formatDate(chapter.published_at)}</p>
+                                                        </div>
+                                                    </div>
+                                                    {showLock && <LockIcon className="text-text-secondary" />}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
+                    {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ --- */}
+
                 </div>
             </div>
 
-            {/* Модальные окна SubscriptionModal и PaymentMethodModal удалены */}
         
             {isCoverModalOpen && (
                 <div 

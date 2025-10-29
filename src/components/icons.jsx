@@ -70,3 +70,19 @@ export const LockClosedIcon = ({ className = 'w-6 h-6' }) => (
     />
   </svg>
 );
+export const ChatBubbleIcon = ({ className = "w-6 h-6" }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="currentColor"
+    className={className}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-3.86 8.25-8.625 8.25-4.766 0-8.625-3.694-8.625-8.25s3.859-8.25 8.625-8.25c4.766 0 8.625 3.694 8.625 8.25Z"
+    />
+  </svg>
+);

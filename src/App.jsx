@@ -167,35 +167,100 @@ useEffect(() => {
 
 }, [user, authLoading]);
 
+  // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ --- VVVV ---
   // Этот useEffect отвечает ТОЛЬКО за загрузку новелл
+  // (ПЕРЕПИСАН С ЛОГИКОЙ КЭШИРОВАНИЯ)
   useEffect(() => {
+    const CACHE_KEY = 'novels_cache';
+    // Кэш "живет" 1 час. Можете поменять на 10 * 60 * 1000 (10 минут), если обновления частые.
+    const MAX_CACHE_AGE_MS = 1000 * 60 * 60; // 1 час
+
     if (user && !needsPolicyAcceptance) {
-      setIsLoadingContent(true);
-      const fetchNovels = async () => {
+
+      // Функция загрузки новелл
+      const fetchNovels = async (isBackgroundFetch = false) => {
+        // Показываем спиннер, только если это НЕ фоновая загрузка
+        if (!isBackgroundFetch) {
+          setIsLoadingContent(true);
+        }
+
         const { data: novelsData, error: novelsError } = await supabase
           .from('novels')
           .select(`*, novel_stats ( views )`);
 
         if (novelsError) {
           console.error("Ошибка загрузки новелл:", novelsError);
-          setNovels([]);
+          // Не сбрасываем новеллы, если это была фоновая ошибка
+          if (!isBackgroundFetch) {
+            setNovels([]);
+          }
         } else {
+          // Обрабатываем и сортируем
           const formattedNovels = novelsData.map(novel => ({
             ...novel,
             views: novel.novel_stats?.views || 0,
           }));
           formattedNovels.sort((a, b) => b.views - a.views);
+          
+          // 1. Устанавливаем свежие данные в React
           setNovels(formattedNovels);
+          
+          // 2. Сохраняем свежие данные в localStorage
+          try {
+            const cacheData = {
+              timestamp: Date.now(),
+              data: formattedNovels
+            };
+            localStorage.setItem(CACHE_KEY, JSON.stringify(cacheData));
+          } catch (e) {
+            console.warn("Не удалось сохранить кеш новелл:", e);
+          }
         }
+        
+        // В любом случае убираем спиннер
         setIsLoadingContent(false);
       };
-      fetchNovels();
+
+      // --- Основная логика при монтировании ---
+      try {
+        const cachedItem = localStorage.getItem(CACHE_KEY);
+        if (cachedItem) {
+          const cache = JSON.parse(cachedItem);
+          const isCacheValid = (Date.now() - cache.timestamp) < MAX_CACHE_AGE_MS;
+
+          if (isCacheValid) {
+            // 1. Кэш ЕСТЬ и он СВЕЖИЙ
+            // Показываем данные из кэша мгновенно, загрузку не запускаем
+            setNovels(cache.data);
+            setIsLoadingContent(false);
+          } else {
+            // 2. Кэш ЕСТЬ, но он СТАРЫЙ
+            // Показываем старые данные мгновенно (БЕЗ спиннера)
+            setNovels(cache.data);
+            setIsLoadingContent(false);
+            // ...и запускаем фоновую загрузку
+            fetchNovels(true); // true = фоновая загрузка
+          }
+        } else {
+          // 3. Кэша НЕТ
+          // Запускаем обычную загрузку со спиннером
+          fetchNovels(false);
+        }
+      } catch (e) {
+        // Ошибка чтения кэша, просто грузим по-старому
+        console.error("Ошибка чтения кэша новелл:", e);
+        fetchNovels(false);
+      }
+
     } else if (!user) {
-      // Если пользователя нет, тоже сбрасываем
+      // Если пользователя нет, сбрасываем состояние и чистим кэш
       setNovels([]);
       setIsLoadingContent(false);
+      localStorage.removeItem(CACHE_KEY);
     }
-  }, [user, needsPolicyAcceptance]); // <-- Зависимость от 'user' (а не user.id)
+  }, [user, needsPolicyAcceptance]);
+  // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
+
 
   // Загрузка глав для выбранной новеллы
   useEffect(() => {
@@ -388,7 +453,28 @@ const handleFontChange = (newFontClass) => {
 
   const renderContent = () => {
     if (page === 'details') {
-      return <NovelDetails novel={selectedNovel} onSelectChapter={handleSelectChapter} onGenreSelect={handleGenreSelect} subscription={subscription} botUsername={BOT_USERNAME} userId={userId} chapters={chapters} isLoadingChapters={isLoadingChapters} lastReadData={lastReadData} onBack={handleBack} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} onTriggerSubscription={() => setIsSubModalOpen(true)}/>;
+      const displayName = user?.user_metadata?.full_name || 
+                          user?.user_metadata?.user_name || 
+                          user?.user_metadata?.display_name || 
+                          'Аноним';
+                        
+      return <NovelDetails 
+                novel={selectedNovel} 
+                onSelectChapter={handleSelectChapter} 
+                onGenreSelect={handleGenreSelect} 
+                subscription={subscription} 
+                botUsername={BOT_USERNAME} 
+                userId={userId} 
+                chapters={chapters} 
+                isLoadingChapters={isLoadingChapters} 
+                lastReadData={lastReadData} 
+                onBack={handleBack} 
+                bookmarks={bookmarks} 
+                onToggleBookmark={handleToggleBookmark} 
+                onTriggerSubscription={() => setIsSubModalOpen(true)}
+                isUserAdmin={isUserAdmin}
+                userName={displayName}
+             />;
     }
     if (page === 'reader') {
     const displayName = user?.user_metadata?.full_name || 

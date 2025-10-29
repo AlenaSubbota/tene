@@ -7,9 +7,7 @@ import { Header } from '../Header.jsx';
 import { useAuth } from '../../Auth.jsx';
 import LoadingSpinner from '../LoadingSpinner.jsx';
 import { NovelReviews } from '../NovelReviews.jsx';
-// --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ --- VVVV ---
-import { StarRating } from '../StarRating.jsx'; // Импортируем наш новый компонент
-// --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
+import { StarRating } from '../StarRating.jsx';
 
 const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -20,30 +18,60 @@ const formatDate = (dateString) => {
 const VISIBLE_GENRES_COUNT = 4;
 
 export const NovelDetails = ({
-    novel, onSelectChapter, onTriggerSubscription, onGenreSelect,
+    novel, // <-- Это prop, мы будем использовать его как НАЧАЛЬНОЕ значение
+    onSelectChapter, onTriggerSubscription, onGenreSelect,
     subscription, botUsername, userId, chapters, isLoadingChapters,
     lastReadData, onBack, bookmarks, onToggleBookmark,
     isUserAdmin, userName,
-    // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Принимаем props) --- VVVV ---
     userRatings, setUserRatings
-    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
 }) => {
     const { user } = useAuth();
 
-    // ... (хук для просмотров без изменений) ...
+    // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ --- VVVV ---
+
+    // 1. Создаем ЛОКАЛЬНОЕ "живое" состояние для новеллы.
+    //    'novel' (prop) используется только один раз при первой загрузке.
+    const [liveNovel, setLiveNovel] = useState(novel);
+
+    // 2. Синхронизируем состояние, если prop 'novel' вдруг изменится 
+    //    (например, из-за Realtime в родительском App.jsx)
     useEffect(() => {
-        if (user && novel?.id) {
-            const viewedKey = `viewed-${novel.id}`;
+        setLiveNovel(novel);
+    }, [novel]);
+
+    // 3. Полностью переписываем хук для просмотров
+    useEffect(() => {
+        // Используем 'liveNovel'
+        if (user && liveNovel?.id) {
+            const viewedKey = `viewed-${liveNovel.id}`;
+            
             if (!sessionStorage.getItem(viewedKey)) {
                 sessionStorage.setItem(viewedKey, 'true');
+                
                 const increment = async () => {
-                    const { error } = await supabase.rpc('increment_views', { novel_id_to_inc: novel.id });
-                    if(error) console.error("Ошибка обновления счетчика просмотров:", error);
+                    // Вызываем нашу НОВУЮ SQL-функцию, которая ВОЗВРАЩАЕТ значение
+                    const { data: newViewCount, error } = await supabase.rpc(
+                        'increment_views', // <-- Имя функции из Шага 1
+                        { novel_id_to_inc: liveNovel.id }
+                    );
+                    
+                    if (error) {
+                        console.error("Ошибка обновления счетчика просмотров:", error);
+                    } else if (newViewCount !== null) {
+                        // 4. Обновляем ЛОКАЛЬНОЕ состояние 'liveNovel'
+                        //    Это немедленно обновит UI.
+                        setLiveNovel(currentNovel => ({
+                            ...currentNovel,
+                            views: newViewCount 
+                        }));
+                    }
                 };
                 increment();
             }
         }
-    }, [novel, user]);
+    }, [liveNovel, user]); // <-- Теперь зависимость от 'liveNovel'
+
+    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
 
     // Состояния
     const [sortOrder, setSortOrder] = useState('newest');
@@ -55,29 +83,35 @@ export const NovelDetails = ({
     const [activeTab, setActiveTab] = useState('description');
 
 
-    // ... (все useMemo без изменений) ...
+    // --- VVVV --- ИЗМЕНЕНИЯ В useMemo (зависимость от liveNovel) --- VVVV ---
     const isBookmarked = useMemo(() => {
-        if (!novel?.id || !bookmarks) return false;
-        return bookmarks.includes(novel.id);
-    }, [bookmarks, novel]);
-    const novelGenres = Array.isArray(novel?.genres) ? novel.genres : [];
+        if (!liveNovel?.id || !bookmarks) return false;
+        return bookmarks.includes(liveNovel.id);
+    }, [bookmarks, liveNovel]); // <-- liveNovel
+
+    const novelGenres = Array.isArray(liveNovel?.genres) ? liveNovel.genres : []; // <-- liveNovel
+
     const hasActiveSubscription = subscription?.expires_at && new Date(subscription.expires_at) > new Date();
-    const lastReadChapterId = useMemo(() => (lastReadData && novel && lastReadData[novel.id] ? lastReadData[novel.id].chapterId : null), [lastReadData, novel]);
+    
+    const lastReadChapterId = useMemo(() => (lastReadData && liveNovel && lastReadData[liveNovel.id] ? lastReadData[liveNovel.id].chapterId : null), [lastReadData, liveNovel]); // <-- liveNovel
+    
+    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
+
     const sortedChapters = useMemo(() => {
         if (!Array.isArray(chapters)) return [];
         const chaptersCopy = [...chapters];
         return sortOrder === 'newest' ? chaptersCopy.sort((a, b) => b.id - a.id) : chaptersCopy.sort((a, b) => a.id - b.id);
     }, [chapters, sortOrder]);
+
     const genresToShow = useMemo(() => {
         if (showAllGenres) {
             return novelGenres;
         }
         return novelGenres.slice(0, VISIBLE_GENRES_COUNT);
     }, [novelGenres, showAllGenres]);
+
     const hiddenGenresCount = novelGenres.length - genresToShow.length;
 
-
-    // ... (useEffect для описания без изменений) ...
     useEffect(() => {
         if (descriptionRef.current && activeTab === 'description') {
             const checkHeight = () => {
@@ -93,51 +127,41 @@ export const NovelDetails = ({
                 window.removeEventListener('resize', checkHeight);
             };
         }
-    }, [novel?.description, activeTab]);
+    }, [liveNovel?.description, activeTab]); // <-- liveNovel
 
-    // --- VVVV --- ЗАМЕНА ЛОГИКИ УДАЛЕНИЯ --- VVVV ---
+    
     const handleSetRating = async (newRating) => {
-      if (!userId || !novel?.id) return;
+      if (!userId || !liveNovel?.id) return; // <-- liveNovel
 
-      const oldRating = userRatings[novel.id];
+      const oldRating = userRatings[liveNovel.id]; // <-- liveNovel
 
       if (newRating === 0) {
-        // --- Логика УДАЛЕНИЯ рейтинга ---
-        
-        // 1. Оптимистичное обновление UI: 
-        // НЕ ставим 0, а УДАЛЯЕМ ключ из объекта
         setUserRatings(prev => {
           const newRatings = { ...prev };
-          delete newRatings[novel.id]; // <--- ГЛАВНОЕ ИЗМЕНЕНИЕ
+          delete newRatings[liveNovel.id]; // <-- liveNovel
           return newRatings;
         });
 
         const { error } = await supabase
           .from('novel_ratings')
           .delete()
-          .eq('novel_id', novel.id)
+          .eq('novel_id', liveNovel.id) // <-- liveNovel
           .eq('user_id', userId);
 
         if (error) {
           console.error("Ошибка удаления рейтинга:", error);
           alert("Не удалось убрать оценку. Попробуйте снова.");
-          // Откат: возвращаем старую оценку
-          if (oldRating) { // Убедимся, что она была
-            setUserRatings(prev => ({ ...prev, [novel.id]: oldRating }));
+          if (oldRating) {
+            setUserRatings(prev => ({ ...prev, [liveNovel.id]: oldRating })); // <-- liveNovel
           }
         }
-        // (База данных сама обновит `novels` через Realtime)
-
       } else {
-        // --- Логика ДОБАВЛЕНИЯ/ОБНОВЛЕНИЯ рейтинга ---
-        
-        // 1. Оптимистичное обновление UI
-        setUserRatings(prev => ({ ...prev, [novel.id]: newRating }));
+        setUserRatings(prev => ({ ...prev, [liveNovel.id]: newRating })); // <-- liveNovel
 
         const { error } = await supabase
           .from('novel_ratings')
           .upsert({ 
-              novel_id: novel.id,
+              novel_id: liveNovel.id, // <-- liveNovel
               user_id: userId,
               rating: newRating
           });
@@ -145,24 +169,20 @@ export const NovelDetails = ({
         if (error) {
           console.error("Ошибка сохранения рейтинга:", error);
           alert("Не удалось сохранить вашу оценку. Попробуйте снова.");
-          // Откат
           if (oldRating) {
-             setUserRatings(prev => ({ ...prev, [novel.id]: oldRating }));
+             setUserRatings(prev => ({ ...prev, [liveNovel.id]: oldRating })); // <-- liveNovel
           } else {
              setUserRatings(prev => {
                 const newRatings = { ...prev };
-                delete newRatings[novel.id];
+                delete newRatings[liveNovel.id]; // <-- liveNovel
                 return newRatings;
              });
           }
         }
-        // (База данных сама обновит `novels` через Realtime)
       }
     };
-    // --- ^^^^ --- КОНЕЦ ЗАМЕНЫ --- ^^^^ ---
 
-    // ... (остальные обработчики без изменений) ...
-    const handleBookmarkToggle = (e) => { e.stopPropagation(); if (!novel) return; onToggleBookmark(novel.id); };
+    const handleBookmarkToggle = (e) => { e.stopPropagation(); if (!liveNovel) return; onToggleBookmark(liveNovel.id); }; // <-- liveNovel
     const handleChapterClick = (chapter) => {
         if (!hasActiveSubscription && chapter.isPaid) {
             onTriggerSubscription();
@@ -172,22 +192,26 @@ export const NovelDetails = ({
     };
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
 
-    if (!novel) {
+    // --- VVVV --- ИЗМЕНЕНИЯ В РЕНДЕРЕ (используем liveNovel) --- VVVV ---
+    if (!liveNovel) {
         return <LoadingSpinner />;
     }
 
-    // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Переменные для рендера) --- VVVV ---
-    const myRating = userRatings[novel.id] || 0;
-    // Данные о новелле теперь приходят из App.jsx с рейтингом
-    const avgRating = novel.average_rating || 0.0;
-    const ratingCount = novel.rating_count || 0;
-    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
+    const myRating = userRatings[liveNovel.id] || 0;
+    
+    // Используем liveNovel. average_rating и rating_count придут из liveNovel
+    const avgRating = liveNovel.average_rating || 0.0;
+    const ratingCount = liveNovel.rating_count || 0;
+    
+    // **ВАЖНО**: Здесь мы тоже используем liveNovel.views
+    // (Я не вижу этого в твоем JSX, но если оно где-то есть, оно обновится)
+    // const currentViews = liveNovel.views; 
 
     return (
         <div className="bg-background min-h-screen text-text-main font-sans">
-            <Header title={novel.title} onBack={onBack} />
+            <Header title={liveNovel.title} onBack={onBack} />
 
-            <div key={novel.id} className="animate-fade-in">
+            <div key={liveNovel.id} className="animate-fade-in">
                 <div className="max-w-5xl mx-auto p-4 md:p-8">
 
                     {/* Блок 1: Обложка, Кнопки, Жанры */}
@@ -195,18 +219,14 @@ export const NovelDetails = ({
                         {/* Левая колонка: Обложка + Кнопки */}
                         <div className="col-span-5 md:col-span-4">
                             <img
-                                src={`/${novel.cover_url}`}
-                                alt={novel.title}
+                                src={`/${liveNovel.cover_url}`}
+                                alt={liveNovel.title}
                                 className="w-full mx-auto rounded-lg shadow-2xl shadow-black/60 object-cover aspect-[3/4] cursor-pointer transition-transform duration-200 hover:scale-[1.03]"
                                 onClick={() => setIsCoverModalOpen(true)}
                             />
 
-                            {/* --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Добавляем блок рейтинга) --- VVVV --- */}
                             <div className="mt-4 flex flex-col items-center gap-2">
-                              {/* Показываем виджет оценки */}
                               <StarRating initialRating={myRating} onRatingSet={handleSetRating} />
-
-                              {/* Показываем среднюю оценку */}
                               {ratingCount > 0 ? (
                                 <p className="text-xs text-text-secondary">
                                   Средняя: <strong>{Number(avgRating).toFixed(1)}</strong> ({ratingCount} {ratingCount === 1 ? 'оценка' : (ratingCount > 1 && ratingCount < 5 ? 'оценки' : 'оценок')})
@@ -215,7 +235,6 @@ export const NovelDetails = ({
                                 <p className="text-xs text-text-secondary">Оценок пока нет</p>
                               )}
                             </div>
-                            {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ --- */}
 
                             <div className="mt-4 flex flex-col gap-3 w-full">
                                {lastReadChapterId ? (
@@ -235,8 +254,8 @@ export const NovelDetails = ({
 
                         {/* Правая колонка: Заголовок, Автор, ЖАНРЫ */}
                         <div className="col-span-7 md:col-span-8">
-                            <h1 className="text-xl md:text-4xl font-bold text-text-main text-left">{novel.title}</h1>
-                            <p className="text-sm md:text-lg text-text-secondary mt-1 text-left">{novel.author}</p>
+                            <h1 className="text-xl md:text-4xl font-bold text-text-main text-left">{liveNovel.title}</h1>
+                            <p className="text-sm md:text-lg text-text-secondary mt-1 text-left">{liveNovel.author}</p>
 
                             <div className="mt-4 md:mt-6">
                                 <h2 className="text-sm font-bold uppercase tracking-widest text-text-secondary mb-3">Жанры</h2>
@@ -288,7 +307,7 @@ export const NovelDetails = ({
                         {activeTab === 'description' && (
                             <div className="pt-6 animate-fade-in">
                                 <div ref={descriptionRef} className={`relative overflow-hidden transition-[max-height] duration-500 ease-in-out prose prose-invert prose-sm text-text-secondary max-w-none ${isDescriptionExpanded ? 'max-h-[2000px]' : 'max-h-28'}`}>
-                                    <div dangerouslySetInnerHTML={{ __html: novel.description }} />
+                                    <div dangerouslySetInnerHTML={{ __html: liveNovel.description }} />
                                     {!isDescriptionExpanded && isLongDescription && <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-background to-transparent"></div>}
                                 </div>
                                 {isLongDescription && (
@@ -303,7 +322,7 @@ export const NovelDetails = ({
                         {activeTab === 'reviews' && (
                             <div className="animate-fade-in">
                                 <NovelReviews
-                                    novelId={novel.id}
+                                    novelId={liveNovel.id}
                                     userId={userId}
                                     userName={userName}
                                     isUserAdmin={isUserAdmin}
@@ -368,8 +387,8 @@ export const NovelDetails = ({
                     </button>
 
                     <img
-                        src={`/${novel.cover_url}`}
-                        alt={novel.title}
+                        src={`/${liveNovel.cover_url}`}
+                        alt={liveNovel.title}
                         className="max-w-full max-h-[90vh] w-auto h-auto rounded-lg object-contain shadow-2xl shadow-black/50"
                         onClick={(e) => e.stopPropagation()}
                     />

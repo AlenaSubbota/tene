@@ -118,7 +118,6 @@ useEffect(() => {
         // [ИСПРАВЛЕНИЕ] Извлекаем первый (и единственный) объект из массива
         const userProfile = profileDataArray[0]; 
         
-        console.log("Загружены свежие данные профиля (объект):", userProfile);
         
         // [ИСПРАВЛЕНИЕ] Используем 'userProfile', а не 'profileDataArray'
         setIsUserAdmin(userProfile.is_admin || false);
@@ -143,7 +142,6 @@ useEffect(() => {
           filter: `id=eq.${user.id}`
         }, 
         (payload) => {
-          console.log('Realtime: Профиль пользователя обновлен!', payload.new);
           
           // Обновляем состояние из Realtime (здесь 'payload.new' - это ОБЪЕКТ, и это_правильно)
           const newProfile = payload.new;
@@ -155,7 +153,6 @@ useEffect(() => {
       )
       .subscribe(async (status, err) => {
          if (status === 'SUBSCRIBED') {
-           console.log('Успешно подписан на Realtime! Загружаю свежие данные...');
            await loadProfileData(); // Загружаем данные после подписки
          }
          if (status === 'CHANNEL_ERROR' || err) {
@@ -165,7 +162,6 @@ useEffect(() => {
 
     // 4. Функция очистки (остается)
     return () => {
-      console.log('Отписка от Realtime-канала profiles...');
       supabase.removeChannel(channel);
     };
 
@@ -237,7 +233,6 @@ useEffect(() => {
 
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
-    console.log('Проверка объекта Telegram WebApp (tg):', tg);
     if (!tg) return;
     tg.ready();
     tg.expand();
@@ -324,13 +319,9 @@ const handleFontChange = (newFontClass) => {
 
     tg.showConfirm(`Вы будете перенаправлены в бот для способа оплаты: ${method}. Продолжить?`, async (confirmed) => {
       if (!confirmed) {
-        console.log("Пользователь отменил перенаправление в бот.");
         return;
       }
-
-      console.log('User ID перед обновлением токена:', userId); 
       const token = uuidv4(); 
-      console.log('Новый сгенерированный токен:', token); 
 
       try {
         const { error: updateError } = await supabase
@@ -341,7 +332,6 @@ const handleFontChange = (newFontClass) => {
           })
           .eq('id', userId);
 
-        console.log('Результат обновления токена в Supabase:', { updateError }); 
 
         if (updateError) {
           console.error("Ошибка обновления профиля в Supabase:", updateError);
@@ -350,7 +340,6 @@ const handleFontChange = (newFontClass) => {
         }
 
         const link = `https://t.me/${BOT_USERNAME}?start=${token}`;
-        console.log('Формируемая ссылка для Telegram:', link); 
 
         tg.openTelegramLink(link);
         tg.close();

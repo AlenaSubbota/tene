@@ -1,8 +1,10 @@
 // src/components/StarRating.jsx
-import React, { useState } from 'react';
 
-// --- VVVV --- НОВАЯ ИКОНКА: Звезда --- VVVV ---
-// Встроенная SVG-иконка для "красивой звезды"
+// --- ИЗМЕНЕНИЕ 1: Импортируем хуки ---
+import React, { useState, useEffect } from 'react'; 
+// (StarIcon у тебя уже есть в этом файле, так что icons.jsx не нужен)
+
+// --- VVVV --- Твоя SVG-иконка (оставляем) --- VVVV ---
 const StarIcon = ({ className, filled }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -31,27 +33,44 @@ const StarIcon = ({ className, filled }) => (
 
 
 export const StarRating = ({ initialRating = 0, onRatingSet }) => {
-  // Используем ТОЛЬКО hover-состояние.
-  // 'initialRating' приходит из App.jsx и является "источником правды".
-  const [hoverRating, setHoverRating] = useState(0);
 
-  const handleClick = (newRating) => {
-    // Позволяем сбросить оценку, если кликнуть по той же звезде
-    if (newRating === initialRating) {
-      onRatingSet(0); // 0 = "удалить мою оценку"
-    } else {
-      onRatingSet(newRating);
-    }
-  };
+  // --- VVVV --- ИСПРАВЛЕНИЕ: Возвращаем состояния --- VVVV ---
+  // Нам НУЖНО внутреннее состояние 'rating', чтобы useEffect мог его обновить.
+  const [rating, setRating] = useState(initialRating);
+  const [hoverRating, setHoverRating] = useState(0); // 'hoverRating' было 'hover' у меня
+  // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ --- ^^^^ ---
+
+
+  // --- VVVV --- ИСПРАВЛЕНИЕ: Твой useEffect был правильным, но ему не хватало setRating --- VVVV ---
+  // Этот хук синхронизирует ВНУТРЕННЕЕ состояние (rating) с ВНЕШНИМ (initialRating)
+  useEffect(() => {
+        setRating(initialRating);
+    }, [initialRating]);
+  // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ --- ^^^^ ---
+
+    // --- VVVV --- ИСПРАВЛЕНИЕ: Этот handleClick теперь будет работать --- VVVV ---
+    const handleClick = (ratingValue) => {
+        if (ratingValue === rating) {
+            // "Сброс" рейтинга, если кликнуть на ту же звезду
+            setRating(0);
+            onRatingSet(0);
+        } else {
+            // Установка нового рейтинга
+            setRating(ratingValue);
+            onRatingSet(ratingValue);
+        }
+    };
+    // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ --- ^^^^ ---
 
   return (
-    <div className="flex items-center gap-1.5"> {/* gap-1.5 чуть свободнее, чем gap-1 */}
+    <div className="flex items-center gap-1.5"> 
       {[1, 2, 3, 4, 5].map((index) => {
         
-        // Звезда "активна" (заполнена), если:
-        // 1. На нее наведен курсор (hoverRating)
-        // 2. Или (если курсор не наведен) она является частью initialRating
-        const isFilled = (hoverRating || initialRating) >= index;
+        // --- VVVV --- ИСПРАВЛЕНИЕ: Звезда должна смотреть на 'rating', а не 'initialRating' --- VVVV ---
+        // 'hoverRating' имеет приоритет,
+        // иначе смотрим на 'rating' (наше внутреннее, обновленное состояние)
+        const isFilled = (hoverRating || rating) >= index;
+        // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ --- ^^^^ ---
 
         return (
           <button
@@ -62,16 +81,14 @@ export const StarRating = ({ initialRating = 0, onRatingSet }) => {
             className="transition-transform duration-150 ease-in-out hover:scale-125 focus:outline-none"
             aria-label={`Оценка ${index}`}
           >
-            {/* --- VVVV --- ИЗМЕНЕНИЕ: Уменьшаем размер до w-6 h-6 --- VVVV --- */}
             <StarIcon
               className={`w-6 h-6 ${
                 isFilled
                   ? 'text-amber-500' // Классический "золотой" цвет для рейтинга
-                  : 'text-text-secondary/30' // Цвет пустой звезды (из вашего кода)
+                  : 'text-text-secondary/30' // Цвет пустой звезды (из твоего кода)
               }`}
               filled={isFilled}
             />
-            {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ --- ^^^^ --- */}
           </button>
         );
       })}

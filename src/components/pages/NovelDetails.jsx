@@ -95,18 +95,23 @@ export const NovelDetails = ({
         }
     }, [novel?.description, activeTab]);
 
-    // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Обработчик рейтинга) --- VVVV ---
-    // Обработчик установки/изменения рейтинга
+    // --- VVVV --- ЗАМЕНА ЛОГИКИ УДАЛЕНИЯ --- VVVV ---
     const handleSetRating = async (newRating) => {
       if (!userId || !novel?.id) return;
 
       const oldRating = userRatings[novel.id];
 
-      // 1. Оптимистичное обновление UI
-      setUserRatings(prev => ({ ...prev, [novel.id]: newRating }));
-
       if (newRating === 0) {
         // --- Логика УДАЛЕНИЯ рейтинга ---
+        
+        // 1. Оптимистичное обновление UI: 
+        // НЕ ставим 0, а УДАЛЯЕМ ключ из объекта
+        setUserRatings(prev => {
+          const newRatings = { ...prev };
+          delete newRatings[novel.id]; // <--- ГЛАВНОЕ ИЗМЕНЕНИЕ
+          return newRatings;
+        });
+
         const { error } = await supabase
           .from('novel_ratings')
           .delete()
@@ -116,13 +121,22 @@ export const NovelDetails = ({
         if (error) {
           console.error("Ошибка удаления рейтинга:", error);
           alert("Не удалось убрать оценку. Попробуйте снова.");
-          setUserRatings(prev => ({ ...prev, [novel.id]: oldRating })); // Откат
+          // Откат: возвращаем старую оценку
+          if (oldRating) { // Убедимся, что она была
+            setUserRatings(prev => ({ ...prev, [novel.id]: oldRating }));
+          }
         }
+        // (База данных сама обновит `novels` через Realtime)
+
       } else {
         // --- Логика ДОБАВЛЕНИЯ/ОБНОВЛЕНИЯ рейтинга ---
+        
+        // 1. Оптимистичное обновление UI
+        setUserRatings(prev => ({ ...prev, [novel.id]: newRating }));
+
         const { error } = await supabase
           .from('novel_ratings')
-          .upsert({ // upsert = insert or update
+          .upsert({ 
               novel_id: novel.id,
               user_id: userId,
               rating: newRating
@@ -131,12 +145,21 @@ export const NovelDetails = ({
         if (error) {
           console.error("Ошибка сохранения рейтинга:", error);
           alert("Не удалось сохранить вашу оценку. Попробуйте снова.");
-          setUserRatings(prev => ({ ...prev, [novel.id]: oldRating })); // Откат
+          // Откат
+          if (oldRating) {
+             setUserRatings(prev => ({ ...prev, [novel.id]: oldRating }));
+          } else {
+             setUserRatings(prev => {
+                const newRatings = { ...prev };
+                delete newRatings[novel.id];
+                return newRatings;
+             });
+          }
         }
+        // (База данных сама обновит `novels` через Realtime)
       }
-      // Триггер в базе данных (Шаг 1) сам пересчитает средний рейтинг
     };
-    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
+    // --- ^^^^ --- КОНЕЦ ЗАМЕНЫ --- ^^^^ ---
 
     // ... (остальные обработчики без изменений) ...
     const handleBookmarkToggle = (e) => { e.stopPropagation(); if (!novel) return; onToggleBookmark(novel.id); };

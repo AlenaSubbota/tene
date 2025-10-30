@@ -2,7 +2,9 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from "../../supabase-config.js";
-import { LockIcon, ChatBubbleIcon, EyeIcon } from '../icons.jsx'; // <-- Добавил EyeIcon
+// --- VVVV --- ИЗМЕНЕНИЕ: Убрал EyeIcon --- VVVV ---
+import { LockIcon, ChatBubbleIcon } from '../icons.jsx';
+// --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ --- ^^^^ ---
 import { Header } from '../Header.jsx';
 import { useAuth } from '../../Auth.jsx';
 import LoadingSpinner from '../LoadingSpinner.jsx';
@@ -15,47 +17,34 @@ const formatDate = (dateString) => {
     return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
-// Функция для просмотров из NovelList
-const formatViews = (num) => {
-    if (num >= 1000000) {
-        return (num / 1000000).toFixed(1) + 'M';
-    }
-    if (num >= 1000) {
-        return (num / 1000).toFixed(1) + 'K';
-    }
-    return num;
-};
+// --- VVVV --- ИЗМЕНЕНИЕ: Убрал formatViews --- VVVV ---
+// const formatViews = (num) => { ... };
+// --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ --- ^^^^ ---
 
 const VISIBLE_GENRES_COUNT = 4;
 
 export const NovelDetails = ({
-    novel, // <-- Это prop, мы будем использовать его как НАЧАЛЬНОЕ значение
+    novel, 
     onSelectChapter, onTriggerSubscription, onGenreSelect,
     subscription, botUsername, userId, chapters, isLoadingChapters,
     lastReadData, onBack, bookmarks, onToggleBookmark,
     isUserAdmin, userName,
     userRatings, setUserRatings,
-    // --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 1: Принять prop --- VVVV ---
-    onNovelStatsUpdate
-    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 1 --- ^^^^ ---
+    onNovelStatsUpdate // <-- Этот prop остается, он важен
 }) => {
     const { user } = useAuth();
 
-    // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ --- VVVV ---
-
-    // 1. Создаем ЛОКАЛЬНОЕ "живое" состояние для новеллы.
-    //    'novel' (prop) используется только один раз при первой загрузке.
+    // 1. "Живое" состояние (остается)
     const [liveNovel, setLiveNovel] = useState(novel);
 
-    // 2. Синхронизируем состояние, если prop 'novel' вдруг изменится 
-    //    (например, из-за Realtime в родительском App.jsx)
+    // 2. Синхронизация (остается)
     useEffect(() => {
         setLiveNovel(novel);
     }, [novel]);
 
-    // 3. Полностью переписанный хук для просмотров
+    // 3. Хук для просмотров (остается, он работает в фоне)
     useEffect(() => {
-        if (!user || !novel?.id) return; // Используем 'novel.id' из пропсов
+        if (!user || !novel?.id) return; 
 
         const viewedKey = `viewed-${novel.id}`;
         
@@ -64,21 +53,14 @@ export const NovelDetails = ({
             let rpcError = null;
 
             if (!sessionStorage.getItem(viewedKey)) {
-                // СЛУЧАЙ 1: Первый просмотр в сессии.
-                // Инкрементируем И получаем новое значение.
                 sessionStorage.setItem(viewedKey, 'true');
-                
                 const { data, error } = await supabase.rpc(
-                    'increment_and_get_views', // <-- Правильная функция
+                    'increment_and_get_views', 
                     { novel_id_to_inc: novel.id }
                 );
                 newViewCount = data;
                 rpcError = error;
-
             } else {
-                // СЛУЧАЙ 2: Повторный просмотр в сессии.
-                // ПРОСТО получаем актуальное значение, НЕ инкрементируя.
-                // (Это исправляет баг со старыми данными)
                 const { data, error } = await supabase
                     .from('novel_stats')
                     .select('views')
@@ -91,7 +73,6 @@ export const NovelDetails = ({
                 rpcError = error;
             }
 
-            // Обновляем состояние в любом случае
             if (rpcError) {
                 console.error("Ошибка при получении/обновлении просмотров:", rpcError);
             } else if (newViewCount !== null) {
@@ -100,19 +81,18 @@ export const NovelDetails = ({
                     views: newViewCount 
                 }));
 
-                // --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 2: Вызвать callback для App.jsx --- VVVV ---
+                // Сообщаем App.jsx об изменении (остается)
                 if (onNovelStatsUpdate) {
                     onNovelStatsUpdate(novel.id, { views: newViewCount });
                 }
-                // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 2 --- ^^^^ ---
             }
         };
 
         fetchAndUpdateViews();
 
-    }, [novel?.id, user, onNovelStatsUpdate]); // <-- ИЗМЕНЕНИЕ 3: Добавить prop в зависимости
+    }, [novel?.id, user, onNovelStatsUpdate]); 
 
-    // Состояния
+    // --- (Остальной код компонента без изменений) ---
     const [sortOrder, setSortOrder] = useState('newest');
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
     const descriptionRef = useRef(null);
@@ -121,21 +101,17 @@ export const NovelDetails = ({
     const [showAllGenres, setShowAllGenres] = useState(false);
     const [activeTab, setActiveTab] = useState('description');
 
-
-    // --- VVVV --- ИЗМЕНЕНИЯ В useMemo (зависимость от liveNovel) --- VVVV ---
     const isBookmarked = useMemo(() => {
         if (!liveNovel?.id || !bookmarks) return false;
         return bookmarks.includes(liveNovel.id);
-    }, [bookmarks, liveNovel]); // <-- liveNovel
+    }, [bookmarks, liveNovel]); 
 
-    const novelGenres = Array.isArray(liveNovel?.genres) ? liveNovel.genres : []; // <-- liveNovel
+    const novelGenres = Array.isArray(liveNovel?.genres) ? liveNovel.genres : []; 
 
     const hasActiveSubscription = subscription?.expires_at && new Date(subscription.expires_at) > new Date();
     
-    const lastReadChapterId = useMemo(() => (lastReadData && liveNovel && lastReadData[liveNovel.id] ? lastReadData[liveNovel.id].chapterId : null), [lastReadData, liveNovel]); // <-- liveNovel
+    const lastReadChapterId = useMemo(() => (lastReadData && liveNovel && lastReadData[liveNovel.id] ? lastReadData[liveNovel.id].chapterId : null), [lastReadData, liveNovel]); 
     
-    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
-
     const sortedChapters = useMemo(() => {
         if (!Array.isArray(chapters)) return [];
         const chaptersCopy = [...chapters];
@@ -166,41 +142,41 @@ export const NovelDetails = ({
                 window.removeEventListener('resize', checkHeight);
             };
         }
-    }, [liveNovel?.description, activeTab]); // <-- liveNovel
+    }, [liveNovel?.description, activeTab]); 
 
     
     const handleSetRating = async (newRating) => {
-      if (!userId || !liveNovel?.id) return; // <-- liveNovel
+      if (!userId || !liveNovel?.id) return; 
 
-      const oldRating = userRatings[liveNovel.id]; // <-- liveNovel
+      const oldRating = userRatings[liveNovel.id]; 
 
       if (newRating === 0) {
         setUserRatings(prev => {
           const newRatings = { ...prev };
-          delete newRatings[liveNovel.id]; // <-- liveNovel
+          delete newRatings[liveNovel.id]; 
           return newRatings;
         });
 
         const { error } = await supabase
           .from('novel_ratings')
           .delete()
-          .eq('novel_id', liveNovel.id) // <-- liveNovel
+          .eq('novel_id', liveNovel.id) 
           .eq('user_id', userId);
 
         if (error) {
           console.error("Ошибка удаления рейтинга:", error);
           alert("Не удалось убрать оценку. Попробуйте снова.");
           if (oldRating) {
-            setUserRatings(prev => ({ ...prev, [liveNovel.id]: oldRating })); // <-- liveNovel
+            setUserRatings(prev => ({ ...prev, [liveNovel.id]: oldRating })); 
           }
         }
       } else {
-        setUserRatings(prev => ({ ...prev, [liveNovel.id]: newRating })); // <-- liveNovel
+        setUserRatings(prev => ({ ...prev, [liveNovel.id]: newRating })); 
 
         const { error } = await supabase
           .from('novel_ratings')
           .upsert({ 
-              novel_id: liveNovel.id, // <-- liveNovel
+              novel_id: liveNovel.id, 
               user_id: userId,
               rating: newRating
           });
@@ -209,21 +185,19 @@ export const NovelDetails = ({
           console.error("Ошибка сохранения рейтинга:", error);
           alert("Не удалось сохранить вашу оценку. Попробуйте снова.");
           if (oldRating) {
-             setUserRatings(prev => ({ ...prev, [liveNovel.id]: oldRating })); // <-- liveNovel
+             setUserRatings(prev => ({ ...prev, [liveNovel.id]: oldRating })); 
           } else {
              setUserRatings(prev => {
                 const newRatings = { ...prev };
-                delete newRatings[liveNovel.id]; // <-- liveNovel
+                delete newRatings[liveNovel.id]; 
                 return newRatings;
              });
           }
         }
       }
-      // Примечание: Обновление liveNovel.average_rating и rating_count
-      // произойдет автоматически через Realtime listener в App.jsx
     };
 
-    const handleBookmarkToggle = (e) => { e.stopPropagation(); if (!liveNovel) return; onToggleBookmark(liveNovel.id); }; // <-- liveNovel
+    const handleBookmarkToggle = (e) => { e.stopPropagation(); if (!liveNovel) return; onToggleBookmark(liveNovel.id); }; 
     const handleChapterClick = (chapter) => {
         if (!hasActiveSubscription && chapter.isPaid) {
             onTriggerSubscription();
@@ -233,19 +207,18 @@ export const NovelDetails = ({
     };
     const handleContinueReading = () => { if (lastReadChapterId) { const chapterToContinue = chapters.find(c => c.id === lastReadChapterId); if (chapterToContinue) onSelectChapter(chapterToContinue); } };
 
-    // --- VVVV --- ИЗМЕНЕНИЯ В РЕНДЕРЕ (используем liveNovel) --- VVVV ---
     if (!liveNovel) {
         return <LoadingSpinner />;
     }
 
     const myRating = userRatings[liveNovel.id] || 0;
     
-    // Используем liveNovel. average_rating и rating_count придут из liveNovel
     const avgRating = liveNovel.average_rating || 0.0;
     const ratingCount = liveNovel.rating_count || 0;
-    // --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 4: Добавляем просмотры --- VVVV ---
-    const currentViews = liveNovel.views || 0;
-    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 4 --- ^^^^ ---
+    
+    // --- VVVV --- ИЗМЕНЕНИЕ: Убрал const currentViews --- VVVV ---
+    // const currentViews = liveNovel.views || 0;
+    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ --- ^^^^ ---
 
     return (
         <div className="bg-background min-h-screen text-text-main font-sans">
@@ -268,23 +241,15 @@ export const NovelDetails = ({
                             <div className="mt-4 flex flex-col items-center gap-2">
                               <StarRating initialRating={myRating} onRatingSet={handleSetRating} />
                               
-                              {/* --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 5: Отображаем просмотры и рейтинг --- VVVV --- */}
-                              <div className="flex items-center justify-center gap-4 text-xs text-text-secondary mt-1">
-                                {ratingCount > 0 ? (
-                                  <span>
-                                    Рейтинг: <strong>{Number(avgRating).toFixed(1)}</strong> ({ratingCount})
-                                  </span>
-                                ) : (
-                                  <span>Оценок нет</span>
-                                )}
-                              </div>
-                              <div className="flex items-center justify-center gap-2 text-xs text-text-secondary">
-                                <EyeIcon className="w-4 h-4" />
-                                <span>
-                                  Просмотры: <strong>{formatViews(currentViews)}</strong>
-                                </span>
-                              </div>
-                              {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 5 --- ^^^^ --- */}
+                              {/* --- VVVV --- ИЗМЕНЕНИЕ: Вернул старый блок отображения рейтинга --- VVVV --- */}
+                              {ratingCount > 0 ? (
+                                <p className="text-xs text-text-secondary">
+                                  Средняя: <strong>{Number(avgRating).toFixed(1)}</strong> ({ratingCount} {ratingCount === 1 ? 'оценка' : (ratingCount > 1 && ratingCount < 5 ? 'оценки' : 'оценок')})
+                                </p>
+                              ) : (
+                                <p className="text-xs text-text-secondary">Оценок пока нет</p>
+                              )}
+                              {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ --- ^^^^ --- */}
 
                             </div>
 

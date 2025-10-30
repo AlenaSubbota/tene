@@ -90,6 +90,8 @@ useEffect(() => {
   localStorage.setItem('fontClass', fontClass);
 }, [fontClass]);
 
+  // src/App.jsx
+
   // --- ИЗМЕНЕНИЕ 4: Полностью переписана логика проверки ---
   // Этот useEffect отвечает ТОЛЬКО за профиль и политику
   // Файл: src/App.jsx
@@ -145,7 +147,11 @@ useEffect(() => {
         setIsUserAdmin(userProfile.is_admin || false);
         setSubscription(userProfile.subscription || null); 
         setLastReadData(userProfile.last_read || {});
+        
+        // --- VVVV --- ИСПРАВЛЕНИЕ 1 (ЗАГРУЗКА) --- VVVV ---
+        // Конвертируем массив строк (text[]) в массив чисел (number[])
         setBookmarks((userProfile.bookmarks || []).map(Number));
+        // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ 1 --- ^^^^ ---
         
       } else {
         console.warn("Профиль не найден или пуст.");
@@ -191,8 +197,12 @@ useEffect(() => {
           setSubscription(newProfile.subscription || null);
           setIsUserAdmin(newProfile.is_admin || false);
           setLastReadData(newProfile.last_read || {});
+          
+          // --- VVVV --- ИСПРАВЛЕНИЕ 2 (REALTIME) --- VVVV ---
+          // Конвертируем массив строк (text[]) в массив чисел (number[])
           const newBookmarksAsNumbers = (newProfile.bookmarks || []).map(Number);
           setBookmarks(newBookmarksAsNumbers);
+          // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ 2 --- ^^^^ ---
         }
       )
       // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Realtime для рейтингов) --- VVVV ---

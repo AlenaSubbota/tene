@@ -400,18 +400,18 @@ useEffect(() => {
 
   const updateUserData = useCallback(async (dataToUpdate) => {
     if (userId) {
-      // ИСПОЛЬЗUЕМ UPSERT. Он создаст профиль, если его нет.
-      // Он требует, чтобы `id` был частью объекта.
-      const { error } = await supabase
-        .from('profiles')
-        .upsert({ ...dataToUpdate, id: userId }) // <--- ГЛАВНОЕ ИСПРАВЛЕНИЕ
-        .select(); // Добавляем .select(), чтобы .upsert() вернул данные
+      // Мы передаем 'dataToUpdate' как один JSONB-аргумент 'data_to_update'
+      const { error } = await supabase.rpc('update_my_profile', {
+        data_to_update: dataToUpdate
+      });
 
       if (error) {
-        console.error("Ошибка при upsert профиля:", error);
-        alert(`Не удалось сохранить данные. Ошибка RLS? См. консоль.`);
+        // Эта ошибка теперь будет более значимой, если что-то пойдет не так
+        console.error("Ошибка при вызове RPC update_my_profile:", error);
+        alert(`Не удалось сохранить данные: ${error.message}`);
       }
     }
+    // 'userId' - единственная зависимость, все верно
   }, [userId]);
 
   const handleTextSizeChange = useCallback((amount) => {

@@ -35,7 +35,7 @@ export const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }
     };
 
     return (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
+        <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 p-4">
               {novels.map((novel, index) => {
                 const isBookmarked = bookmarks.includes(novel.id);
 

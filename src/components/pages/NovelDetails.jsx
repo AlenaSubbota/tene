@@ -42,55 +42,45 @@ export const NovelDetails = ({
         setLiveNovel(novel);
     }, [novel]);
 
-    // 3. Хук для просмотров (остается, он работает в фоне)
+    // 3. Хук для просмотров (ИСПРАВЛЕННАЯ ЛОГИКА)
     useEffect(() => {
+        // Если нет юзера или новеллы, ничего не делаем
         if (!user || !novel?.id) return; 
 
+        // Ключ для sessionStorage остается
         const viewedKey = `viewed-${novel.id}`;
         
-        const fetchAndUpdateViews = async () => {
-            let newViewCount = null;
-            let rpcError = null;
-
+        // Функция теперь только инкрементирует счетчик, не обновляя состояние
+        const incrementView = async () => {
+            // Проверяем, смотрел ли юзер в ЭТОЙ СЕССИИ
             if (!sessionStorage.getItem(viewedKey)) {
+                // 1. Помечаем, что в этой сессии просмотр был
                 sessionStorage.setItem(viewedKey, 'true');
-                const { data, error } = await supabase.rpc(
+                
+                // 2. "Выстреливаем" RPC-запрос для инкремента в базе.
+                // Нам не нужно ждать ответа или обрабатывать 'data'.
+                // Realtime-слушатель в App.jsx сам поймает это обновление.
+                const { error } = await supabase.rpc(
                     'increment_and_get_views', 
                     { novel_id_to_inc: novel.id }
                 );
-                newViewCount = data;
-                rpcError = error;
-            } else {
-                const { data, error } = await supabase
-                    .from('novel_stats')
-                    .select('views')
-                    .eq('novel_id', novel.id)
-                    .single();
-                
-                if (data) {
-                    newViewCount = data.views;
-                }
-                rpcError = error;
-            }
 
-            if (rpcError) {
-                console.error("Ошибка при получении/обновлении просмотров:", rpcError);
-            } else if (newViewCount !== null) {
-                setLiveNovel(currentNovel => ({
-                    ...currentNovel,
-                    views: newViewCount 
-                }));
-
-                // Сообщаем App.jsx об изменении (остается)
-                if (onNovelStatsUpdate) {
-                    onNovelStatsUpdate(novel.id, { views: newViewCount });
+                // 3. (Опционально) Логируем ошибку, если она произошла,
+                // но не обновляем состояние, чтобы не ломать UI.
+                if (error) {
+                    console.error("Ошибка при инкременте просмотров:", error);
                 }
             }
+            // 4. Если 'else' (уже просмотрено в этой сессии) - мы не делаем НИЧЕГО.
+            // Это экономит и запросы к базе, и вызовы состояния.
         };
 
-        fetchAndUpdateViews();
+        // Запускаем функцию
+        incrementView();
 
-    }, [novel?.id, user, onNovelStatsUpdate]); 
+    // 5. Убираем 'onNovelStatsUpdate' из зависимостей,
+    // так как мы его больше не вызываем напрямую.
+    }, [novel?.id, user]);
 
     // --- (Остальной код компонента без изменений) ---
     const [sortOrder, setSortOrder] = useState('newest');

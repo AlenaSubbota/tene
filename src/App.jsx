@@ -145,7 +145,7 @@ useEffect(() => {
         setIsUserAdmin(userProfile.is_admin || false);
         setSubscription(userProfile.subscription || null); 
         setLastReadData(userProfile.last_read || {});
-        setBookmarks(userProfile.bookmarks || []);
+        setBookmarks((userProfile.bookmarks || []).map(Number));
         
       } else {
         console.warn("Профиль не найден или пуст.");
@@ -191,7 +191,8 @@ useEffect(() => {
           setSubscription(newProfile.subscription || null);
           setIsUserAdmin(newProfile.is_admin || false);
           setLastReadData(newProfile.last_read || {});
-          setBookmarks(newProfile.bookmarks || []);
+          const newBookmarksAsNumbers = (newProfile.bookmarks || []).map(Number);
+          setBookmarks(newBookmarksAsNumbers);
         }
       )
       // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Realtime для рейтингов) --- VVVV ---

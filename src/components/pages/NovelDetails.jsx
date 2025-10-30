@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from "../../supabase-config.js";
-import { LockIcon, ChatBubbleIcon } from '../icons.jsx';
+import { LockIcon, ChatBubbleIcon, EyeIcon } from '../icons.jsx'; // <-- Добавил EyeIcon
 import { Header } from '../Header.jsx';
 import { useAuth } from '../../Auth.jsx';
 import LoadingSpinner from '../LoadingSpinner.jsx';
@@ -15,6 +15,17 @@ const formatDate = (dateString) => {
     return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
 };
 
+// Функция для просмотров из NovelList
+const formatViews = (num) => {
+    if (num >= 1000000) {
+        return (num / 1000000).toFixed(1) + 'M';
+    }
+    if (num >= 1000) {
+        return (num / 1000).toFixed(1) + 'K';
+    }
+    return num;
+};
+
 const VISIBLE_GENRES_COUNT = 4;
 
 export const NovelDetails = ({
@@ -23,7 +34,10 @@ export const NovelDetails = ({
     subscription, botUsername, userId, chapters, isLoadingChapters,
     lastReadData, onBack, bookmarks, onToggleBookmark,
     isUserAdmin, userName,
-    userRatings, setUserRatings
+    userRatings, setUserRatings,
+    // --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 1: Принять prop --- VVVV ---
+    onNovelStatsUpdate
+    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 1 --- ^^^^ ---
 }) => {
     const { user } = useAuth();
 
@@ -39,39 +53,64 @@ export const NovelDetails = ({
         setLiveNovel(novel);
     }, [novel]);
 
-    // 3. Полностью переписываем хук для просмотров
+    // 3. Полностью переписанный хук для просмотров
     useEffect(() => {
-        // Используем 'liveNovel'
-        if (user && liveNovel?.id) {
-            const viewedKey = `viewed-${liveNovel.id}`;
-            
+        if (!user || !novel?.id) return; // Используем 'novel.id' из пропсов
+
+        const viewedKey = `viewed-${novel.id}`;
+        
+        const fetchAndUpdateViews = async () => {
+            let newViewCount = null;
+            let rpcError = null;
+
             if (!sessionStorage.getItem(viewedKey)) {
+                // СЛУЧАЙ 1: Первый просмотр в сессии.
+                // Инкрементируем И получаем новое значение.
                 sessionStorage.setItem(viewedKey, 'true');
                 
-                const increment = async () => {
-                    // Вызываем нашу НОВУЮ SQL-функцию, которая ВОЗВРАЩАЕТ значение
-                    const { data: newViewCount, error } = await supabase.rpc(
-                        'increment_and_get_views', // <-- Имя функции из Шага 1
-                        { novel_id_to_inc: liveNovel.id }
-                    );
-                    
-                    if (error) {
-                        console.error("Ошибка обновления счетчика просмотров:", error);
-                    } else if (newViewCount !== null) {
-                        // 4. Обновляем ЛОКАЛЬНОЕ состояние 'liveNovel'
-                        //    Это немедленно обновит UI.
-                        setLiveNovel(currentNovel => ({
-                            ...currentNovel,
-                            views: newViewCount 
-                        }));
-                    }
-                };
-                increment();
-            }
-        }
-    }, [liveNovel, user]); // <-- Теперь зависимость от 'liveNovel'
+                const { data, error } = await supabase.rpc(
+                    'increment_and_get_views', // <-- Правильная функция
+                    { novel_id_to_inc: novel.id }
+                );
+                newViewCount = data;
+                rpcError = error;
 
-    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
+            } else {
+                // СЛУЧАЙ 2: Повторный просмотр в сессии.
+                // ПРОСТО получаем актуальное значение, НЕ инкрементируя.
+                // (Это исправляет баг со старыми данными)
+                const { data, error } = await supabase
+                    .from('novel_stats')
+                    .select('views')
+                    .eq('novel_id', novel.id)
+                    .single();
+                
+                if (data) {
+                    newViewCount = data.views;
+                }
+                rpcError = error;
+            }
+
+            // Обновляем состояние в любом случае
+            if (rpcError) {
+                console.error("Ошибка при получении/обновлении просмотров:", rpcError);
+            } else if (newViewCount !== null) {
+                setLiveNovel(currentNovel => ({
+                    ...currentNovel,
+                    views: newViewCount 
+                }));
+
+                // --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 2: Вызвать callback для App.jsx --- VVVV ---
+                if (onNovelStatsUpdate) {
+                    onNovelStatsUpdate(novel.id, { views: newViewCount });
+                }
+                // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 2 --- ^^^^ ---
+            }
+        };
+
+        fetchAndUpdateViews();
+
+    }, [novel?.id, user, onNovelStatsUpdate]); // <-- ИЗМЕНЕНИЕ 3: Добавить prop в зависимости
 
     // Состояния
     const [sortOrder, setSortOrder] = useState('newest');
@@ -180,6 +219,8 @@ export const NovelDetails = ({
           }
         }
       }
+      // Примечание: Обновление liveNovel.average_rating и rating_count
+      // произойдет автоматически через Realtime listener в App.jsx
     };
 
     const handleBookmarkToggle = (e) => { e.stopPropagation(); if (!liveNovel) return; onToggleBookmark(liveNovel.id); }; // <-- liveNovel
@@ -202,10 +243,9 @@ export const NovelDetails = ({
     // Используем liveNovel. average_rating и rating_count придут из liveNovel
     const avgRating = liveNovel.average_rating || 0.0;
     const ratingCount = liveNovel.rating_count || 0;
-    
-    // **ВАЖНО**: Здесь мы тоже используем liveNovel.views
-    // (Я не вижу этого в твоем JSX, но если оно где-то есть, оно обновится)
-    // const currentViews = liveNovel.views; 
+    // --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 4: Добавляем просмотры --- VVVV ---
+    const currentViews = liveNovel.views || 0;
+    // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 4 --- ^^^^ ---
 
     return (
         <div className="bg-background min-h-screen text-text-main font-sans">
@@ -227,13 +267,25 @@ export const NovelDetails = ({
 
                             <div className="mt-4 flex flex-col items-center gap-2">
                               <StarRating initialRating={myRating} onRatingSet={handleSetRating} />
-                              {ratingCount > 0 ? (
-                                <p className="text-xs text-text-secondary">
-                                  Средняя: <strong>{Number(avgRating).toFixed(1)}</strong> ({ratingCount} {ratingCount === 1 ? 'оценка' : (ratingCount > 1 && ratingCount < 5 ? 'оценки' : 'оценок')})
-                                </p>
-                              ) : (
-                                <p className="text-xs text-text-secondary">Оценок пока нет</p>
-                              )}
+                              
+                              {/* --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 5: Отображаем просмотры и рейтинг --- VVVV --- */}
+                              <div className="flex items-center justify-center gap-4 text-xs text-text-secondary mt-1">
+                                {ratingCount > 0 ? (
+                                  <span>
+                                    Рейтинг: <strong>{Number(avgRating).toFixed(1)}</strong> ({ratingCount})
+                                  </span>
+                                ) : (
+                                  <span>Оценок нет</span>
+                                )}
+                              </div>
+                              <div className="flex items-center justify-center gap-2 text-xs text-text-secondary">
+                                <EyeIcon className="w-4 h-4" />
+                                <span>
+                                  Просмотры: <strong>{formatViews(currentViews)}</strong>
+                                </span>
+                              </div>
+                              {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 5 --- ^^^^ --- */}
+
                             </div>
 
                             <div className="mt-4 flex flex-col gap-3 w-full">

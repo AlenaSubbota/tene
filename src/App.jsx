@@ -57,6 +57,24 @@ export default function App() {
   const BOT_USERNAME = "tenebrisverbot";
   const userId = user?.id;
 
+  // VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 1: Добавить callback для обновления состояния --- VVVV
+  const handleNovelStatsUpdate = useCallback((novelId, newStats) => {
+    // newStats - это объект, например { views: 101 } или { average_rating: 4.5, rating_count: 20 }
+    setNovels(currentNovels =>
+      currentNovels.map(n =>
+        n.id === novelId
+          ? { ...n, ...newStats } // Обновляем статистику
+          : n
+      )
+    );
+    setSelectedNovel(currentNovel =>
+      currentNovel && currentNovel.id === novelId
+        ? { ...currentNovel, ...newStats } // Обновляем и выбранную новеллу
+        : currentNovel
+    );
+  }, []);
+  // ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 1 --- ^^^^
+
 useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('dark', 'theme-amber');
@@ -202,56 +220,28 @@ useEffect(() => {
       )
       // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
       
-      // --- VVVV --- ИЗМЕНЕНИЕ REALTIME-ОБРАБОТЧИКА --- VVVV ---
-      // Слушаем ЛЮБЫЕ обновления в таблице `novels`
+      // --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 2: Заменить listener 'novels' на 'novel_stats' --- VVVV ---
+      // Слушаем ЛЮБЫЕ обновления в `novel_stats` (просмотры, рейтинги)
       .on(
         'postgres_changes',
         {
           event: 'UPDATE', // Нас интересует только обновление
           schema: 'public',
-          table: 'novels'
+          table: 'novel_stats' // <-- СЛУШАЕМ ПРАВИЛЬНУЮ ТАБЛИЦУ
           // Нет фильтра, слушаем все
         },
         (payload) => {
-          // Когда триггер (рейтинга) ИЛИ функция (просмотров) обновляет `novels`,
-          // мы получаем здесь `payload.new`.
-          // `payload.new` теперь содержит АКТУАЛЬНЫЕ `average_rating`, `rating_count` И `views`
-          const updatedNovel = payload.new;
-
-          // Обновляем наш локальный state `novels`
-          setNovels(currentNovels => {
-            const novelIndex = currentNovels.findIndex(n => n.id === updatedNovel.id);
-            if (novelIndex === -1) {
-              return currentNovels;
-            }
-            
-            const newNovels = [...currentNovels];
-            
-            // --- ГЛАВНОЕ ИСПРАВЛЕНИЕ ---
-            // Мы больше не сохраняем старые `views`.
-            // Мы просто берем *весь* новый объект из payload,
-            // потому что он теперь содержит ВСЕ актуальные статы.
-            newNovels[novelIndex] = {
-              ...currentNovels[novelIndex], // Сохраняем `genres` и т.д.
-              ...updatedNovel, // Перезаписываем `views`, `average_rating`, `rating_count`
-            };
-            
-            return newNovels;
-          });
-
-          // Также обновляем `selectedNovel`, если мы на странице деталей
-          setSelectedNovel(currentSelectedNovel => {
-            if (currentSelectedNovel && currentSelectedNovel.id === updatedNovel.id) {
-              return {
-                 ...currentSelectedNovel, // Сохраняем `genres` и т.д.
-                 ...updatedNovel, // Перезаписываем `views`, `average_rating`, `rating_count`
-              };
-            }
-            return currentSelectedNovel;
-          });
+          // payload.new будет содержать { novel_id, views, average_rating, rating_count }
+          const updatedStats = payload.new;
+          
+          // Вызываем наш callback, чтобы обновить состояние
+          // Это унифицирует обновление и от Realtime, и от прямого вызова
+          if (updatedStats) {
+            handleNovelStatsUpdate(updatedStats.novel_id, updatedStats);
+          }
         }
       )
-      // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ REALTIME-ОБРАБОТЧИКА --- ^^^^ ---
+      // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 2 --- ^^^^ ---
       .subscribe(async (status, err) => {
          if (status === 'SUBSCRIBED') {
            await loadProfileData(); // Загружаем данные после подписки
@@ -266,7 +256,7 @@ useEffect(() => {
       supabase.removeChannel(channel);
     };
 
-}, [user, authLoading]);
+}, [user, authLoading, handleNovelStatsUpdate]); // <-- Добавили handleNovelStatsUpdate в зависимости
 
   // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Загрузка новелл) --- VVVV ---
   // Этот useEffect отвечает ТОЛЬКО за загрузку новелл
@@ -297,12 +287,14 @@ useEffect(() => {
          // --- VVVV --- ИСПРАВЛЕНО: Маппинг данных из `novel_stats` --- VVVV ---
           const formattedNovels = novelsData.map(novel => ({
             ...novel,
-            // Данные теперь в `novel_stats`
+            // Данные теперь в `novel_stats` (или 0 по умолчанию)
             views: novel.novel_stats?.views || 0,
             average_rating: novel.novel_stats?.average_rating || 0.0,
             rating_count: novel.novel_stats?.rating_count || 0,
+            // Удаляем дублирующую структуру, чтобы избежать путаницы
+            novel_stats: undefined 
           }));
-          // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ --- ^^^^ ---
+          // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ --- ^^^^ ---
 
           formattedNovels.sort((a, b) => b.views - a.views);
           
@@ -332,12 +324,16 @@ useEffect(() => {
           if (isCacheValid) {
             setNovels(cache.data);
             setIsLoadingContent(false);
+            // Загружаем в фоне, только если кэш ОЧЕНЬ старый (например, >15 мин)
+            // Для 1 часа можно не грузить в фоне
           } else {
-            setNovels(cache.data);
-            setIsLoadingContent(false);
+            // Кэш невалиден
+            setNovels(cache.data); // Показываем старые данные...
+            setIsLoadingContent(false); // ...но не показываем спиннер
             fetchNovels(true); // true = фоновая загрузка
           }
         } else {
+          // Кэша нет
           fetchNovels(false);
         }
       } catch (e) {
@@ -569,6 +565,9 @@ const handleFontChange = (newFontClass) => {
                 // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Передача props) --- VVVV ---
                 userRatings={userRatings}
                 setUserRatings={setUserRatings}
+                // --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 3: Передать callback --- VVVV ---
+                onNovelStatsUpdate={handleNovelStatsUpdate}
+                // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 3 --- ^^^^ ---
                 // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
              />;
     }

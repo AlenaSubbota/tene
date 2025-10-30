@@ -6,39 +6,21 @@ import { supabase } from "../../supabase-config.js";
 import { Header } from "../Header.jsx";
 import { BookmarkIcon, EyeIcon } from '../icons.jsx';
 
-export const BookmarksPage = ({ onSelectNovel, bookmarks, onToggleBookmark }) => {
-    const [bookmarkedNovels, setBookmarkedNovels] = useState([]);
-    const [isLoading, setIsLoading] = useState(true);
+// --- ИЗМЕНЕНИЕ: Принимаем 'novels' (полный список) как пропс ---
+export const BookmarksPage = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }) => {
+    
+    // --- ИЗМЕНЕНИЕ: Удалили useEffect и useState. Используем useMemo ---
+    // Он просто фильтрует список, который уже есть в App.jsx
+    const bookmarkedNovels = useMemo(() => {
+        if (!novels || !bookmarks) {
+            return [];
+        }
+        // Находим новеллы, ID которых есть в закладках
+        return novels.filter(novel => bookmarks.includes(novel.id));
+    }, [novels, bookmarks]);
 
-    useEffect(() => {
-        const fetchBookmarkedNovels = async () => {
-            setIsLoading(true);
-            setBookmarkedNovels([]); 
-
-            if (!bookmarks || bookmarks.length === 0) {
-                setIsLoading(false);
-                return;
-            }
-            
-            // --- ИЗМЕНЕНИЕ: Заменяем сложный запрос Firebase на один простой запрос Supabase ---
-            // Было: query(collection(db, "novels"), where(documentId(), 'in', chunk))
-            // Стало: .from('novels').select('*').in('id', bookmarks)
-            // Нам больше не нужно разбивать массив на части!
-            const { data, error } = await supabase
-                .from('novels')
-                .select('*') // Выбираем все поля новеллы
-                .in('id', bookmarks); // Где ID находится в нашем массиве закладок
-
-            if (error) {
-                console.error("Ошибка загрузки новелл из закладок:", error);
-            } else {
-                setBookmarkedNovels(data);
-            }
-            setIsLoading(false);
-        };
-
-        fetchBookmarkedNovels();
-    }, [bookmarks]);
+    // Загрузка теперь зависит от того, загружены ли 'novels' в App.jsx
+    const isLoading = !novels;
 
     // --- JSX для отображения остается без изменений ---
     return (

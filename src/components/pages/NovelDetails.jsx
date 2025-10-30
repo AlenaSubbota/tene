@@ -51,7 +51,7 @@ export const NovelDetails = ({
                 const increment = async () => {
                     // Вызываем нашу НОВУЮ SQL-функцию, которая ВОЗВРАЩАЕТ значение
                     const { data: newViewCount, error } = await supabase.rpc(
-                        'increment_views', // <-- Имя функции из Шага 1
+                        'increment_and_get_views', // <-- Имя функции из Шага 1
                         { novel_id_to_inc: liveNovel.id }
                     );
                     

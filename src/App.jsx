@@ -282,11 +282,11 @@ useEffect(() => {
           setIsLoadingContent(true);
         }
 
-        // --- VVVV --- ИЗМЕНЕНИЕ 1: Убираем `novel_stats`, читаем `views` из `novels` --- VVVV ---
+        // --- VVVV --- ИСПРАВЛЕНО: Загружаем `novel_stats` --- VVVV ---
         const { data: novelsData, error: novelsError } = await supabase
           .from('novels')
-          .select(`*, average_rating, rating_count, views`); // <--- Упрощенный запрос
-        // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ --- ^^^^ ---
+          .select('*, novel_stats(*)') // <--- ПРАВИЛЬНЫЙ ЗАПРОС
+        // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ --- ^^^^ ---
 
         if (novelsError) {
           console.error("Ошибка загрузки новелл:", novelsError);
@@ -294,15 +294,15 @@ useEffect(() => {
             setNovels([]);
           }
         } else {
-          // --- VVVV --- ИЗМЕНЕНИЕ 2: Исправляем маппинг данных --- VVVV ---
+         // --- VVVV --- ИСПРАВЛЕНО: Маппинг данных из `novel_stats` --- VVVV ---
           const formattedNovels = novelsData.map(novel => ({
             ...novel,
-            // 'views' теперь берем НАПРЯМУЮ из 'novel'
-            views: novel.views || 0,
-            average_rating: novel.average_rating || 0.0,
-            rating_count: novel.rating_count || 0,
+            // Данные теперь в `novel_stats`
+            views: novel.novel_stats?.views || 0,
+            average_rating: novel.novel_stats?.average_rating || 0.0,
+            rating_count: novel.novel_stats?.rating_count || 0,
           }));
-          // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ --- ^^^^ ---
+          // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ --- ^^^^ ---
 
           formattedNovels.sort((a, b) => b.views - a.views);
           

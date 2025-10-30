@@ -39,11 +39,8 @@ export const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }
               {novels.map((novel, index) => {
                 const isBookmarked = bookmarks.includes(novel.id);
 
-                // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Получаем рейтинг и просмотры) --- VVVV ---
                 const avgRating = novel.average_rating || 0.0;
-                // Предполагаем, что просмотры приходят в поле 'views'
                 const views = novel.views || 0; 
-                // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
 
                 return (
                   <div key={novel.id} onClick={() => onSelectNovel(novel)} className="relative group cursor-pointer animate-fade-in-down" style={{ animationDelay: `${index * 50}ms` }}>
@@ -53,37 +50,34 @@ export const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }
 
                       <button
                         onClick={(e) => handleBookmarkToggle(e, novel.id)}
-                        className={`absolute top-2 right-2 z-10 p-1.5 rounded-full transition-colors ${isBookmarked ? 'bg-accent/90 text-white' : 'bg-black/40 text-white/80 hover:bg-black/60'}`}
+                        // Изменяем размер кнопки и иконки закладки
+                        className={`absolute top-1.5 right-1.5 z-10 p-1 rounded-full transition-colors ${isBookmarked ? 'bg-accent/90 text-white' : 'bg-black/40 text-white/80 hover:bg-black/60'}`}
                       >
-                        <BookmarkIcon filled={isBookmarked} className="w-5 h-5" />
+                        {/* Уменьшаем иконку закладки с w-5 h-5 до w-4 h-4 */}
+                        <BookmarkIcon filled={isBookmarked} className="w-4 h-4" /> 
                       </button>
 
-                      {/* --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Плашка рейтинга - меняем цвет) --- VVVV --- */}
 {avgRating > 0 && (
-  <div className="absolute top-2 left-2 flex items-center gap-1 bg-accent backdrop-blur-sm text-white px-2 py-0.5 rounded-full text-xs font-bold">
-    {/* Иконка сердца УДАЛЕНА по вашему скриншоту */}
+  // Изменяем padding, шрифт и размер иконки внутри плашки рейтинга
+  <div className="absolute top-1.5 left-1.5 flex items-center gap-0.5 bg-accent backdrop-blur-sm text-white px-1.5 py-0.5 rounded-full text-[10px] font-bold">
     <span>{Number(avgRating).toFixed(1)}</span>
   </div>
 )}
-{/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ --- */}
                       
-
-                      {/* --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Добавляем просмотры) --- VVVV --- */}
-                      {views > 0 && (
-                        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/50 backdrop-blur-sm text-white px-2 py-0.5 rounded-full text-xs font-bold">
-                          <EyeIcon className="w-4 h-4" />
-                          <span>{formatViews(views)}</span>
-                        </div>
-                      )}
-                      {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ --- */}
+{views > 0 && (
+  // Изменяем padding, шрифт и размер иконки внутри плашки просмотров
+  <div className="absolute bottom-1.5 left-1.5 flex items-center gap-0.5 bg-black/50 backdrop-blur-sm text-white px-1.5 py-0.5 rounded-full text-[10px] font-bold">
+    {/* Уменьшаем иконку глаза с w-4 h-4 до w-3.5 h-3.5 */}
+    <EyeIcon className="w-3.5 h-3.5" />
+    <span>{formatViews(views)}</span>
+  </div>
+)}
 
                     </div>
-                    {/* --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Убираем автора) --- VVVV --- */}
-                    <div className="mt-2">
-                      <h3 className="font-semibold text-sm text-text-main truncate group-hover:text-accent">{novel.title}</h3>
-                      {/* <p>{novel.author}</p> <-- Эта строка УДАЛЕНА по вашей просьбе */}
+                    <div className="mt-1"> {/* Уменьшаем отступ сверху mt-2 до mt-1 */}
+                      {/* Уменьшаем размер текста заголовка с text-sm до text-xs */}
+                      <h3 className="font-semibold text-xs text-text-main truncate group-hover:text-accent">{novel.title}</h3>
                     </div>
-                    {/* --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ --- */}
                   </div>
                 );
               })}

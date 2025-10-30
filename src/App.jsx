@@ -1,12 +1,11 @@
-// src/App.jsx
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase-config.js';
-// --- ИЗМЕНЕНИЕ 1: Получаем setUser из useAuth ---
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { UpdatePassword } from './components/pages/UpdatePassword.jsx';
 import { useAuth } from './Auth';
 import { v4 as uuidv4 } from 'uuid';
 
-// Импорты всех ваших компонентов (остаются без изменений)
+
 import { AuthScreen } from './AuthScreen.jsx';
 import { HelpScreen } from './components/pages/HelpScreen.jsx';
 import LoadingSpinner from './components/LoadingSpinner.jsx';
@@ -537,6 +536,7 @@ const handleFontChange = (newFontClass) => {
     }
   };
 
+  // Логика загрузки и политики остается
   if (authLoading || (isLoadingContent && !needsPolicyAcceptance && user)) {
     return <LoadingSpinner />;
   }
@@ -546,75 +546,98 @@ const handleFontChange = (newFontClass) => {
   if (showHelp) {
     return <HelpScreen onBack={() => setShowHelp(false)} />;
   }
-  if (!user) {
-    return <AuthScreen />;
-  }
 
-  const renderContent = () => {
-    if (page === 'details') {
-      const displayName = user?.user_metadata?.full_name || 
-                          user?.user_metadata?.user_name || 
-                          user?.user_metadata?.display_name || 
-                          'Аноним';
-                        
-      return <NovelDetails 
-                novel={selectedNovel} 
-                onSelectChapter={handleSelectChapter} 
-                onGenreSelect={handleGenreSelect} 
-                subscription={subscription} 
-                botUsername={BOT_USERNAME} 
-                userId={userId} 
-                chapters={chapters} 
-                isLoadingChapters={isLoadingChapters} 
-                lastReadData={lastReadData} 
-                onBack={handleBack} 
-                bookmarks={bookmarks} 
-                onToggleBookmark={handleToggleBookmark} 
-                onTriggerSubscription={() => setIsSubModalOpen(true)}
-                isUserAdmin={isUserAdmin}
-                userName={displayName}
-                // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Передача props) --- VVVV ---
-                userRatings={userRatings}
-                setUserRatings={setUserRatings}
-                // --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 3: Передать callback --- VVVV ---
-                onNovelStatsUpdate={handleNovelStatsUpdate}
-                // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 3 --- ^^^^ ---
-                // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
-             />;
-    }
-    if (page === 'reader') {
-    const displayName = user?.user_metadata?.full_name || 
-                        user?.user_metadata?.user_name || 
-                        user?.user_metadata?.display_name || 
-                        'Аноним';
-                        
-    return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} fontClass={fontClass} onFontChange={handleFontChange} userId={userId} userName={displayName} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} onTriggerSubscription={() => setIsSubModalOpen(true)} />;
-  }
-    switch (activeTab) {
-      case 'library':
-        return (<>
-          <Header title="Библиотека" />
-          <NewsSlider onReadMore={setSelectedNews} />
-          {genreFilter && (<div className="flex items-center justify-between p-3 mx-4 mb-0 rounded-lg border border-border-color bg-component-bg text-text-main">
-            <p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p>
-            <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
-          </div>)}
-          <NovelList novels={novels.filter(n => !genreFilter || (n.genres && n.genres.includes(genreFilter)))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
-        </>);
-      case 'search': return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
-      case 'bookmarks': return <BookmarksPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
-      case 'profile': return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={() => setIsSubModalOpen(true)} userId={userId} onThemeChange={setTheme} currentTheme={theme} onShowHelp={() => setShowHelp(true)} />;
-      default: return <Header title="Библиотека" />;
-    }
-  };
-
+  // А вот здесь начинается роутинг
   return (
-    <main className={`bg-background min-h-screen font-sans text-text-main ${!isUserAdmin ? 'no-select' : ''}`}>
-      <div className="pb-20">{renderContent()}</div>
-      {page === 'list' && <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />}
-      {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
-      {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
-      {selectedNews && <NewsModal newsItem={selectedNews} onClose={() => setSelectedNews(null)} />}
-    </main>
+    <Routes>
+      {!user ? (
+        // --- Маршруты для НЕ-авторизованного пользователя ---
+        <>
+          <Route path="/auth" element={<AuthScreen />} />
+          <Route path="/update-password" element={<UpdatePassword />} />
+          {/* Все остальные пути ведут на /auth */}
+          <Route path="*" element={<Navigate to="/auth" replace />} />
+        </>
+      ) : (
+        // --- Маршруты для АВТОРИЗОВАННОГО пользователя ---
+        <>
+          {/* Если вошедший пользователь зайдет на /auth, вернем его */}
+          <Route path="/auth" element={<Navigate to="/" replace />} />
+          <Route path="/update-password" element={<Navigate to="/" replace />} />
+          
+          {/* Все остальные пути ("*") ведут на ваше основное приложение.
+            Мы просто оборачиваем ВЕСЬ ваш старый рендеринг в этот <Route>.
+          */}
+          <Route path="*" element={
+            <main className={`bg-background min-h-screen font-sans text-text-main ${!isUserAdmin ? 'no-select' : ''}`}>
+              <div className="pb-20">
+                {/* Вся ваша старая функция renderContent() 
+                  теперь встроена прямо здесь
+                */}
+                {(() => {
+                  if (page === 'details') {
+                    const displayName = user?.user_metadata?.full_name || 
+                                        user?.user_metadata?.user_name || 
+                                        user?.user_metadata?.display_name || 
+                                        'Аноним';
+                                      
+                    return <NovelDetails 
+                              novel={selectedNovel} 
+                              onSelectChapter={handleSelectChapter} 
+                              onGenreSelect={handleGenreSelect} 
+                              subscription={subscription} 
+                              botUsername={BOT_USERNAME} 
+                              userId={userId} 
+                              chapters={chapters} 
+                              isLoadingChapters={isLoadingChapters} 
+                              lastReadData={lastReadData} 
+                              onBack={handleBack} 
+                              bookmarks={bookmarks} 
+                              onToggleBookmark={handleToggleBookmark} 
+                              onTriggerSubscription={() => setIsSubModalOpen(true)}
+                              isUserAdmin={isUserAdmin}
+                              userName={displayName}
+                              userRatings={userRatings}
+                              setUserRatings={setUserRatings}
+                              onNovelStatsUpdate={handleNovelStatsUpdate}
+                           />;
+                  }
+                  if (page === 'reader') {
+                  const displayName = user?.user_metadata?.full_name || 
+                                      user?.user_metadata?.user_name || 
+                                      user?.user_metadata?.display_name || 
+                                      'Аноним';
+                                      
+                  return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} fontClass={fontClass} onFontChange={handleFontChange} userId={userId} userName={displayName} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} onTriggerSubscription={() => setIsSubModalOpen(true)} />;
+                }
+                  switch (activeTab) {
+                    case 'library':
+                      return (<>
+                        <Header title="Библиотека" />
+                        <NewsSlider onReadMore={setSelectedNews} />
+                        {genreFilter && (<div className="flex items-center justify-between p-3 mx-4 mb-0 rounded-lg border border-border-color bg-component-bg text-text-main">
+                          <p className="text-sm"><span className="opacity-70">Жанр:</span><strong className="ml-2">{genreFilter}</strong></p>
+                          <button onClick={handleClearGenreFilter} className="text-xs font-bold text-accent hover:underline">Сбросить</button>
+                        </div>)}
+                        <NovelList novels={novels.filter(n => !genreFilter || (n.genres && n.genres.includes(genreFilter)))} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />
+                      </>);
+                    case 'search': return <SearchPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
+                    case 'bookmarks': return <BookmarksPage novels={novels} onSelectNovel={handleSelectNovel} bookmarks={bookmarks} onToggleBookmark={handleToggleBookmark} />;
+                    case 'profile': return <ProfilePage user={user} subscription={subscription} onGetSubscriptionClick={() => setIsSubModalOpen(true)} userId={userId} onThemeChange={setTheme} currentTheme={theme} onShowHelp={() => setShowHelp(true)} />;
+                    default: return <Header title="Библиотека" />;
+                  }
+                })()}
+              </div>
+              
+              {/* Все ваши модальные окна и BottomNav остаются здесь */}
+              {page === 'list' && <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />}
+              {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
+              {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
+              {selectedNews && <NewsModal newsItem={selectedNews} onClose={() => setSelectedNews(null)} />}
+            </main>
+          } />
+        </>
+      )}
+    </Routes>
   );
 }

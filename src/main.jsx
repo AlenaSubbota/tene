@@ -16,3 +16,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </BrowserRouter> {/* <-- 4. Закрыть обертку #1 */}
   </React.StrictMode>,
 )
+// Лишней скобки здесь больше нет

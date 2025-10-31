@@ -45,9 +45,18 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            # [cite_start]Переходим в папку с ГЛАВНЫМ docker-compose.yml [cite: 122]
             cd ~/tene-frontend
-            # [cite_start]Скачиваем последнюю версию образа приложения [cite: 124]
+            
+            # 1. Скачиваем новый образ
             docker compose pull tene-frontend
-            # Перезапускаем всё. [cite_start]Docker-compose обновит только tene-frontend [cite: 126]
+            
+            # 2. ЯВНО останавливаем контейнер по имени
+            # (|| true) - чтобы не было ошибки, если он уже остановлен
+            docker stop tene-frontend-app || true
+            
+            # 3. ЯВНО удаляем контейнер по имени
+            # (|| true) - чтобы не было ошибки, если он уже удален
+            docker rm tene-frontend-app || true
+            
+            # 4. Теперь, когда место свободно, запускаем новый
             docker compose up -d --no-deps --force-recreate tene-frontend

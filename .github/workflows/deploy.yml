@@ -45,7 +45,9 @@ jobs:
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd ~/tene-frontend
+            # --- [ИСПРАВЛЕНИЕ] ---
+            # Переходим в папку, где находится docker-compose.yml, управляющий nginx и фронтендом
+            cd ~/nginx-proxy
             
             # 1. Скачиваем новый образ
             docker compose pull tene-frontend
@@ -59,4 +61,5 @@ jobs:
             docker rm tene-frontend-app || true
             
             # 4. Теперь, когда место свободно, запускаем новый
+            # Эта команда (docker compose up) должна выполняться из папки ~/nginx-proxy
             docker compose up -d --no-deps --force-recreate tene-frontend

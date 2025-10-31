@@ -48,6 +48,6 @@ jobs:
             # [cite_start]Переходим в папку с ГЛАВНЫМ docker-compose.yml [cite: 122]
             cd ~/tene-frontend
             # [cite_start]Скачиваем последнюю версию образа приложения [cite: 124]
-            docker compose pull tene-frontend-app
+            docker compose pull tene-frontend
             # Перезапускаем всё. [cite_start]Docker-compose обновит только tene-frontend [cite: 126]
-            docker compose up -d --no-deps tene-frontend-app
+            docker compose up -d --no-deps tene-frontend

@@ -2,82 +2,95 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabase-config'; 
+import { supabase } from '../../supabase-config';
+import { useAuth } from '../../Auth'; // <-- 1. ИМПОРТИРУЕМ useAuth
 
 export const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [loading, setLoading] = useState(true); // Всегда начинаем с загрузки
+  const [isSubmitting, setIsSubmitting] = useState(false); // Для блокировки кнопки
   const navigate = useNavigate();
+  
+  // 2. ПОЛУЧАЕМ 'user' И 'loading' ИЗ AuthProvider
+  // 'loading' здесь означает "AuthProvider еще не закончил первую проверку сессии"
+  // 'user' будет установлен, когда AuthProvider поймает 'PASSWORD_RECOVERY'
+  const { user, loading: authLoading } = useAuth();
 
+  // 3. НОВОЕ СОСТОЯНИЕ ДЛЯ ОЖИДАНИЯ
+  // Мы должны подождать, пока authLoading не станет false, И user не станет true.
+  // Но если authLoading стал false, а user все еще null, значит, ссылка невалидная.
+  const [isReady, setIsReady] = useState(false);
+  
+  // 4. НОВЫЙ useEffect ДЛЯ ПРОВЕРКИ СЕССИИ
   useEffect(() => {
-    let recoveryEventReceived = false;
+    if (authLoading) {
+      // AuthProvider еще не загрузился, просто ждем.
+      return;
+    }
 
-    // Подписываемся на события Auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY') {
-        // Это наше событие! Supabase прочел токен из URL (даже если URL уже "чистый")
-        // и установил временную сессию.
-        recoveryEventReceived = true;
-        setLoading(false); // Показываем форму
-      }
-    });
+    // AuthProvider загрузился.
+    if (user) {
+      // Отлично, AuthProvider поймал событие PASSWORD_RECOVERY
+      // и установил временную сессию.
+      setIsReady(true);
+    } else {
+      // AuthProvider загрузился, но user === null.
+      // Это значит, что мы на странице /update-password
+      // без валидного токена.
+      setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
+      setIsReady(false); // Не даем показать форму
+    }
 
-    // Устанавливаем таймер. Если за 5 секунд событие не пришло,
-    // значит, ссылка действительно невалидная или истекла.
-    const timer = setTimeout(() => {
-      if (!recoveryEventReceived) {
-         // Мы все еще в состоянии 'loading' и не получили событие
-         setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
-         setLoading(false); // Показываем ошибку
-      }
-    }, 5000); // 5 секунд ожидания
+    // authLoading изменится с true на false
+    // user изменится с null на {...}
+  }, [user, authLoading]);
 
-    return () => {
-      // Очистка при размонтировании компонента
-      subscription.unsubscribe();
-      clearTimeout(timer);
-    };
-  }, []); // Пустой массив зависимостей, запускается только один раз при монтировании
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setMessage('');
+    setIsSubmitting(true); // Блокируем кнопку
 
-    // Теперь эта функция будет вызвана с активной сессией восстановления
+    // Теперь мы *уверены*, что сессия установлена,
+    // потому что 'user' из useAuth() существует.
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
       setError(error.message);
+      setIsSubmitting(false); // Разблокируем
     } else {
-      setMessage('Пароль успешно обновлен! Вы будете перенаправлены на главную.');
+      setMessage('Пароль успешно обновлен! Вы будете перенаправлены...');
       
-      // Принудительно выходим из системы, чтобы "убить" сессию восстановления
+      // Принудительно выходим, чтобы "убить" сессию восстановления
       await supabase.auth.signOut(); 
       
       setTimeout(() => {
-        // Переходим на главную (которая теперь покажет /auth, т.к. мы вышли)
-        navigate('/'); 
+        // Переходим на /auth
+        navigate('/auth'); 
       }, 3000);
     }
   };
 
+  // 5. ОБНОВЛЕННАЯ ЛОГИКА РЕНДЕРИНГА
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
       <div className="w-full max-w-sm text-center">
         <h1 className="text-3xl font-bold mb-8">Задайте новый пароль</h1>
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">
           
-          {loading ? (
-            // Состояние 1: Идет проверка ссылки
+          {!isReady ? (
+            // Состояние 1: Либо authLoading, либо ошибка
             <div className="flex flex-col items-center gap-4">
-              <p>Проверка ссылки...</p>
-              {/* Ты можешь добавить сюда свой LoadingSpinner, если хочешь */}
+              {error ? (
+                <p className="text-red-500 text-sm text-center">{error}</p>
+              ) : (
+                <p>Проверка ссылки...</p>
+              )}
             </div>
           ) : (
-            // Состояние 2: Проверка завершена (успех или ошибка)
+            // Состояние 2: Готово к вводу пароля
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <input
                 type="password"
@@ -86,20 +99,18 @@ export const UpdatePassword = () => {
                 placeholder="Новый пароль"
                 className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
                 required
-                disabled={!!message} // Блокируем после успеха
+                disabled={isSubmitting || !!message} // Блокируем при отправке или успехе
               />
               
-              {/* Показываем ошибку ИЛИ сообщение об успехе */}
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}
               {message && <p className="text-green-500 text-sm text-center">{message}</p>}
               
               <button
                 type="submit"
                 className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
-                // Блокируем кнопку, если есть ошибка или уже есть сообщение об успехе
-                disabled={!!message || !!error} 
+                disabled={isSubmitting || !!message} 
               >
-                Сохранить пароль
+                {isSubmitting ? 'Сохранение...' : 'Сохранить пароль'}
               </button>
             </form>
           )}

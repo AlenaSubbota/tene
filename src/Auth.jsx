@@ -1,4 +1,4 @@
-// src/Auth.jsx (ИСПРАВЛЕННАЯ версия с displayName и сбросом пароля)
+// src/Auth.jsx (ИСПРАВЛЕННАЯ ВЕРСИЯ - ФИКС ЗАГРУЗКИ)
 
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from './supabase-config.js';
@@ -6,23 +6,25 @@ import { supabase } from './supabase-config.js';
 // --- 1. Контекст (без изменений) ---
 const AuthContext = createContext();
 
-// --- 2. Провайдер (без изменений, взят из вашего файла) ---
+// --- 2. Провайдер (ИЗМЕНЕН useEffect) ---
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // <-- Начинаем с true
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    // getSession() УБРАН, чтобы избежать гонки состояний при восстановлении пароля.
+    // onAuthStateChange срабатывает НЕМЕДЛЕННО при загрузке
+    // и корректно обрабатывает #access_token из URL.
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      setLoading(false); // <-- КЛЮЧЕВОЙ МОМЕНТ:
+                         // Загрузка завершена ТОЛЬКО ПОСЛЕ
+                         // первой проверки состояния (включая токен).
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, []); // <-- Пустой массив, запускается один раз
 
   const value = { user, setUser, loading };
 
@@ -35,7 +37,8 @@ export const useAuth = () => {
 };
 
 
-// --- 4. Компонент с формой (ОБЪЕДИНЕННАЯ ВЕРСИЯ) ---
+// --- 4. Компонент с формой (БЕЗ ИЗМЕНЕНИЙ) ---
+// (Весь твой код AuthForm остается здесь... )
 export const AuthForm = () => {
   // Вместо isRegistering (boolean), используем mode (string) для 3 состояний
   const [mode, setMode] = useState('login'); // 'login', 'register', 'reset'

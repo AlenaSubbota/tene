@@ -550,32 +550,39 @@ const handleFontChange = (newFontClass) => {
   // А вот здесь начинается роутинг
   return (
     <Routes>
+      {/* ОБЩИЕ МАРШРУТЫ 
+        Эти маршруты доступны всегда, и мы управляем ими вручную.
+      */}
+      <Route 
+        path="/auth" 
+        element={!user ? <AuthScreen /> : <Navigate to="/" replace />} 
+      />
+      <Route 
+        path="/update-password" 
+        element={<UpdatePassword />} 
+      />
+
       {!user ? (
         // --- Маршруты для НЕ-авторизованного пользователя ---
         <>
-          <Route path="/auth" element={<AuthScreen />} />
-          <Route path="/update-password" element={<UpdatePassword />} />
-          {/* Все остальные пути ведут на /auth */}
+          {/* Все, что не /auth и не /update-password, 
+            перенаправляем на /auth 
+          */}
           <Route path="*" element={<Navigate to="/auth" replace />} />
         </>
       ) : (
         // --- Маршруты для АВТОРИЗОВАННОГО пользователя ---
         <>
-          {/* Если вошедший пользователь зайдет на /auth, вернем его */}
-          <Route path="/auth" element={<Navigate to="/" replace />} />
-          <Route path="/update-password" element={<Navigate to="/" replace />} />
-          
-          {/* Все остальные пути ("*") ведут на ваше основное приложение.
-            Мы просто оборачиваем ВЕСЬ ваш старый рендеринг в этот <Route>.
+          {/* Авторизованный пользователь уже на главной, 
+            все остальные пути ("*") ведут на твое основное приложение.
           */}
           <Route path="*" element={
             <main className={`bg-background min-h-screen font-sans text-text-main ${!isUserAdmin ? 'no-select' : ''}`}>
+              {/* ... (здесь весь твой <main> ... </main> с модалками и BottomNav) ... */}
               <div className="pb-20">
-                {/* Вся ваша старая функция renderContent() 
-                  теперь встроена прямо здесь
-                */}
                 {(() => {
                   if (page === 'details') {
+                    // ... (твой код для 'details')
                     const displayName = user?.user_metadata?.full_name || 
                                         user?.user_metadata?.user_name || 
                                         user?.user_metadata?.display_name || 
@@ -600,16 +607,17 @@ const handleFontChange = (newFontClass) => {
                               userRatings={userRatings}
                               setUserRatings={setUserRatings}
                               onNovelStatsUpdate={handleNovelStatsUpdate}
-                           />;
+                           />;                    
                   }
                   if (page === 'reader') {
+                  // ... (твой код для 'reader')
                   const displayName = user?.user_metadata?.full_name || 
                                       user?.user_metadata?.user_name || 
                                       user?.user_metadata?.display_name || 
                                       'Аноним';
                                       
                   return <ChapterReader chapter={selectedChapter} novel={selectedNovel} fontSize={fontSize} onFontSizeChange={handleTextSizeChange} fontClass={fontClass} onFontChange={handleFontChange} userId={userId} userName={displayName} onSelectChapter={handleSelectChapter} allChapters={chapters} subscription={subscription} botUsername={BOT_USERNAME} onBack={handleBack} isUserAdmin={isUserAdmin} onTriggerSubscription={() => setIsSubModalOpen(true)} />;
-                }
+                  }
                   switch (activeTab) {
                     case 'library':
                       return (<>

@@ -1,4 +1,4 @@
-// src/components/pages/UpdatePassword.jsx
+// src/components/pages/UpdatePassword.jsx (ПРАВИЛЬНАЯ ВЕРСИЯ)
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,10 +15,9 @@ export const UpdatePassword = () => {
   // 2. ПОЛУЧАЕМ 'user' И 'loading' ИЗ AuthProvider
   const { user, loading: authLoading } = useAuth();
 
-  // 3. Состояние готовности
   const [isReady, setIsReady] = useState(false);
   
-  // 4. useEffect ДЛЯ ПРОВЕРКИ СЕССИИ
+  // 3. useEffect ДЛЯ ПРОВЕРКИ СЕССИИ
   useEffect(() => {
     if (authLoading) {
       // AuthProvider еще не загрузился, просто ждем.
@@ -27,15 +26,14 @@ export const UpdatePassword = () => {
 
     // AuthProvider загрузился.
     if (user) {
-      // Отлично, AuthProvider поймал событие PASSWORD_RECOVERY
-      // и установил временную сессию.
+      // Отлично, AuthProvider поймал событие PASSWORD_RECOVERY (из #access_token)
       setIsReady(true);
     } else {
       // AuthProvider загрузился, но user === null.
       // Это значит, что мы на странице /update-password
       // без валидного токена.
       setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
-      setIsReady(false); // Не даем показать форму
+      setIsReady(false);
     }
   }, [user, authLoading]); // Зависим от user и authLoading
 
@@ -46,8 +44,7 @@ export const UpdatePassword = () => {
     setMessage('');
     setIsSubmitting(true); 
 
-    // Теперь мы *уверены*, что сессия установлена,
-    // потому что 'user' из useAuth() существует.
+    // 'user' из useAuth() существует, значит сессия установлена
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
@@ -55,16 +52,15 @@ export const UpdatePassword = () => {
       setIsSubmitting(false);
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены...');
-      
       await supabase.auth.signOut(); 
-      
       setTimeout(() => {
         navigate('/auth'); 
       }, 3000);
     }
   };
 
-  // 5. ЛОГИКА РЕНДЕРИНГА
+  // ... (весь ваш JSX-код рендеринга остается таким же, как в файле)
+  // 4. ЛОГИКА РЕНДЕРИНГА (из вашего файла)
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
       <div className="w-full max-w-sm text-center">
@@ -83,6 +79,7 @@ export const UpdatePassword = () => {
           ) : (
             // Состояние 2: Готово к вводу пароля
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              {/* ... (ваша форма: input, button, и т.д.) ... */}
               <input
                 type="password"
                 value={password}

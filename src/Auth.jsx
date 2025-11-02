@@ -8,15 +8,12 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true); // <-- Начинаем с true
 
   useEffect(() => {
-    // getSession() УБРАН, чтобы избежать гонки состояний при восстановлении пароля.
     // onAuthStateChange срабатывает НЕМЕДЛЕННО при загрузке
     // и корректно обрабатывает #access_token из URL.
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      setLoading(false); // <-- КЛЮЧЕВОЙ МОМЕНТ:
-                         // Загрузка завершена ТОЛЬКО ПОСЛЕ
-                         // первой проверки состояния (включая токен).
+      setLoading(false); // <-- КЛЮЧЕВОЙ МОМЕНТ
     });
 
     return () => subscription.unsubscribe();

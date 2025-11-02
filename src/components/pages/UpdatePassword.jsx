@@ -2,49 +2,47 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../../supabase-config'; 
+import { supabase } from '../../supabase-config'; // Импортируем supabase напрямую
 
 export const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isReady, setIsReady] = useState(false); 
+  const [isReady, setIsReady] = useState(false); // Готовность к показу формы
   const navigate = useNavigate();
+  
   const location = useLocation();
 
   useEffect(() => {
-    // 1. Парсим query-параметры
+    // 1. Парсим query-параметры (то, что после "?")
     const params = new URLSearchParams(location.search);
     const token = params.get('token');
-    const type = params.get('type');
-    
-    // 2. ❗❗❗ ВОТ ИСПРАВЛЕНИЕ ❗❗❗
-    // Получаем redirect_to из URL
-    const redirectTo = params.get('redirect_to');
+    const type = params.get('type'); // Должно быть 'recovery'
 
-    // 3. Проверяем, что это токен для восстановления
+    // 2. Проверяем, что это токен для восстановления
     if (type !== 'recovery' || !token) {
       setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
-      setIsReady(false);
+      setIsReady(false); // Не показываем форму
       return;
     }
 
-    // 4. Верифицируем токен
+    // 3. Ключевой шаг: Вручную верифицируем токен
     const verifyToken = async () => {
       
-      // 5. ❗❗❗ И ПЕРЕДАЕМ ЕГО СЮДА ❗❗❗
+      // ❗❗❗ ИСПРАВЛЕНИЕ: Мы убрали 'redirect_to'.
+      // Сервер выдает ошибку, если его передавать.
       const { data, error: verifyError } = await supabase.auth.verifyOtp({
         token,
         type: 'recovery',
-        redirect_to: redirectTo, // Добавляем этот параметр
       });
 
       if (verifyError) {
-        // Теперь мы должны видеть более конкретную ошибку, если токен неверный
-        setError(verifyError.message || 'Недействительная или просроченная ссылка.');
+        // Токен невалидный или просрочен
+        setError(verifyError.message || 'Недействительная или просроченная ссылка. Пожалуйста, попробуйте еще раз.');
         setIsReady(false);
       } else if (data.session) {
+        // Отлично! Токен валиден, сессия установлена.
         setIsReady(true);
       }
     };
@@ -60,7 +58,8 @@ export const UpdatePassword = () => {
     setMessage('');
     setIsSubmitting(true);
 
-    // 6. Обновляем пароль (здесь все без изменений)
+    // 4. Сессия была установлена шагом 'verifyOtp',
+    // поэтому 'updateUser' теперь сработает
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
@@ -68,7 +67,9 @@ export const UpdatePassword = () => {
       setIsSubmitting(false);
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены...');
+      
       await supabase.auth.signOut(); 
+      
       setTimeout(() => {
         navigate('/auth'); 
       }, 3000);

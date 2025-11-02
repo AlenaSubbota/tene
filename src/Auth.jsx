@@ -1,12 +1,8 @@
-// src/Auth.jsx (ИСПРАВЛЕННАЯ ВЕРСИЯ - ФИКС ЗАГРУЗКИ)
-
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { supabase } from './supabase-config.js';
 
-// --- 1. Контекст (без изменений) ---
 const AuthContext = createContext();
 
-// --- 2. Провайдер (ИЗМЕНЕН useEffect) ---
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true); // <-- Начинаем с true
@@ -28,17 +24,16 @@ export const AuthProvider = ({ children }) => {
 
   const value = { user, setUser, loading };
 
+  // Не рендерим детей, пока не завершится первая проверка
   return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
 };
 
-// --- 3. Хук useAuth (без изменений) ---
 export const useAuth = () => {
   return useContext(AuthContext);
 };
 
 
-// --- 4. Компонент с формой (БЕЗ ИЗМЕНЕНИЙ) ---
-// (Весь твой код AuthForm остается здесь... )
+// --- 4. Компонент с формой (ОБЪЕДИНЕННАЯ ВЕРСИЯ) ---
 export const AuthForm = () => {
   // Вместо isRegistering (boolean), используем mode (string) для 3 состояний
   const [mode, setMode] = useState('login'); // 'login', 'register', 'reset'

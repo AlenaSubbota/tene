@@ -1,65 +1,53 @@
 // src/components/pages/UpdatePassword.jsx
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../../supabase-config'; // Импортируем supabase напрямую
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '../../supabase-config';
+import { useAuth } from '../../Auth'; // <-- 1. ИМПОРТИРУЕМ useAuth
 
 export const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isReady, setIsReady] = useState(false); // Готовность к показу формы
   const navigate = useNavigate();
   
-  const location = useLocation();
+  // 2. ПОЛУЧАЕМ 'user' И 'loading' ИЗ AuthProvider
+  const { user, loading: authLoading } = useAuth();
 
+  // 3. Состояние готовности
+  const [isReady, setIsReady] = useState(false);
+  
+  // 4. useEffect ДЛЯ ПРОВЕРКИ СЕССИИ
   useEffect(() => {
-    // 1. Парсим query-параметры (то, что после "?")
-    const params = new URLSearchParams(location.search);
-    const token = params.get('token');
-    const type = params.get('type'); // Должно быть 'recovery'
-
-    // 2. Проверяем, что это токен для восстановления
-    if (type !== 'recovery' || !token) {
-      setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
-      setIsReady(false); // Не показываем форму
+    if (authLoading) {
+      // AuthProvider еще не загрузился, просто ждем.
       return;
     }
 
-    // 3. Ключевой шаг: Вручную верифицируем токен
-    const verifyToken = async () => {
-      
-      // ❗❗❗ ИСПРАВЛЕНИЕ: Мы убрали 'redirect_to'.
-      // Сервер выдает ошибку, если его передавать.
-      const { data, error: verifyError } = await supabase.auth.verifyOtp({
-        token,
-        type: 'recovery',
-      });
-
-      if (verifyError) {
-        // Токен невалидный или просрочен
-        setError(verifyError.message || 'Недействительная или просроченная ссылка. Пожалуйста, попробуйте еще раз.');
-        setIsReady(false);
-      } else if (data.session) {
-        // Отлично! Токен валиден, сессия установлена.
-        setIsReady(true);
-      }
-    };
-
-    verifyToken();
-    
-  }, [location.search]);
+    // AuthProvider загрузился.
+    if (user) {
+      // Отлично, AuthProvider поймал событие PASSWORD_RECOVERY
+      // и установил временную сессию.
+      setIsReady(true);
+    } else {
+      // AuthProvider загрузился, но user === null.
+      // Это значит, что мы на странице /update-password
+      // без валидного токена.
+      setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
+      setIsReady(false); // Не даем показать форму
+    }
+  }, [user, authLoading]); // Зависим от user и authLoading
 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setMessage('');
-    setIsSubmitting(true);
+    setIsSubmitting(true); 
 
-    // 4. Сессия была установлена шагом 'verifyOtp',
-    // поэтому 'updateUser' теперь сработает
+    // Теперь мы *уверены*, что сессия установлена,
+    // потому что 'user' из useAuth() существует.
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
@@ -76,7 +64,7 @@ export const UpdatePassword = () => {
     }
   };
 
-  // --- Рендеринг (без изменений) ---
+  // 5. ЛОГИКА РЕНДЕРИНГА
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
       <div className="w-full max-w-sm text-center">
@@ -84,6 +72,7 @@ export const UpdatePassword = () => {
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">
           
           {!isReady ? (
+            // Состояние 1: Либо authLoading, либо ошибка
             <div className="flex flex-col items-center gap-4">
               {error ? (
                 <p className="text-red-500 text-sm text-center">{error}</p>
@@ -92,6 +81,7 @@ export const UpdatePassword = () => {
               )}
             </div>
           ) : (
+            // Состояние 2: Готово к вводу пароля
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <input
                 type="password"

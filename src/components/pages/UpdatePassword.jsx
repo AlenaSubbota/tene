@@ -1,65 +1,72 @@
 // src/components/pages/UpdatePassword.jsx
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../../supabase-config';
-import { useAuth } from '../../Auth'; // <-- 1. ИМПОРТИРУЕМ useAuth
+import { useNavigate, useLocation } from 'react-router-dom';
+import { supabase } from '../../supabase-config'; // Импортируем supabase напрямую
 
 export const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false); // Для блокировки кнопки
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReady, setIsReady] = useState(false); // Готовность к показу формы
   const navigate = useNavigate();
   
-  // 2. ПОЛУЧАЕМ 'user' И 'loading' ИЗ AuthProvider
-  // 'loading' здесь означает "AuthProvider еще не закончил первую проверку сессии"
-  // 'user' будет установлен, когда AuthProvider поймает 'PASSWORD_RECOVERY'
-  const { user, loading: authLoading } = useAuth();
+  // 1. Получаем доступ к URL
+  const location = useLocation();
 
-  // 3. НОВОЕ СОСТОЯНИЕ ДЛЯ ОЖИДАНИЯ
-  // Мы должны подождать, пока authLoading не станет false, И user не станет true.
-  // Но если authLoading стал false, а user все еще null, значит, ссылка невалидная.
-  const [isReady, setIsReady] = useState(false);
-  
-  // 4. НОВЫЙ useEffect ДЛЯ ПРОВЕРКИ СЕССИИ
+  // 2. Этот useEffect запускается один раз при загрузке страницы
   useEffect(() => {
-    if (authLoading) {
-      // AuthProvider еще не загрузился, просто ждем.
+    // 3. Парсим query-параметры (то, что после "?")
+    const params = new URLSearchParams(location.search);
+    const token = params.get('token');
+    const type = params.get('type');
+
+    // 4. Проверяем, что это токен для восстановления
+    if (type !== 'recovery' || !token) {
+      setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
+      setIsReady(false); // Не показываем форму
       return;
     }
 
-    // AuthProvider загрузился.
-    if (user) {
-      // Отлично, AuthProvider поймал событие PASSWORD_RECOVERY
-      // и установил временную сессию.
-      setIsReady(true);
-    } else {
-      // AuthProvider загрузился, но user === null.
-      // Это значит, что мы на странице /update-password
-      // без валидного токена.
-      setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
-      setIsReady(false); // Не даем показать форму
-    }
+    // 5. Ключевой шаг: Вручную верифицируем токен
+    // Этот метод обменяет токен из URL на сессию
+    const verifyToken = async () => {
+      const { data, error: verifyError } = await supabase.auth.verifyOtp({
+        token,
+        type: 'recovery',
+      });
 
-    // authLoading изменится с true на false
-    // user изменится с null на {...}
-  }, [user, authLoading]);
+      if (verifyError) {
+        // Токен невалидный или просрочен
+        setError('Недействительная или просроченная ссылка. Пожалуйста, попробуйте еще раз.');
+        setIsReady(false);
+      } else if (data.session) {
+        // Отлично! Токен валиден, сессия установлена.
+        // supabase-js сохранил ее. Теперь мы можем менять пароль.
+        setIsReady(true);
+      }
+    };
+
+    verifyToken();
+    
+    // location.search гарантирует, что эффект сработает, если URL изменится
+  }, [location.search]);
 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setMessage('');
-    setIsSubmitting(true); // Блокируем кнопку
+    setIsSubmitting(true);
 
-    // Теперь мы *уверены*, что сессия установлена,
-    // потому что 'user' из useAuth() существует.
+    // 6. Теперь мы уверены, что сессия установлена (благодаря verifyOtp)
+    // Просто обновляем пароль
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
       setError(error.message);
-      setIsSubmitting(false); // Разблокируем
+      setIsSubmitting(false);
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены...');
       
@@ -67,13 +74,12 @@ export const UpdatePassword = () => {
       await supabase.auth.signOut(); 
       
       setTimeout(() => {
-        // Переходим на /auth
         navigate('/auth'); 
       }, 3000);
     }
   };
 
-  // 5. ОБНОВЛЕННАЯ ЛОГИКА РЕНДЕРИНГА
+  // Логика рендеринга (остается почти без изменений)
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
       <div className="w-full max-w-sm text-center">
@@ -81,7 +87,7 @@ export const UpdatePassword = () => {
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">
           
           {!isReady ? (
-            // Состояние 1: Либо authLoading, либо ошибка
+            // Состояние 1: Либо проверка, либо ошибка
             <div className="flex flex-col items-center gap-4">
               {error ? (
                 <p className="text-red-500 text-sm text-center">{error}</p>
@@ -99,7 +105,7 @@ export const UpdatePassword = () => {
                 placeholder="Новый пароль"
                 className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
                 required
-                disabled={isSubmitting || !!message} // Блокируем при отправке или успехе
+                disabled={isSubmitting || !!message}
               />
               
               {error && <p className="text-red-500 text-sm text-center">{error}</p>}

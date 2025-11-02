@@ -2,55 +2,55 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '../../supabase-config'; // Импортируем supabase напрямую
+import { supabase } from '../../supabase-config'; 
 
 export const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isReady, setIsReady] = useState(false); // Готовность к показу формы
+  const [isReady, setIsReady] = useState(false); 
   const navigate = useNavigate();
-  
-  // 1. Получаем доступ к URL
   const location = useLocation();
 
-  // 2. Этот useEffect запускается один раз при загрузке страницы
   useEffect(() => {
-    // 3. Парсим query-параметры (то, что после "?")
+    // 1. Парсим query-параметры
     const params = new URLSearchParams(location.search);
     const token = params.get('token');
     const type = params.get('type');
+    
+    // 2. ❗❗❗ ВОТ ИСПРАВЛЕНИЕ ❗❗❗
+    // Получаем redirect_to из URL
+    const redirectTo = params.get('redirect_to');
 
-    // 4. Проверяем, что это токен для восстановления
+    // 3. Проверяем, что это токен для восстановления
     if (type !== 'recovery' || !token) {
       setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
-      setIsReady(false); // Не показываем форму
+      setIsReady(false);
       return;
     }
 
-    // 5. Ключевой шаг: Вручную верифицируем токен
-    // Этот метод обменяет токен из URL на сессию
+    // 4. Верифицируем токен
     const verifyToken = async () => {
+      
+      // 5. ❗❗❗ И ПЕРЕДАЕМ ЕГО СЮДА ❗❗❗
       const { data, error: verifyError } = await supabase.auth.verifyOtp({
         token,
         type: 'recovery',
+        redirect_to: redirectTo, // Добавляем этот параметр
       });
 
       if (verifyError) {
-        // Токен невалидный или просрочен
-        setError('Недействительная или просроченная ссылка. Пожалуйста, попробуйте еще раз.');
+        // Теперь мы должны видеть более конкретную ошибку, если токен неверный
+        setError(verifyError.message || 'Недействительная или просроченная ссылка.');
         setIsReady(false);
       } else if (data.session) {
-        // Отлично! Токен валиден, сессия установлена.
-        // supabase-js сохранил ее. Теперь мы можем менять пароль.
         setIsReady(true);
       }
     };
 
     verifyToken();
     
-    // location.search гарантирует, что эффект сработает, если URL изменится
   }, [location.search]);
 
 
@@ -60,8 +60,7 @@ export const UpdatePassword = () => {
     setMessage('');
     setIsSubmitting(true);
 
-    // 6. Теперь мы уверены, что сессия установлена (благодаря verifyOtp)
-    // Просто обновляем пароль
+    // 6. Обновляем пароль (здесь все без изменений)
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
@@ -69,17 +68,14 @@ export const UpdatePassword = () => {
       setIsSubmitting(false);
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены...');
-      
-      // Принудительно выходим, чтобы "убить" сессию восстановления
       await supabase.auth.signOut(); 
-      
       setTimeout(() => {
         navigate('/auth'); 
       }, 3000);
     }
   };
 
-  // Логика рендеринга (остается почти без изменений)
+  // --- Рендеринг (без изменений) ---
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
       <div className="w-full max-w-sm text-center">
@@ -87,7 +83,6 @@ export const UpdatePassword = () => {
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">
           
           {!isReady ? (
-            // Состояние 1: Либо проверка, либо ошибка
             <div className="flex flex-col items-center gap-4">
               {error ? (
                 <p className="text-red-500 text-sm text-center">{error}</p>
@@ -96,7 +91,6 @@ export const UpdatePassword = () => {
               )}
             </div>
           ) : (
-            // Состояние 2: Готово к вводу пароля
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <input
                 type="password"

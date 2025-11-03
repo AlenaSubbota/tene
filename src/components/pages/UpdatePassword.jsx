@@ -52,7 +52,7 @@ export const UpdatePassword = () => {
       console.log("Отправляем email как:", email); // <-- НОВЫЙ ЛОГ
     } else {
       setError('Неверная ссылка (отсутствует токен, тип или email).');
-      console.log("Ошибка парсинга:", { token, type, email });
+      console.log("Ошибочка парсинга:", { token, type, email });
     }
   }, [searchParams]);
 

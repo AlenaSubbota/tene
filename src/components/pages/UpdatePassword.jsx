@@ -7,8 +7,8 @@ export const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [isVerifying, setIsVerifying] = useState(true); // Новое состояние
-  const [isVerified, setIsVerified] = useState(false);  // Новое состояние
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [isVerified, setIsVerified] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -17,9 +17,25 @@ export const UpdatePassword = () => {
   useEffect(() => {
     const verifyToken = async () => {
       setIsVerifying(true);
+      
       const token = searchParams.get('token');
       const type = searchParams.get('type');
-      const emailParam = searchParams.get('email'); // email будет закодирован (darsisa%40bk.ru)
+
+      // --- НОВОЕ РЕШЕНИЕ (ИЩЕМ EMAIL ВНУТРИ REDIRECT_TO) ---
+      const redirectToUrlString = searchParams.get('redirect_to');
+      let emailParam = null;
+
+      if (redirectToUrlString) {
+        try {
+          // searchParams.get() автоматически декодирует redirect_to один раз
+          // (из %2540 в %40).
+          const redirectUrl = new URL(redirectToUrlString);
+          emailParam = redirectUrl.searchParams.get('email'); // Получаем 'darsisa%40bk.ru'
+        } catch (e) {
+          console.error("Не удалось распарсить redirect_to:", e);
+        }
+      }
+      // --- КОНЕЦ РЕШЕНИЯ ---
 
       if (!token || !emailParam || type !== 'recovery') {
         setError('Недействительная или неполная ссылка для сброса пароля.');
@@ -27,14 +43,12 @@ export const UpdatePassword = () => {
         return;
       }
 
-      // --- ЭТО КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ИЗ НАШЕЙ ПЕРВОЙ ПОПЫТКИ ---
-      // Мы должны декодировать email ПЕРЕД отправкой в Supabase
+      // emailParam все еще закодирован ('darsisa%40bk.ru'),
+      // декодируем его, чтобы получить 'darsisa@bk.ru'
       const email = decodeURIComponent(emailParam);
-      // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
       console.log(`Вызываем verifyOtp с email: ${email} и token: ${token}`);
 
-      // Вызываем verifyOtp с декодированным email
       const { error: verifyError } = await supabase.auth.verifyOtp({
         token,
         type,
@@ -54,7 +68,7 @@ export const UpdatePassword = () => {
     verifyToken();
   }, [searchParams]);
 
-  // Шаг 2: Обработчик формы для ОБНОВЛЕНИЯ пароля
+  // Шаг 2: Обработчик формы (остается без изменений)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!password) {
@@ -65,7 +79,6 @@ export const UpdatePassword = () => {
     setError('');
     setMessage('');
 
-    // Теперь, когда сессия активна, мы можем обновить пользователя
     const { error } = await supabase.auth.updateUser({
       password: password,
     });
@@ -77,25 +90,22 @@ export const UpdatePassword = () => {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены на страницу входа.');
       await supabase.auth.signOut();
       setTimeout(() => {
-        navigate('/'); // Переход на логин
+        navigate('/');
       }, 3000);
     }
     setIsSubmitting(false);
   };
 
-  // Логика отображения
+  // Логика отображения (остается без изменений)
   const renderContent = () => {
-    // 1. Пока идет верификация токена
     if (isVerifying) {
       return <p className="text-text-main/70">Проверка ссылки...</p>;
     }
     
-    // 2. Если была ошибка (в useEffect или в форме)
     if (error) {
       return <p className="text-red-500 text-sm text-center">{error}</p>;
     }
     
-    // 3. Если верификация прошла, показываем форму
     if (isVerified) {
       return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -120,7 +130,6 @@ export const UpdatePassword = () => {
       );
     }
     
-    // 4. Если не загрузка и не успех (на всякий случай)
     return <p className="text-text-main/70">Не удалось проверить сессию.</p>;
   };
 

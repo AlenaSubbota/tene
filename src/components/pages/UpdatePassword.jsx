@@ -23,17 +23,23 @@ export const UpdatePassword = () => {
     const token = searchParams.get('token');
     const type = searchParams.get('type');
     
-    // --- ПАРСИМ EMAIL ---
+    // --- ПАРСИМ EMAIL БЕЗ ДВОЙНОГО РАСКОДИРОВАНИЯ ---
     let email = null;
     const redirectUrlString = searchParams.get('redirect_to');
     
     if (redirectUrlString) {
       try {
         const redirectUrl = new URL(redirectUrlString);
+        // 1. Просто получаем email_encoded. Он будет "darsisa%40bk.ru"
         const email_encoded = redirectUrl.searchParams.get('email');
-        if (email_encoded) {
-          email = decodeURIComponent(email_encoded); // Двойное раскодирование
-        }
+        
+        // --- ФИНАЛЬНОЕ ИЗМЕНЕНИЕ: УБИРАЕМ decodeURIComponent ---
+        // if (email_encoded) {
+        //   email = decodeURIComponent(email_encoded); // <-- УДАЛЯЕМ ЭТО
+        // }
+        email = email_encoded; // <-- ПРИСВАИВАЕМ "КАК ЕСТЬ"
+        // --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
       } catch (e) {
         console.error("Не удалось распарсить redirect_to URL:", e);
       }
@@ -42,10 +48,11 @@ export const UpdatePassword = () => {
     if (token && type === 'recovery' && email) {
       // Сохраняем ВСЕ
       setRecoveryData({ token, type, email });
-      console.log("Токен, тип и email найдены в URL.");
+      console.log("Токен, тип и email (закодированный) найдены в URL.");
+      console.log("Отправляем email как:", email); // <-- НОВЫЙ ЛОГ
     } else {
       setError('Неверная ссылка (отсутствует токен, тип или email).');
-      console.log("Ошибочка парсинга:", { token, type, email });
+      console.log("Ошибка парсинга:", { token, type, email });
     }
   }, [searchParams]);
 
@@ -59,13 +66,13 @@ export const UpdatePassword = () => {
     setError('');
     
     const { token, type, email } = recoveryData;
-    console.log("Вызываем verifyOtp с type: 'recovery' (И С EMAIL)...");
+    // email теперь "darsisa%40bk.ru"
+    console.log("Вызываем verifyOtp с type: 'recovery' (И С ЗАКОДИРОВАННЫМ EMAIL)...");
     
-    // --- ФИНАЛЬНАЯ КОМБИНАЦИЯ: token + type + email ---
     const { error: verifyError } = await supabase.auth.verifyOtp({
       token,
       type, // 'recovery'
-      email, // <-- ВОЗВРАЩАЕМ EMAIL
+      email, // <-- Теперь здесь "darsisa%40bk.ru"
     });
 
     if (verifyError) {

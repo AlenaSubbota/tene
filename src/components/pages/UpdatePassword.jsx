@@ -5,7 +5,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabase-config';
 
 export const UpdatePassword = () => {
-  // ... (стейты как у тебя)
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
@@ -17,24 +16,24 @@ export const UpdatePassword = () => {
   useEffect(() => {
     const token = searchParams.get('token');
     const type = searchParams.get('type');
-    const email = searchParams.get('email'); // <-- ДОБАВЛЯЕМ ЭТО
+    // const email = searchParams.get('email'); // <-- УБИРАЕМ ЭТО
 
     // (Твои логи для отладки)
     console.log("Token:", token); 
     console.log("Type:", type); 
-    console.log("Email:", email); // <-- Добавь этот лог
+    // console.log("Email:", email); // <-- УБИРАЕМ ЭТО
 
-    // (Твой redirectTo больше не нужен для проверки, но email нужен)
-    // const redirectTo = searchParams.get('redirect_to'); 
+    // const redirectTo = searchParams.get('redirect_to'); // Это нам не нужно передавать
     
-    if (token && type === 'recovery' && email) { // <-- ПРОВЕРЯЕМ НАЛИЧИЕ EMAIL
+    // ИСПРАВЛЯЕМ УСЛОВИЕ:
+    if (token && type === 'recovery') { 
       
-      // ИСПРАВЛЕННЫЙ ВЫЗОВ:
+      // ИСПРАВЛЯЕМ ВЫЗОВ:
       supabase.auth
         .verifyOtp({
           token,
           type, // 'recovery'
-          email, // <-- ВОТ КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
+          // email, // <-- УБИРАЕМ ЭТО
         })
         .then(({ data, error }) => {
           if (error) {
@@ -46,12 +45,10 @@ export const UpdatePassword = () => {
           }
         });
     } else {
-      // Нет токена, типа или email
+      // Нет токена или неправильный тип
       setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
     }
   }, [searchParams]); // Зависимость от searchParams
-
-  // ... (остальная часть компонента handleSubmit и рендер остаются без изменений)
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -83,7 +80,6 @@ export const UpdatePassword = () => {
   // ... (твой JSX рендер)
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
-      {/* ... (весь твой JSX без изменений) ... */}
        <div className="w-full max-w-sm text-center">
         <h1 className="text-3xl font-bold mb-8">Задайте новый пароль</h1>
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">

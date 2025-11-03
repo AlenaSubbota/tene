@@ -1,6 +1,8 @@
+// src/components/pages/UpdatePassword.jsx
+
 import React, { useState, useEffect } from 'react';
-// Убираем useSearchParams, он нам не нужен
-import { useNavigate } from 'react-router-dom'; 
+// ВОЗВРАЩАЕМ useSearchParams
+import { useNavigate, useSearchParams } from 'react-router-dom'; 
 import { supabase } from '../../supabase-config';
 
 export const UpdatePassword = () => {
@@ -10,25 +12,20 @@ export const UpdatePassword = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReady, setIsReady] = useState(false); 
   const navigate = useNavigate();
-  // const [searchParams] = useSearchParams(); // <-- УДАЛЯЕМ ЭТУ СТРОКУ
+  // ВОЗВРАЩАЕМ useSearchParams
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    // 1. Получаем хэш из URL (он будет вида #token=...&type=...)
-    const hash = window.location.hash;
-    
-    // 2. Используем URLSearchParams для парсинга хэша (убираем # в начале)
-    const params = new URLSearchParams(hash.substring(1));
+    // ВОЗВРАЩАЕМ get() из searchParams
+    const token = searchParams.get('token');
+    const type = searchParams.get('type');
 
-    const token = params.get('token');
-    const type = params.get('type');
-
-    // (Ваши логи для отладки)
-    console.log("HASH Token:", token); 
-    console.log("HASH Type:", type); 
+    console.log("Token из URL (?):", token); 
+    console.log("Type из URL (?):", type); 
 
     if (token && type === 'recovery') { 
       
-      // Теперь этот вызов выполнится!
+      // Этот вызов теперь единственный и должен сработать
       supabase.auth
         .verifyOtp({
           token,
@@ -36,22 +33,25 @@ export const UpdatePassword = () => {
         })
         .then(({ data, error }) => {
           if (error) {
-            console.error("Ошибка verifyOtp:", error);
+            console.error("Ошибка verifyOtp:", error.message);
             setError('Ссылка для восстановления пароля недействительна или срок ее действия истек.');
           } else {
             console.log("verifyOtp success, data:", data);
-            // Успех! Устанавливаем сессию и разрешаем ввод пароля
+            // Успех! Разрешаем ввод пароля
             setIsReady(true);
           }
         });
     } else {
         setError('Неверная ссылка для восстановления пароля.');
-        console.log("Token или type не найдены в хэше URL.");
+        console.log("Token или type='recovery' не найдены в параметрах URL (?).");
     }
-  }, []); // <-- Пустой массив зависимостей, чтобы код выполнился 1 раз при загрузке
+  }, [searchParams]); // <-- Запускаем эффект, когда searchParams готовы
+  
+  // ... (Ваш handleSubmit и JSX-разметка остаются без изменений)
+  // ... (скопируйте их из вашего файла)
+  // ...
 
   const handleSubmit = async (e) => {
-    // ... (Ваш код handleSubmit остается без изменений)
     e.preventDefault();
     if (!password) {
       setError('Пароль не может быть пустым');
@@ -62,7 +62,6 @@ export const UpdatePassword = () => {
     setError('');
     setMessage('');
 
-    // Этот вызов updateUser сработает, т.к. сессия была установлена в useEffect
     const { error } = await supabase.auth.updateUser({
       password: password,
     });
@@ -73,13 +72,12 @@ export const UpdatePassword = () => {
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены на страницу входа.');
       setTimeout(() => {
-        navigate('/'); // Перенаправляем на главную (или на /auth)
+        navigate('/'); 
       }, 3000);
     }
     setIsSubmitting(false);
   };
   
-  // ... (остальная часть вашего JSX-кода рендеринга)
   return (
      <div className="flex justify-center items-center min-h-screen bg-background text-text-main p-4">
       <div className="w-full max-w-sm text-center">
@@ -88,8 +86,7 @@ export const UpdatePassword = () => {
           {error ? (
             <p className="text-red-500 text-sm text-center">{error}</p>
           ) : !isReady ? (
-            // Показываем индикатор, пока идет проверка токена
-            <p>Проверка ссылки...</p>
+            <p className="text-text-main/70">Проверка ссылки...</p>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <input

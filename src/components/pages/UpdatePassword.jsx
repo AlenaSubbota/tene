@@ -17,47 +17,47 @@ export const UpdatePassword = () => {
     const token = searchParams.get('token');
     const type = searchParams.get('type');
     
-    // --- НОВОЕ ИСПРАВЛЕНИЕ: ПАРСИМ EMAIL ИЗ REDIRECT_TO ---
     let email = null;
     const redirectUrlString = searchParams.get('redirect_to');
 
     if (redirectUrlString) {
       try {
-        // Создаем URL-объект из строки redirect_to
         const redirectUrl = new URL(redirectUrlString);
-        // Достаем email из параметров *этого* URL
-        email = redirectUrl.searchParams.get('email');
+        // 1. Получаем ОДИН РАЗ раскодированное значение (будет "darsisa%40bk.ru")
+        const email_encoded = redirectUrl.searchParams.get('email');
+        
+        // --- ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ ---
+        // 2. Раскодируем его ВТОРОЙ РАЗ, чтобы получить "darsisa@bk.ru"
+        if (email_encoded) {
+          email = decodeURIComponent(email_encoded);
+        }
+        // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+
       } catch (e) {
         console.error("Не удалось распарсить redirect_to URL:", e);
       }
     }
-    // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
     console.log("Token из URL (?):", token); 
     console.log("Type из URL (?):", type);
-    console.log("Email (распарсенный из redirect_to):", email); // <-- Новый лог
+    console.log("Email (ФИНАЛЬНЫЙ, раскодированный):", email); // <-- Смотрим сюда
 
-    // Условие теперь должно сработать
     if (token && type === 'recovery' && email) { 
       
       supabase.auth
         .verifyOtp({
           token,
           type, // 'recovery'
-          email, // <-- Теперь email должен быть здесь
+          email, // <-- Теперь здесь должен быть "darsisa@bk.ru"
         })
         .then(({ data, error }) => {
           if (error) {
             console.error("Ошибка verifyOtp:", error.message);
-            // Если снова 400 Bad Request, значит токен уже использован
-            if (error.message.includes("400")) {
-               setError('Эта ссылка уже была использована или срок ее действия истек. Пожалуйста, запросите сброс пароля еще раз.');
-            } else {
-               setError('Ссылка для восстановления пароля недействительна.');
-            }
+            // Эта ошибка теперь будет означать, что токен ДЕЙСТВИТЕЛЬНО истек
+            setError('Ссылка недействительна или срок ее действия истек. Пожалуйста, запросите новую ссылку.');
           } else {
             console.log("verifyOtp success, data:", data);
-            // Успех! Устанавливаем сессию и разрешаем ввод пароля
+            // УСПЕХ!
             setIsReady(true);
           }
         });

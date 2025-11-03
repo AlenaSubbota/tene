@@ -27,16 +27,26 @@ export const UpdatePassword = () => {
     
     if (redirectUrlString) {
       try {
-        const redirectUrl = new URL(redirectUrlString);
-        // 1. Просто получаем email_encoded. Он будет "darsisa%40bk.ru"
-        const email_encoded = redirectUrl.searchParams.get('email');
+        // 
+        // ПРОБЛЕМА БЫЛА ЗДЕСЬ:
+        // const redirectUrl = new URL(redirectUrlString);
+        // const email_encoded = redirectUrl.searchParams.get('email'); // <-- ЭТО АВТОМАТИЧЕСКИ ДЕКОДИРУЕТ
+        // email = email_encoded; 
+        //
+
+        // --- НОВОЕ РЕШЕНИЕ (ПАРСИМ СТРОКУ ВРУЧНУЮ) ---
+        // Ищем '?email=' или '&email=' и берем все до следующего '&'
+        const emailParamMatch = redirectUrlString.match(/[?&]email=([^&]+)/);
         
-        // --- УБЕДИТЕСЬ, ЧТО У ВАС ТАК: ---
-        email = email_encoded; // <-- НЕТ decodeURIComponent
-        // --- ---
+        if (emailParamMatch && emailParamMatch[1]) {
+          email = emailParamMatch[1]; // <-- Получаем "darsisa%40bk.ru" как есть
+        } else {
+          console.error("Не удалось извлечь email из redirect_to.");
+        }
+        // --- КОНЕЦ РЕШЕНИЯ ---
 
       } catch (e) {
-        console.error("Не удалось распарсить redirect_to URL:", e);
+        console.error("Не удалось обработать redirect_to URL:", e);
       }
     }
 

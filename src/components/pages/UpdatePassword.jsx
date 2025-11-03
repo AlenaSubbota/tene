@@ -1,8 +1,7 @@
 // src/components/pages/UpdatePassword.jsx
 
 import React, { useState, useEffect } from 'react';
-// ВОЗВРАЩАЕМ useSearchParams
-import { useNavigate, useSearchParams } from 'react-router-dom'; 
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabase-config';
 
 export const UpdatePassword = () => {
@@ -12,24 +11,27 @@ export const UpdatePassword = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReady, setIsReady] = useState(false); 
   const navigate = useNavigate();
-  // ВОЗВРАЩАЕМ useSearchParams
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    // ВОЗВРАЩАЕМ get() из searchParams
     const token = searchParams.get('token');
     const type = searchParams.get('type');
+    // --- ВОТ ИЗМЕНЕНИЕ ---
+    const email = searchParams.get('email'); 
 
     console.log("Token из URL (?):", token); 
-    console.log("Type из URL (?):", type); 
+    console.log("Type из URL (?):", type);
+    console.log("Email из URL (?):", email); // <-- Новый лог
 
-    if (token && type === 'recovery') { 
+    // --- ИЗМЕНЕНИЕ В УСЛОВИИ ---
+    if (token && type === 'recovery' && email) { 
       
-      // Этот вызов теперь единственный и должен сработать
+      // --- ИЗМЕНЕНИЕ В ВЫЗОВЕ ---
       supabase.auth
         .verifyOtp({
           token,
           type, // 'recovery'
+          email, // <-- ВОЗВРАЩАЕМ EMAIL
         })
         .then(({ data, error }) => {
           if (error) {
@@ -37,20 +39,16 @@ export const UpdatePassword = () => {
             setError('Ссылка для восстановления пароля недействительна или срок ее действия истек.');
           } else {
             console.log("verifyOtp success, data:", data);
-            // Успех! Разрешаем ввод пароля
+            // Успех! Устанавливаем сессию и разрешаем ввод пароля
             setIsReady(true);
           }
         });
     } else {
-        setError('Неверная ссылка для восстановления пароля.');
-        console.log("Token или type='recovery' не найдены в параметрах URL (?).");
+        setError('Неверная ссылка для восстановления пароля (отсутствует токен, тип или email).');
+        console.log("Token, type='recovery' или email не найдены в параметрах URL (?).");
     }
   }, [searchParams]); // <-- Запускаем эффект, когда searchParams готовы
   
-  // ... (Ваш handleSubmit и JSX-разметка остаются без изменений)
-  // ... (скопируйте их из вашего файла)
-  // ...
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!password) {
@@ -62,6 +60,7 @@ export const UpdatePassword = () => {
     setError('');
     setMessage('');
 
+    // Этот вызов updateUser сработает, т.к. сессия была установлена в useEffect
     const { error } = await supabase.auth.updateUser({
       password: password,
     });
@@ -72,12 +71,13 @@ export const UpdatePassword = () => {
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены на страницу входа.');
       setTimeout(() => {
-        navigate('/'); 
+        navigate('/'); // Перенаправляем на главную (или на /auth)
       }, 3000);
     }
     setIsSubmitting(false);
   };
   
+  // Рендеринг JSX (остается без изменений)
   return (
      <div className="flex justify-center items-center min-h-screen bg-background text-text-main p-4">
       <div className="w-full max-w-sm text-center">
@@ -86,6 +86,7 @@ export const UpdatePassword = () => {
           {error ? (
             <p className="text-red-500 text-sm text-center">{error}</p>
           ) : !isReady ? (
+            // Показываем индикатор, пока идет проверка токена
             <p className="text-text-main/70">Проверка ссылки...</p>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">

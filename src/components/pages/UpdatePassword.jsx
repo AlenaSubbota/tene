@@ -9,19 +9,20 @@ export const UpdatePassword = () => {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   
-  const [isVerifying, setIsVerifying] = useState(false); // Для кнопки "Проверить"
-  const [isSubmitting, setIsSubmitting] = useState(false); // Для кнопки "Сохранить"
+  const [isVerifying, setIsVerifying] = useState(false); 
+  const [isSubmitting, setIsSubmitting] = useState(false); 
   
-  // isReady теперь означает, что ссылка проверена и можно вводить пароль
   const [isReady, setIsReady] = useState(false); 
   
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // --- НОВОЕ СОСТОЯНИЕ ДЛЯ ДАННЫХ ИЗ URL ---
   const [recoveryData, setRecoveryData] = useState(null);
+  
+  // --- НОВОЕ СОСТОЯНИЕ ДЛЯ ПРОВЕРКИ EMAIL ---
+  const [emailConfirmation, setEmailConfirmation] = useState('');
 
-  // --- ШАГ 1: useEffect ТЕПЕРЬ ТОЛЬКО ПАРСИТ URL ---
+  // useEffect по-прежнему ТОЛЬКО парсит URL
   useEffect(() => {
     const token = searchParams.get('token');
     const typeFromUrl = searchParams.get('type');
@@ -42,14 +43,13 @@ export const UpdatePassword = () => {
     }
 
     if (token && email && typeFromUrl === 'recovery') {
-      // Просто сохраняем данные, НЕ вызываем verifyOtp
-      setRecoveryData({ token, email, type: 'email' }); // Важно: type: 'email'
+      setRecoveryData({ token, email, type: 'email' }); 
     } else {
       setError('Неверная ссылка для восстановления пароля (не найден токен, тип или email).');
     }
   }, [searchParams]);
   
-  // --- ШАГ 2: НОВЫЙ ОБРАБОТЧИК ДЛЯ ВЕРИФИКАЦИИ ---
+  // Обработчик верификации (остается таким же)
   const handleVerifyLink = async () => {
     if (!recoveryData) {
       setError('Ошибка: данные для восстановления не найдены.');
@@ -66,7 +66,7 @@ export const UpdatePassword = () => {
     const { error: verifyError } = await supabase.auth.verifyOtp({
       token,
       email,
-      type, // <-- Здесь будет 'email', как мы и сохранили
+      type, 
     });
 
     if (verifyError) {
@@ -75,16 +75,18 @@ export const UpdatePassword = () => {
       setIsVerifying(false);
     } else {
       console.log("verifyOtp success!");
-      // УСПЕХ! Показываем форму для ввода пароля
       setIsReady(true); 
       setIsVerifying(false);
     }
   };
 
-  // --- ШАГ 3: ОБРАБОТЧИК ФОРМЫ ОСТАЕТСЯ ПРЕЖНИМ ---
+  // Обработчик формы (остается таким же)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // ... (весь ваш код handleSubmit остается без изменений) ...
+    if (!password) {
+      setError('Пароль не может быть пустым');
+      return;
+    }
     
     setIsSubmitting(true);
     setError('');
@@ -106,13 +108,17 @@ export const UpdatePassword = () => {
     setIsSubmitting(false);
   };
   
-  // --- ШАГ 4: ОБНОВЛЕННЫЙ JSX ---
+  // --- ОБНОВЛЕННЫЙ JSX ---
+  
+  // Рассчитываем, активна ли кнопка подтверждения
+  const isConfirmationDisabled = !recoveryData || emailConfirmation.toLowerCase() !== recoveryData.email.toLowerCase();
+
   const renderContent = () => {
     if (error) {
       return <p className="text-red-500 text-sm text-center">{error}</p>;
     }
     
-    // Если isReady === true, показываем форму ввода пароля
+    // Шаг 3: Форма ввода нового пароля (после успеха verifyOtp)
     if (isReady) {
       return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -137,15 +143,26 @@ export const UpdatePassword = () => {
       );
     }
 
-    // Если isReady === false и данные из URL есть, показываем кнопку верификации
+    // Шаг 2: Форма подтверждения email (то, что остановит бота)
     if (recoveryData) {
       return (
         <div className="flex flex-col gap-4 items-center">
-           <p className="text-text-main/70">Нажмите, чтобы подтвердить ссылку.</p>
+           <p className="text-text-main/70 text-sm">
+             Чтобы продолжить, введите ваш email: <br/> 
+             <strong className="text-text-main">{recoveryData.email}</strong>
+           </p>
+           <input
+             type="email"
+             value={emailConfirmation}
+             onChange={(e) => setEmailConfirmation(e.target.value)}
+             placeholder="Введите email"
+             className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
+             required
+           />
            <button
              onClick={handleVerifyLink}
              className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
-             disabled={isVerifying}
+             disabled={isVerifying || isConfirmationDisabled} // <-- Ключевое изменение
            >
              {isVerifying ? 'Проверка...' : 'Подтвердить'}
            </button>
@@ -153,7 +170,7 @@ export const UpdatePassword = () => {
       );
     }
     
-    // По умолчанию (пока парсится URL или если была ошибка парсинга)
+    // Шаг 1: Загрузка
     return <p className="text-text-main/70">Загрузка...</p>;
   };
 

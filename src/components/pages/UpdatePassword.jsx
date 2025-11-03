@@ -69,18 +69,23 @@ export const UpdatePassword = () => {
     setIsVerifying(true);
     setError('');
     
-    const { token, type, email } = recoveryData;
-    // email теперь "darsisa%40bk.ru"
-    console.log("Вызываем verifyOtp с type: 'recovery' (И С ЗАКОДИРОВАННЫМ EMAIL)...");
+    // Мы берем только токен и тип. Email нам не нужен для вызова.
+    const { token, type } = recoveryData; 
     
+    console.log("Вызываем verifyOtp с type: 'recovery' (БЕЗ EMAIL, только токен)...");
+    
+    // --- ВОТ ИЗМЕНЕНИЕ ---
     const { error: verifyError } = await supabase.auth.verifyOtp({
       token,
       type, // 'recovery'
-      email, // <-- Теперь здесь "darsisa%40bk.ru"
+      // email: email, // <-- УБИРАЕМ ЭТУ СТРОКУ
     });
+    // --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
     if (verifyError) {
       console.error("Ошибка verifyOtp:", verifyError.message);
+      // Ошибка "Invalid email format" должна исчезнуть. 
+      // Если останется "Token expired", значит, нужно запросить новую ссылку.
       setError('Ссылка недействительна или срок ее действия истек. Пожалуйста, запросите новую ссылку.');
       setIsVerifying(false);
     } else {

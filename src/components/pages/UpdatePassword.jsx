@@ -1,85 +1,95 @@
-// src/components/pages/UpdatePassword.jsx (ПРАВИЛЬНАЯ ВЕРСИЯ)
+// src/components/pages/UpdatePassword.jsx
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom'; // Добавляем useSearchParams
 import { supabase } from '../../supabase-config';
-import { useAuth } from '../../Auth'; // <-- 1. ИМПОРТИРУЕМ useAuth
 
 export const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReady, setIsReady] = useState(false); // Для показа формы
   const navigate = useNavigate();
-  
-  // 2. ПОЛУЧАЕМ 'user' И 'loading' ИЗ AuthProvider
-  const { user, loading: authLoading } = useAuth();
+  const [searchParams] = useSearchParams(); // Получаем параметры из URL
 
-  const [isReady, setIsReady] = useState(false);
-  
-  // 3. useEffect ДЛЯ ПРОВЕРКИ СЕССИИ
   useEffect(() => {
-    if (authLoading) {
-      // AuthProvider еще не загрузился, просто ждем.
-      return;
-    }
+    const token = searchParams.get('token');
+    const type = searchParams.get('type');
+    const redirectTo = searchParams.get('redirect_to'); // Получаем redirect_to
 
-    // AuthProvider загрузился.
-    if (user) {
-      // Отлично, AuthProvider поймал событие PASSWORD_RECOVERY (из #access_token)
-      setIsReady(true);
+    console.log("Token:", token); // Для отладки
+    console.log("Type:", type); // Для отладки
+    console.log("Redirect To:", redirectTo); // Для отладки
+
+    if (token && type === 'recovery') {
+      // Выполняем verifyOtp с ТРЕМЯ параметрами: token, type, redirect_to
+      supabase.auth
+        .verifyOtp({
+          token,
+          type, // 'recovery'
+          options: {
+             redirect_to: redirectTo, // <-- Ключевое изменение
+          }
+        })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Ошибка verifyOtp:', error);
+            setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
+          } else {
+            // Успешная верификация, сессия установлена
+            // data.session содержит токены, но useAuth() должен обновиться автоматически
+            // или мы можем довериться useAuth() после успешной проверки
+            // и просто разрешить показ формы.
+            setIsReady(true); // Показываем форму
+          }
+        });
     } else {
-      // AuthProvider загрузился, но user === null.
-      // Это значит, что мы на странице /update-password
-      // без валидного токена.
+      // Нет токена или неправильный тип
       setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
-      setIsReady(false);
     }
-  }, [user, authLoading]); // Зависим от user и authLoading
-
+  }, [searchParams]); // Зависимость от searchParams
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!isReady) { // Дополнительная проверка
+      setError('Сессия не подтверждена. Пожалуйста, проверьте ссылку.');
+      return;
+    }
     setError('');
     setMessage('');
-    setIsSubmitting(true); 
+    setIsSubmitting(true);
 
-    // 'user' из useAuth() существует, значит сессия установлена
+    // Пытаемся обновить пароль. Если verifyOtp сработал,
+    // то сессия должна быть установлена, и updateUser сработает.
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
+      console.error('Ошибка обновления пароля:', error);
       setError(error.message);
-      setIsSubmitting(false);
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены...');
-      await supabase.auth.signOut(); 
+      // Выходим из системы, чтобы пользователь вошёл с новым паролем
+      await supabase.auth.signOut();
       setTimeout(() => {
-        navigate('/auth'); 
+        navigate('/auth');
       }, 3000);
     }
+    setIsSubmitting(false);
   };
 
-  // ... (весь ваш JSX-код рендеринга остается таким же, как в файле)
-  // 4. ЛОГИКА РЕНДЕРИНГА (из вашего файла)
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
       <div className="w-full max-w-sm text-center">
         <h1 className="text-3xl font-bold mb-8">Задайте новый пароль</h1>
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">
-          
-          {!isReady ? (
-            // Состояние 1: Либо authLoading, либо ошибка
-            <div className="flex flex-col items-center gap-4">
-              {error ? (
-                <p className="text-red-500 text-sm text-center">{error}</p>
-              ) : (
-                <p>Проверка ссылки...</p>
-              )}
-            </div>
+
+          {error ? (
+            <p className="text-red-500 text-sm text-center">{error}</p>
+          ) : !isReady ? (
+            <p>Проверка ссылки...</p>
           ) : (
-            // Состояние 2: Готово к вводу пароля
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              {/* ... (ваша форма: input, button, и т.д.) ... */}
               <input
                 type="password"
                 value={password}
@@ -89,14 +99,13 @@ export const UpdatePassword = () => {
                 required
                 disabled={isSubmitting || !!message}
               />
-              
-              {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
               {message && <p className="text-green-500 text-sm text-center">{message}</p>}
-              
+
               <button
                 type="submit"
                 className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
-                disabled={isSubmitting || !!message} 
+                disabled={isSubmitting || !!message}
               >
                 {isSubmitting ? 'Сохранение...' : 'Сохранить пароль'}
               </button>

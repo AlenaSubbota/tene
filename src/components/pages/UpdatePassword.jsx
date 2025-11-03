@@ -18,12 +18,10 @@ export const UpdatePassword = () => {
   const [recoveryData, setRecoveryData] = useState(null);
   const [isHuman, setIsHuman] = useState(false); 
 
-  // ШАГ 1: useEffect ТЕПЕРЬ ПАРСИТ ВСЕ
   useEffect(() => {
     const token = searchParams.get('token');
     const type = searchParams.get('type');
     
-    // --- ПАРСИМ EMAIL БЕЗ ДВОЙНОГО РАСКОДИРОВАНИЯ ---
     let email = null;
     const redirectUrlString = searchParams.get('redirect_to');
     
@@ -33,12 +31,9 @@ export const UpdatePassword = () => {
         // 1. Просто получаем email_encoded. Он будет "darsisa%40bk.ru"
         const email_encoded = redirectUrl.searchParams.get('email');
         
-        // --- ФИНАЛЬНОЕ ИЗМЕНЕНИЕ: УБИРАЕМ decodeURIComponent ---
-        // if (email_encoded) {
-        //   email = decodeURIComponent(email_encoded); // <-- УДАЛЯЕМ ЭТО
-        // }
-        email = email_encoded; // <-- ПРИСВАИВАЕМ "КАК ЕСТЬ"
-        // --- КОНЕЦ ИЗМЕНЕНИЯ ---
+        // --- УБЕДИТЕСЬ, ЧТО У ВАС ТАК: ---
+        email = email_encoded; // <-- НЕТ decodeURIComponent
+        // --- ---
 
       } catch (e) {
         console.error("Не удалось распарсить redirect_to URL:", e);
@@ -46,13 +41,12 @@ export const UpdatePassword = () => {
     }
 
     if (token && type === 'recovery' && email) {
-      // Сохраняем ВСЕ
       setRecoveryData({ token, type, email });
       console.log("Токен, тип и email (закодированный) найдены в URL.");
-      console.log("Отправляем email как:", email); // <-- НОВЫЙ ЛОГ
+      console.log("Отправляем email как:", email); // <-- Вот этот лог мы ждем
     } else {
       setError('Неверная ссылка (отсутствует токен, тип или email).');
-      console.log("Ошибочка парсинга:", { token, type, email });
+      console.log("Ошибка парсинга:", { token, type, email });
     }
   }, [searchParams]);
 

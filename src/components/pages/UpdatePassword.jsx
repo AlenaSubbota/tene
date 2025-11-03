@@ -10,32 +10,46 @@ export const UpdatePassword = () => {
 
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isReady, setIsReady] = useState(false); // Показываем форму пароля
+  const [isReady, setIsReady] = useState(false); 
 
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
-  // --- СОСТОЯНИЯ ДЛЯ ОСТАНОВКИ БОТА ---
   const [recoveryData, setRecoveryData] = useState(null);
-  const [isHuman, setIsHuman] = useState(false); // Чекбокс
+  const [isHuman, setIsHuman] = useState(false); 
 
-  // ШАГ 1: useEffect ТЕПЕРЬ ТОЛЬКО ПАРСИТ URL
+  // ШАГ 1: useEffect ТЕПЕРЬ ПАРСИТ ВСЕ
   useEffect(() => {
     const token = searchParams.get('token');
     const type = searchParams.get('type');
-
-    // Email нам больше не нужен, мы его не парсим
     
-    if (token && type === 'recovery') {
-      // Просто сохраняем данные, НЕ вызываем verifyOtp
-      setRecoveryData({ token, type });
-      console.log("Токен и тип найдены в URL.");
-    } else {
-      setError('Неверная ссылка (отсутствует токен или тип).');
+    // --- ПАРСИМ EMAIL (как мы делали раньше) ---
+    let email = null;
+    const redirectUrlString = searchParams.get('redirect_to');
+    
+    if (redirectUrlString) {
+      try {
+        const redirectUrl = new URL(redirectUrlString);
+        const email_encoded = redirectUrl.searchParams.get('email');
+        if (email_encoded) {
+          email = decodeURIComponent(email_encoded); // Двойное раскодирование
+        }
+      } catch (e) {
+        console.error("Не удалось распарсить redirect_to URL:", e);
+      }
     }
-  }, [searchParams]); // Зависим от searchParams
 
-  // ШАГ 2: ОБРАБОТЧИК ВЕРИФИКАЦИИ (ВЫЗЫВАЕТСЯ ПО КЛИКУ)
+    if (token && type === 'recovery' && email) {
+      // Сохраняем ВСЕ
+      setRecoveryData({ token, type, email });
+      console.log("Токен, тип и email найдены в URL.");
+    } else {
+      setError('Неверная ссылка (отсутствует токен, тип или email).');
+      console.log("Ошибка парсинга:", { token, type, email });
+    }
+  }, [searchParams]);
+
+  // ШАГ 2: ОБРАБОТЧИК ВЕРИФИКАЦИИ
   const handleVerifyLink = async () => {
     if (!recoveryData) {
       setError('Ошибка: данные для восстановления не найдены.');
@@ -44,23 +58,22 @@ export const UpdatePassword = () => {
     setIsVerifying(true);
     setError('');
     
-    const { token, type } = recoveryData;
-    console.log("Вызываем verifyOtp с type: 'recovery' (БЕЗ EMAIL)...");
+    const { token, type, email } = recoveryData;
+    console.log("Вызываем verifyOtp с type: 'recovery' (И С EMAIL)...");
     
-    // --- ПРАВИЛЬНЫЙ ВЫЗОВ ДЛЯ НОВОГО СЕРВЕРА ---
+    // --- ФИНАЛЬНАЯ КОМБИНАЦИЯ: token + type + email ---
     const { error: verifyError } = await supabase.auth.verifyOtp({
       token,
       type, // 'recovery'
+      email, // <-- ВОЗВРАЩАЕМ EMAIL
     });
 
     if (verifyError) {
       console.error("Ошибка verifyOtp:", verifyError.message);
-      // Эта ошибка теперь будет означать, что токен ДЕЙСТВИТЕЛЬНО истек
       setError('Ссылка недействительна или срок ее действия истек. Пожалуйста, запросите новую ссылку.');
       setIsVerifying(false);
     } else {
       console.log("verifyOtp success!");
-      // УСПЕХ!
       setIsReady(true);
       setIsVerifying(false);
     }
@@ -73,11 +86,9 @@ export const UpdatePassword = () => {
       setError('Пароль не может быть пустым');
       return;
     }
-
     setIsSubmitting(true);
     setError('');
     setMessage('');
-    // Этот вызов updateUser теперь сработает
     const { error } = await supabase.auth.updateUser({
       password: password,
     });
@@ -93,14 +104,11 @@ export const UpdatePassword = () => {
     setIsSubmitting(false);
   };
 
-  // ШАГ 4: ОБНОВЛЕННЫЙ JSX ДЛЯ РЕНДЕРИНГА
+  // ШАГ 4: JSX (без изменений, с чекбоксом)
   const renderContent = () => {
-    // Если ошибка (например, ссылка плохая)
     if (error) {
       return <p className="text-red-500 text-sm text-center">{error}</p>;
     }
-
-    // Шаг 3: Форма ввода нового пароля (после успеха verifyOtp)
     if (isReady) {
       return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -124,8 +132,6 @@ export const UpdatePassword = () => {
         </form>
       );
     }
-
-    // Шаг 2: Форма подтверждения "Я не робот" (останавливает бота)
     if (recoveryData) {
       return (
         <div className="flex flex-col gap-4 items-center">
@@ -141,19 +147,16 @@ export const UpdatePassword = () => {
               Я подтверждаю, что я не робот
             </label>
           </div>
-          
           <button
             onClick={handleVerifyLink}
             className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
-            disabled={isVerifying || !isHuman} // <-- Кнопка выключена, пока не нажат чекбокс
+            disabled={isVerifying || !isHuman} 
           >
             {isVerifying ? 'Проверка...' : 'Подтвердить'}
           </button>
         </div>
       );
     }
-
-    // Шаг 1: Загрузка (пока парсится URL)
     return <p className="text-text-main/70">Проверка ссылки...</p>;
   };
 

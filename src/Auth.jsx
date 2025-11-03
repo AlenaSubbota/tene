@@ -66,8 +66,12 @@ export const AuthForm = () => {
         if (!error) setMessage('Проверьте вашу почту для подтверждения регистрации!');
         
       } else if (mode === 'reset') {
+        // 3. Логика сброса пароля
+
+        // --- ВОЗВРАЩАЕМ ЭТОТ КОД ---
+        // Нам нужно, чтобы email был в URL
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `https://tene.fun/update-password`,
+          redirectTo: `https://tene.fun/update-password?email=${encodeURIComponent(email)}`,
         });
         // --- КОНЕЦ ИЗМЕНЕНИЯ ---
 

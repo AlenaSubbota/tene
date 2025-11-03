@@ -18,29 +18,25 @@ export const UpdatePassword = () => {
     const type = searchParams.get('type');
     const redirectTo = searchParams.get('redirect_to'); // Получаем redirect_to
 
-    console.log("Token:", token); // Для отладки
-    console.log("Type:", type); // Для отладки
-    console.log("Redirect To:", redirectTo); // Для отладки
+    console.log("Token:", token); 
+    console.log("Type:", type); 
+    console.log("Redirect To:", redirectTo); 
 
     if (token && type === 'recovery') {
-      // Выполняем verifyOtp с ТРЕМЯ параметрами: token, type, redirect_to
+      
+      // ИСПРАВЛЕННЫЙ ВЫЗОВ:
       supabase.auth
         .verifyOtp({
           token,
           type, // 'recovery'
-          options: {
-             redirect_to: redirectTo, // <-- Ключевое изменение
-          }
+          redirect_to: redirectTo, // <-- Просто передаем redirect_to
         })
         .then(({ data, error }) => {
           if (error) {
             console.error('Ошибка verifyOtp:', error);
             setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
           } else {
-            // Успешная верификация, сессия установлена
-            // data.session содержит токены, но useAuth() должен обновиться автоматически
-            // или мы можем довериться useAuth() после успешной проверки
-            // и просто разрешить показ формы.
+            // Успех! Сессия установлена.
             setIsReady(true); // Показываем форму
           }
         });

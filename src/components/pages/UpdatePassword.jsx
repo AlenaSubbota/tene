@@ -1,7 +1,6 @@
-// src/components/pages/UpdatePassword.jsx
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+// Убираем useSearchParams, он нам не нужен
+import { useNavigate } from 'react-router-dom'; 
 import { supabase } from '../../supabase-config';
 
 export const UpdatePassword = () => {
@@ -11,81 +10,85 @@ export const UpdatePassword = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReady, setIsReady] = useState(false); 
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  // const [searchParams] = useSearchParams(); // <-- УДАЛЯЕМ ЭТУ СТРОКУ
 
   useEffect(() => {
-    const token = searchParams.get('token');
-    const type = searchParams.get('type');
-    // const email = searchParams.get('email'); // <-- УБИРАЕМ ЭТО
-
-    // (Твои логи для отладки)
-    console.log("NEW_Token:", token); 
-    console.log("Type:", type); 
-    // console.log("Email:", email); // <-- УБИРАЕМ ЭТО
-// test build
-    // const redirectTo = searchParams.get('redirect_to'); // Это нам не нужно передавать
+    // 1. Получаем хэш из URL (он будет вида #token=...&type=...)
+    const hash = window.location.hash;
     
-    // ИСПРАВЛЯЕМ УСЛОВИЕ:
+    // 2. Используем URLSearchParams для парсинга хэша (убираем # в начале)
+    const params = new URLSearchParams(hash.substring(1));
+
+    const token = params.get('token');
+    const type = params.get('type');
+
+    // (Ваши логи для отладки)
+    console.log("HASH Token:", token); 
+    console.log("HASH Type:", type); 
+
     if (token && type === 'recovery') { 
       
-      // ИСПРАВЛЯЕМ ВЫЗОВ:
+      // Теперь этот вызов выполнится!
       supabase.auth
         .verifyOtp({
           token,
           type, // 'recovery'
-          // email, // <-- УБИРАЕМ Э   ТО
         })
         .then(({ data, error }) => {
           if (error) {
-            console.error('Ошибка verifyOtp:', error);
-            setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
+            console.error("Ошибка verifyOtp:", error);
+            setError('Ссылка для восстановления пароля недействительна или срок ее действия истек.');
           } else {
-            // Успех! Сессия установлена.
-            setIsReady(true); // Показываем форму
+            console.log("verifyOtp success, data:", data);
+            // Успех! Устанавливаем сессию и разрешаем ввод пароля
+            setIsReady(true);
           }
         });
     } else {
-      // Нет токена или неправильный тип
-      setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
+        setError('Неверная ссылка для восстановления пароля.');
+        console.log("Token или type не найдены в хэше URL.");
     }
-  }, [searchParams]); // Зависимость от searchParams
+  }, []); // <-- Пустой массив зависимостей, чтобы код выполнился 1 раз при загрузке
 
   const handleSubmit = async (e) => {
+    // ... (Ваш код handleSubmit остается без изменений)
     e.preventDefault();
-    if (!isReady) { 
-      setError('Сессия не подтверждена. Пожалуйста, проверьте ссылку.');
+    if (!password) {
+      setError('Пароль не может быть пустым');
       return;
     }
+    
+    setIsSubmitting(true);
     setError('');
     setMessage('');
-    setIsSubmitting(true);
 
-    // Эта часть у тебя написана правильно, она сработает,
-    // если verifyOtp в useEffect установил сессию.
-    const { error } = await supabase.auth.updateUser({ password });
+    // Этот вызов updateUser сработает, т.к. сессия была установлена в useEffect
+    const { error } = await supabase.auth.updateUser({
+      password: password,
+    });
 
     if (error) {
-      console.error('Ошибка обновления пароля:', error);
-      setError(error.message);
+      console.error("Ошибка обновления пароля:", error);
+      setError('Не удалось обновить пароль. Попробуйте еще раз.');
     } else {
-      setMessage('Пароль успешно обновлен! Вы будете перенаправлены...');
-      await supabase.auth.signOut();
+      setMessage('Пароль успешно обновлен! Вы будете перенаправлены на страницу входа.');
       setTimeout(() => {
-        navigate('/auth');
+        navigate('/'); // Перенаправляем на главную (или на /auth)
       }, 3000);
     }
     setIsSubmitting(false);
   };
-
-  // ... (твой JSX рендер)
+  
+  // ... (остальная часть вашего JSX-кода рендеринга)
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
-       <div className="w-full max-w-sm text-center">
+     <div className="flex justify-center items-center min-h-screen bg-background text-text-main p-4">
+      <div className="w-full max-w-sm text-center">
         <h1 className="text-3xl font-bold mb-8">Задайте новый пароль</h1>
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">
           {error ? (
             <p className="text-red-500 text-sm text-center">{error}</p>
           ) : !isReady ? (
+            // Показываем индикатор, пока идет проверка токена
             <p>Проверка ссылки...</p>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">

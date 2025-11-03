@@ -14,46 +14,25 @@ export const UpdatePassword = () => {
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
+    // --- ВОЗВРАЩАЕМ К ОРИГИНАЛУ ---
     const token = searchParams.get('token');
     const type = searchParams.get('type');
     
-    let email = null;
-    const redirectUrlString = searchParams.get('redirect_to');
-
-    if (redirectUrlString) {
-      try {
-        const redirectUrl = new URL(redirectUrlString);
-        // 1. Получаем ОДИН РАЗ раскодированное значение (будет "darsisa%40bk.ru")
-        const email_encoded = redirectUrl.searchParams.get('email');
-        
-        // --- ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ ---
-        // 2. Раскодируем его ВТОРОЙ РАЗ, чтобы получить "darsisa@bk.ru"
-        if (email_encoded) {
-          email = decodeURIComponent(email_encoded);
-        }
-        // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
-
-      } catch (e) {
-        console.error("Не удалось распарсить redirect_to URL:", e);
-      }
-    }
-
     console.log("Token из URL (?):", token); 
     console.log("Type из URL (?):", type);
-    console.log("Email (ФИНАЛЬНЫЙ, раскодированный):", email); // <-- Смотрим сюда
+    console.log("Email НЕ ИСПОЛЬЗУЕТСЯ в этом вызове.");
 
-    if (token && type === 'recovery' && email) { 
+    if (token && type === 'recovery') { 
       
+      // ВЫЗОВ БЕЗ EMAIL
       supabase.auth
         .verifyOtp({
           token,
           type, // 'recovery'
-          email, // <-- Теперь здесь должен быть "darsisa@bk.ru"
         })
         .then(({ data, error }) => {
           if (error) {
             console.error("Ошибка verifyOtp:", error.message);
-            // Эта ошибка теперь будет означать, что токен ДЕЙСТВИТЕЛЬНО истек
             setError('Ссылка недействительна или срок ее действия истек. Пожалуйста, запросите новую ссылку.');
           } else {
             console.log("verifyOtp success, data:", data);
@@ -62,10 +41,10 @@ export const UpdatePassword = () => {
           }
         });
     } else {
-        setError('Неверная ссылка для восстановления пароля (не удалось найти токен, тип или email).');
-        console.log("Token, type='recovery' или email не найдены.");
+        setError('Неверная ссылка для восстановления пароля (не найден токен или тип).');
+        console.log("Token или type='recovery' не найдены.");
     }
-  }, [searchParams]);
+  }, [searchParams]); // <-- Запускаем эффект, когда searchParams готовы
   
   const handleSubmit = async (e) => {
     e.preventDefault();

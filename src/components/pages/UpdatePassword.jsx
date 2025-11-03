@@ -23,7 +23,7 @@ export const UpdatePassword = () => {
     const token = searchParams.get('token');
     const type = searchParams.get('type');
     
-    // --- ПАРСИМ EMAIL (как мы делали раньше) ---
+    // --- ПАРСИМ EMAIL ---
     let email = null;
     const redirectUrlString = searchParams.get('redirect_to');
     
@@ -45,7 +45,7 @@ export const UpdatePassword = () => {
       console.log("Токен, тип и email найдены в URL.");
     } else {
       setError('Неверная ссылка (отсутствует токен, тип или email).');
-      console.log("Ошибка парсинга:", { token, type, email });
+      console.log("Ошибочка парсинга:", { token, type, email });
     }
   }, [searchParams]);
 

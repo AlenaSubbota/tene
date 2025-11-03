@@ -1,101 +1,33 @@
 // src/components/pages/UpdatePassword.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase-config';
+import { useAuth } from '../../Auth'; // <-- Импортируем useAuth
 
 export const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-
-  const [isVerifying, setIsVerifying] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isReady, setIsReady] = useState(false); 
-
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  
-  const [recoveryData, setRecoveryData] = useState(null);
-  const [isHuman, setIsHuman] = useState(false); 
 
+  // Получаем состояние загрузки и пользователя из AuthContext
+  const { loading, user } = useAuth();
+
+  // Этот useEffect отслеживает, что происходит с сессией
   useEffect(() => {
-    const token = searchParams.get('token');
-    const type = searchParams.get('type');
-    
-    let email = null;
-    const redirectUrlString = searchParams.get('redirect_to');
-    
-    if (redirectUrlString) {
-      try {
-        // 
-        // ПРОБЛЕМА БЫЛА ЗДЕСЬ:
-        // const redirectUrl = new URL(redirectUrlString);
-        // const email_encoded = redirectUrl.searchParams.get('email'); // <-- ЭТО АВТОМАТИЧЕСКИ ДЕКОДИРУЕТ
-        // email = email_encoded; 
-        //
-
-        // --- НОВОЕ РЕШЕНИЕ (ПАРСИМ СТРОКУ ВРУЧНУЮ) ---
-        // Ищем '?email=' или '&email=' и берем все до следующего '&'
-        const emailParamMatch = redirectUrlString.match(/[?&]email=([^&]+)/);
-        
-        if (emailParamMatch && emailParamMatch[1]) {
-          email = emailParamMatch[1]; // <-- Получаем "darsisa%40bk.ru" как есть
-        } else {
-          console.error("Не удалось извлечь email из redirect_to.");
-        }
-        // --- КОНЕЦ РЕШЕНИЯ ---
-
-      } catch (e) {
-        console.error("Не удалось обработать redirect_to URL:", e);
-      }
+    // Если загрузка AuthProvider'а завершена, а пользователя все еще нет,
+    // значит, пользователь пришел сюда по недействительной/старой ссылке.
+    if (!loading && !user) {
+      setError('Недействительная или просроченная сессия. Пожалуйста, запросите сброс пароля заново.');
+      setTimeout(() => {
+        navigate('/'); // Отправляем на главную
+      }, 3000);
     }
+  }, [loading, user, navigate]);
 
-    if (token && type === 'recovery' && email) {
-      setRecoveryData({ token, type, email });
-      console.log("Токен, тип и email (закодированный) найдены в URL.");
-      console.log("Отправляем email как:", email); // <-- Вот этот лог мы ждем
-    } else {
-      setError('Неверная ссылка (отсутствует токен, тип или email).');
-      console.log("Ошибка парсинга:", { token, type, email });
-    }
-  }, [searchParams]);
 
-  // ШАГ 2: ОБРАБОТЧИК ВЕРИФИКАЦИИ
-  const handleVerifyLink = async () => {
-    if (!recoveryData) {
-      setError('Ошибка: данные для восстановления не найдены.');
-      return;
-    }
-    setIsVerifying(true);
-    setError('');
-    
-    // Мы берем только токен и тип. Email нам не нужен для вызова.
-    const { token, type } = recoveryData; 
-    
-    console.log("Вызываем verifyOtp с type: 'recovery' (БЕЗ EMAIL, только токен)...");
-    
-    // --- ВОТ ИЗМЕНЕНИЕ ---
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      token,
-      type, // 'recovery'
-      // email: email, // <-- УБИРАЕМ ЭТУ СТРОКУ
-    });
-    // --- КОНЕЦ ИЗМЕНЕНИЯ ---
-
-    if (verifyError) {
-      console.error("Ошибка verifyOtp:", verifyError.message);
-      // Ошибка "Invalid email format" должна исчезнуть. 
-      // Если останется "Token expired", значит, нужно запросить новую ссылку.
-      setError('Ссылка недействительна или срок ее действия истек. Пожалуйста, запросите новую ссылку.');
-      setIsVerifying(false);
-    } else {
-      console.log("verifyOtp success!");
-      setIsReady(true);
-      setIsVerifying(false);
-    }
-  };
-
-  // ШАГ 3: ОБРАБОТЧИК ФОРМЫ (без изменений)
+  // Обработчик формы (ШАГ 3 из твоего старого файла, но он теперь главный)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!password) {
@@ -105,27 +37,41 @@ export const UpdatePassword = () => {
     setIsSubmitting(true);
     setError('');
     setMessage('');
+
+    // Пользователь УЖЕ аутентифицирован.
+    // Мы просто обновляем его пароль.
     const { error } = await supabase.auth.updateUser({
       password: password,
     });
+
     if (error) {
       console.error("Ошибка обновления пароля:", error);
       setError('Не удалось обновить пароль. Попробуйте еще раз.');
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены на страницу входа.');
+      // Выходим из системы, так как сессия 'recovery' одноразовая
+      await supabase.auth.signOut();
       setTimeout(() => {
-        navigate('/');
+        navigate('/'); // Переход на логин
       }, 3000);
     }
     setIsSubmitting(false);
   };
 
-  // ШАГ 4: JSX (без изменений, с чекбоксом)
+  // Логика отображения
   const renderContent = () => {
+    // 1. Ждем, пока onAuthStateChange в AuthProvider'е отработает
+    if (loading) {
+      return <p className="text-text-main/70">Проверка сессии...</p>;
+    }
+    
+    // 2. Если была ошибка (из useEffect)
     if (error) {
       return <p className="text-red-500 text-sm text-center">{error}</p>;
     }
-    if (isReady) {
+    
+    // 3. Если загрузка завершена и пользователь есть (сессия 'recovery' активна)
+    if (user) {
       return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
@@ -148,32 +94,9 @@ export const UpdatePassword = () => {
         </form>
       );
     }
-    if (recoveryData) {
-      return (
-        <div className="flex flex-col gap-4 items-center">
-          <div className="flex items-center gap-2 self-center">
-            <input
-              type="checkbox"
-              id="is-human"
-              checked={isHuman}
-              onChange={(e) => setIsHuman(e.target.checked)}
-              className="h-4 w-4 rounded border-border-color text-accent focus:ring-accent"
-            />
-            <label htmlFor="is-human" className="text-text-main/70 text-sm">
-              Я подтверждаю, что я не робот
-            </label>
-          </div>
-          <button
-            onClick={handleVerifyLink}
-            className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
-            disabled={isVerifying || !isHuman} 
-          >
-            {isVerifying ? 'Проверка...' : 'Подтвердить'}
-          </button>
-        </div>
-      );
-    }
-    return <p className="text-text-main/70">Проверка ссылки...</p>;
+
+    // 4. (На всякий случай) Если не загрузка, не ошибка, но и пользователя нет
+    return <p className="text-text-main/70">Проверка сессии...</p>;
   };
 
   return (

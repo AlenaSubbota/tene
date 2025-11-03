@@ -19,10 +19,10 @@ export const UpdatePassword = () => {
     // const email = searchParams.get('email'); // <-- УБИРАЕМ ЭТО
 
     // (Твои логи для отладки)
-    console.log("Token:", token); 
+    console.log("NEW_Token:", token); 
     console.log("Type:", type); 
     // console.log("Email:", email); // <-- УБИРАЕМ ЭТО
-
+// test build
     // const redirectTo = searchParams.get('redirect_to'); // Это нам не нужно передавать
     
     // ИСПРАВЛЯЕМ УСЛОВИЕ:
@@ -33,7 +33,7 @@ export const UpdatePassword = () => {
         .verifyOtp({
           token,
           type, // 'recovery'
-          // email, // <-- УБИРАЕМ ЭТО
+          // email, // <-- УБИРАЕМ Э   ТО
         })
         .then(({ data, error }) => {
           if (error) {

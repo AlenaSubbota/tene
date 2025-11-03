@@ -113,7 +113,7 @@ export const AuthForm = () => {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-3xl font-bold text-center">
-        {mode === 'login' && 'Вход'}
+        {mode === 'login' && 'Вход v2'}
         {mode === 'register' && 'Регистрация'}
         {mode === 'reset' && 'Сброс пароля'}
       </h1>

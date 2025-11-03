@@ -8,28 +8,17 @@ export const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  
-  const [isVerifying, setIsVerifying] = useState(false); 
-  const [isSubmitting, setIsSubmitting] = useState(false); 
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReady, setIsReady] = useState(false); 
-  
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  const [recoveryData, setRecoveryData] = useState(null);
-  
-  // --- НОВОЕ СОСТОЯНИЕ ДЛЯ ПРОВЕРКИ EMAIL ---
-  const [emailConfirmation, setEmailConfirmation] = useState('');
-
-  // useEffect по-прежнему ТОЛЬКО парсит URL
   useEffect(() => {
     const token = searchParams.get('token');
-    const typeFromUrl = searchParams.get('type');
+    const typeFromUrl = searchParams.get('type'); // Будет 'recovery'
     
     let email = null;
     const redirectUrlString = searchParams.get('redirect_to');
-    
     if (redirectUrlString) {
       try {
         const redirectUrl = new URL(redirectUrlString);
@@ -42,45 +31,41 @@ export const UpdatePassword = () => {
       }
     }
 
-    if (token && email && typeFromUrl === 'recovery') {
-      setRecoveryData({ token, email, type: 'email' }); 
+    console.log("Token:", token); 
+    console.log("Email (раскодированный):", email);
+    console.log("Тип из URL (для проверки):", typeFromUrl);
+
+    if (token && email && typeFromUrl === 'recovery') { 
+      
+      // --- ГЛАВНОЕ ИЗМЕНЕНИЕ ---
+      // Тип в URL - 'recovery'. Мы *обязаны* использовать 'recovery'
+      // Это аутентифицирует пользователя и создает сессию.
+      console.log("Вызываем verifyOtp с type: 'recovery'...");
+
+      supabase.auth
+        .verifyOtp({
+          token,
+          email,
+          type: 'recovery', // <-- ВОТ ПРАВИЛЬНЫЙ ТИП
+        })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error("Ошибка verifyOtp:", error.message);
+            // Вот ТЕПЕРЬ, если эта ошибка все еще есть,
+            // это 100% бот notisend.
+            setError('Ссылка недействительна или срок ее действия истек. Пожалуйста, запросите новую ссылку.');
+          } else {
+            // УСПЕХ! Пользователь теперь вошел в систему (сессия создана)
+            console.log("verifyOtp success, data:", data);
+            // Теперь можно показать форму для ввода пароля.
+            setIsReady(true);
+          }
+        });
     } else {
-      setError('Неверная ссылка для восстановления пароля (не найден токен, тип или email).');
+        setError('Неверная ссылка для восстановления пароля (не найден токен, тип или email).');
     }
-  }, [searchParams]);
+  }, [searchParams]); // Зависимость правильная
   
-  // Обработчик верификации (остается таким же)
-  const handleVerifyLink = async () => {
-    if (!recoveryData) {
-      setError('Ошибка: данные для восстановления не найдены.');
-      return;
-    }
-
-    setIsVerifying(true);
-    setError('');
-
-    const { token, email, type } = recoveryData;
-
-    console.log("Вызываем verifyOtp с type: 'email'...");
-
-    const { error: verifyError } = await supabase.auth.verifyOtp({
-      token,
-      email,
-      type, 
-    });
-
-    if (verifyError) {
-      console.error("Ошибка verifyOtp:", verifyError.message);
-      setError('Ссылка недействительна или срок ее действия истек. Пожалуйста, запросите новую ссылку.');
-      setIsVerifying(false);
-    } else {
-      console.log("verifyOtp success!");
-      setIsReady(true); 
-      setIsVerifying(false);
-    }
-  };
-
-  // Обработчик формы (остается таким же)
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!password) {
@@ -92,6 +77,8 @@ export const UpdatePassword = () => {
     setError('');
     setMessage('');
 
+    // Этот вызов updateUser теперь сработает, т.к. verifyOtp
+    // с type: 'recovery' создал сессию
     const { error } = await supabase.auth.updateUser({
       password: password,
     });
@@ -108,78 +95,37 @@ export const UpdatePassword = () => {
     setIsSubmitting(false);
   };
   
-  // --- ОБНОВЛЕННЫЙ JSX ---
-  
-  // Рассчитываем, активна ли кнопка подтверждения
-  const isConfirmationDisabled = !recoveryData || emailConfirmation.toLowerCase() !== recoveryData.email.toLowerCase();
-
-  const renderContent = () => {
-    if (error) {
-      return <p className="text-red-500 text-sm text-center">{error}</p>;
-    }
-    
-    // Шаг 3: Форма ввода нового пароля (после успеха verifyOtp)
-    if (isReady) {
-      return (
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Новый пароль"
-            className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
-            required
-            disabled={isSubmitting || !!message}
-          />
-          {message && <p className="text-green-500 text-sm text-center">{message}</p>}
-          <button
-            type="submit"
-            className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
-            disabled={isSubmitting || !!message}
-          >
-            {isSubmitting ? 'Сохранение...' : 'Сохранить пароль'}
-          </button>
-        </form>
-      );
-    }
-
-    // Шаг 2: Форма подтверждения email (то, что остановит бота)
-    if (recoveryData) {
-      return (
-        <div className="flex flex-col gap-4 items-center">
-           <p className="text-text-main/70 text-sm">
-             Чтобы продолжить, введите ваш email: <br/> 
-             <strong className="text-text-main">{recoveryData.email}</strong>
-           </p>
-           <input
-             type="email"
-             value={emailConfirmation}
-             onChange={(e) => setEmailConfirmation(e.target.value)}
-             placeholder="Введите email"
-             className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
-             required
-           />
-           <button
-             onClick={handleVerifyLink}
-             className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
-             disabled={isVerifying || isConfirmationDisabled} // <-- Ключевое изменение
-           >
-             {isVerifying ? 'Проверка...' : 'Подтвердить'}
-           </button>
-        </div>
-      );
-    }
-    
-    // Шаг 1: Загрузка
-    return <p className="text-text-main/70">Загрузка...</p>;
-  };
-
+  // Рендеринг JSX (как в самом первом варианте)
   return (
      <div className="flex justify-center items-center min-h-screen bg-background text-text-main p-4">
       <div className="w-full max-w-sm text-center">
         <h1 className="text-3xl font-bold mb-8">Задайте новый пароль</h1>
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">
-          {renderContent()}
+          {error ? (
+            <p className="text-red-500 text-sm text-center">{error}</p>
+          ) : !isReady ? (
+            <p className="text-text-main/70">Проверка ссылки...</p>
+          ) : (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Новый пароль"
+                className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
+                required
+                disabled={isSubmitting || !!message}
+              />
+              {message && <p className="text-green-500 text-sm text-center">{message}</p>}
+              <button
+                type="submit"
+                className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
+                disabled={isSubmitting || !!message}
+              >
+                {isSubmitting ? 'Сохранение...' : 'Сохранить пароль'}
+              </button>
+            </form>
+          )}
         </div>
       </div>
     </div>

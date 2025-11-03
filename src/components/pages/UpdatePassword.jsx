@@ -1,74 +1,34 @@
 // src/components/pages/UpdatePassword.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabase-config';
+import { useAuth } from '../../Auth'; // <-- Импортируем useAuth
 
 export const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [isVerifying, setIsVerifying] = useState(true);
-  const [isVerified, setIsVerified] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  
+  // Получаем состояние загрузки и пользователя из AuthContext
+  const { loading, user } = useAuth();
 
-  // Шаг 1: Верификация токена при загрузке
+  // Этот useEffect отслеживает, что происходит с сессией
   useEffect(() => {
-    const verifyToken = async () => {
-      setIsVerifying(true);
-      
-      const token = searchParams.get('token');
-      const type = searchParams.get('type');
+    // onAuthStateChange в AuthProvider'е отработает, когда #access_token будет в URL.
+    
+    // Если загрузка AuthProvider'а завершена, а пользователя все еще нет,
+    // значит, пользователь пришел сюда по недействительной/старой (?token=) ссылке.
+    if (!loading && !user) {
+      setError('Недействительная или просроченная сессия. Пожалуйста, запросите сброс пароля заново.');
+      setTimeout(() => {
+        navigate('/'); // Отправляем на главную (или /auth)
+      }, 3000);
+    }
+  }, [loading, user, navigate]);
 
-      // --- НОВОЕ РЕШЕНИЕ (ИЩЕМ EMAIL ВНУТРИ REDIRECT_TO) ---
-      const redirectToUrlString = searchParams.get('redirect_to');
-      let emailParam = null;
-
-      if (redirectToUrlString) {
-        try {
-          // searchParams.get() автоматически декодирует redirect_to один раз
-          // (из %2540 в %40).
-          const redirectUrl = new URL(redirectToUrlString);
-          emailParam = redirectUrl.searchParams.get('email'); // Получаем 'darsisa%40bk.ru'
-        } catch (e) {
-          console.error("Не удалось распарсить redirect_to:", e);
-        }
-      }
-      // --- КОНЕЦ РЕШЕНИЯ ---
-
-      if (!token || !emailParam || type !== 'recovery') {
-        setError('Недействительная или неполная ссылка для сброса пароля.');
-        setIsVerifying(false);
-        return;
-      }
-
-      // emailParam все еще закодирован ('darsisa%40bk.ru'),
-      // декодируем его, чтобы получить 'darsisa@bk.ru'
-      const email = decodeURIComponent(emailParam);
-
-      console.log(`Вызываем verifyOtp с email: ${email} и token: ${token}`);
-
-      const { error: verifyError } = await supabase.auth.verifyOtp({
-        token,
-        type,
-        email: email, // Отправляем 'darsisa@bk.ru'
-      });
-
-      if (verifyError) {
-        console.error("Ошибка verifyOtp:", verifyError.message);
-        setError('Ссылка недействительна или срок ее действия истек. Пожалуйста, запросите новую.');
-      } else {
-        console.log("Успешная верификация (verifyOtp)! Сессия создана.");
-        setIsVerified(true); // Успех!
-      }
-      setIsVerifying(false);
-    };
-
-    verifyToken();
-  }, [searchParams]);
-
-  // Шаг 2: Обработчик формы (остается без изменений)
+  // Обработчик формы
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!password) {
@@ -79,6 +39,8 @@ export const UpdatePassword = () => {
     setError('');
     setMessage('');
 
+    // Пользователь УЖЕ аутентифицирован (сессия 'recovery' активна).
+    // Мы просто обновляем его пароль.
     const { error } = await supabase.auth.updateUser({
       password: password,
     });
@@ -88,25 +50,29 @@ export const UpdatePassword = () => {
       setError('Не удалось обновить пароль. Попробуйте еще раз.');
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены на страницу входа.');
+      // Выходим из системы, так как сессия 'recovery' одноразовая
       await supabase.auth.signOut();
       setTimeout(() => {
-        navigate('/');
+        navigate('/'); // Переход на логин
       }, 3000);
     }
     setIsSubmitting(false);
   };
 
-  // Логика отображения (остается без изменений)
+  // Логика отображения
   const renderContent = () => {
-    if (isVerifying) {
-      return <p className="text-text-main/70">Проверка ссылки...</p>;
+    // 1. Ждем, пока onAuthStateChange в AuthProvider'е отработает
+    if (loading) {
+      return <p className="text-text-main/70">Проверка сессии...</p>;
     }
-    
+
+    // 2. Если была ошибка (из useEffect)
     if (error) {
       return <p className="text-red-500 text-sm text-center">{error}</p>;
     }
-    
-    if (isVerified) {
+
+    // 3. Если загрузка завершена и пользователь есть (сессия 'recovery' активна)
+    if (user) {
       return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
@@ -129,8 +95,9 @@ export const UpdatePassword = () => {
         </form>
       );
     }
-    
-    return <p className="text-text-main/70">Не удалось проверить сессию.</p>;
+
+    // 4. (На всякий случай) Если не загрузка, не ошибка, но и пользователя нет
+    return <p className="text-text-main/70">Проверка сессии...</p>;
   };
 
   return (

@@ -71,7 +71,7 @@ export const AuthForm = () => {
         // Мы должны передать email в redirectTo, чтобы 
         // UpdatePassword.jsx мог его прочитать.
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `https://tene.fun/update-password?email=${encodeURIComponent(email)}`,
+          redirectTo: `https://tene.fun/update-password`,
         });
         // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 

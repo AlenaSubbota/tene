@@ -1,33 +1,60 @@
 // src/components/pages/UpdatePassword.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabase-config';
-import { useAuth } from '../../Auth'; // <-- Импортируем useAuth
 
 export const UpdatePassword = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [isVerifying, setIsVerifying] = useState(true); // Новое состояние
+  const [isVerified, setIsVerified] = useState(false);  // Новое состояние
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
-  // Получаем состояние загрузки и пользователя из AuthContext
-  const { loading, user } = useAuth();
-
-  // Этот useEffect отслеживает, что происходит с сессией
+  // Шаг 1: Верификация токена при загрузке
   useEffect(() => {
-    // Если загрузка AuthProvider'а завершена, а пользователя все еще нет,
-    // значит, пользователь пришел сюда по недействительной/старой ссылке.
-    if (!loading && !user) {
-      setError('Недействительная или просроченная сессия. Пожалуйста, запросите сброс пароля заново.');
-      setTimeout(() => {
-        navigate('/'); // Отправляем на главную
-      }, 3000);
-    }
-  }, [loading, user, navigate]);
+    const verifyToken = async () => {
+      setIsVerifying(true);
+      const token = searchParams.get('token');
+      const type = searchParams.get('type');
+      const emailParam = searchParams.get('email'); // email будет закодирован (darsisa%40bk.ru)
 
+      if (!token || !emailParam || type !== 'recovery') {
+        setError('Недействительная или неполная ссылка для сброса пароля.');
+        setIsVerifying(false);
+        return;
+      }
 
-  // Обработчик формы (ШАГ 3 из твоего старого файла, но он теперь главный)
+      // --- ЭТО КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ ИЗ НАШЕЙ ПЕРВОЙ ПОПЫТКИ ---
+      // Мы должны декодировать email ПЕРЕД отправкой в Supabase
+      const email = decodeURIComponent(emailParam);
+      // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
+
+      console.log(`Вызываем verifyOtp с email: ${email} и token: ${token}`);
+
+      // Вызываем verifyOtp с декодированным email
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token,
+        type,
+        email: email, // Отправляем 'darsisa@bk.ru'
+      });
+
+      if (verifyError) {
+        console.error("Ошибка verifyOtp:", verifyError.message);
+        setError('Ссылка недействительна или срок ее действия истек. Пожалуйста, запросите новую.');
+      } else {
+        console.log("Успешная верификация (verifyOtp)! Сессия создана.");
+        setIsVerified(true); // Успех!
+      }
+      setIsVerifying(false);
+    };
+
+    verifyToken();
+  }, [searchParams]);
+
+  // Шаг 2: Обработчик формы для ОБНОВЛЕНИЯ пароля
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!password) {
@@ -38,8 +65,7 @@ export const UpdatePassword = () => {
     setError('');
     setMessage('');
 
-    // Пользователь УЖЕ аутентифицирован.
-    // Мы просто обновляем его пароль.
+    // Теперь, когда сессия активна, мы можем обновить пользователя
     const { error } = await supabase.auth.updateUser({
       password: password,
     });
@@ -49,7 +75,6 @@ export const UpdatePassword = () => {
       setError('Не удалось обновить пароль. Попробуйте еще раз.');
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены на страницу входа.');
-      // Выходим из системы, так как сессия 'recovery' одноразовая
       await supabase.auth.signOut();
       setTimeout(() => {
         navigate('/'); // Переход на логин
@@ -60,18 +85,18 @@ export const UpdatePassword = () => {
 
   // Логика отображения
   const renderContent = () => {
-    // 1. Ждем, пока onAuthStateChange в AuthProvider'е отработает
-    if (loading) {
-      return <p className="text-text-main/70">Проверка сессии...</p>;
+    // 1. Пока идет верификация токена
+    if (isVerifying) {
+      return <p className="text-text-main/70">Проверка ссылки...</p>;
     }
     
-    // 2. Если была ошибка (из useEffect)
+    // 2. Если была ошибка (в useEffect или в форме)
     if (error) {
       return <p className="text-red-500 text-sm text-center">{error}</p>;
     }
     
-    // 3. Если загрузка завершена и пользователь есть (сессия 'recovery' активна)
-    if (user) {
+    // 3. Если верификация прошла, показываем форму
+    if (isVerified) {
       return (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <input
@@ -94,9 +119,9 @@ export const UpdatePassword = () => {
         </form>
       );
     }
-
-    // 4. (На всякий случай) Если не загрузка, не ошибка, но и пользователя нет
-    return <p className="text-text-main/70">Проверка сессии...</p>;
+    
+    // 4. Если не загрузка и не успех (на всякий случай)
+    return <p className="text-text-main/70">Не удалось проверить сессию.</p>;
   };
 
   return (

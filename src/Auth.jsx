@@ -67,16 +67,16 @@ export const AuthForm = () => {
         
     } else if (mode === 'reset') {
         
-        // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
         // Мы должны передать email в redirectTo, чтобы 
         // UpdatePassword.jsx мог его прочитать.
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `https://tene.fun/update-password?email=${encodeURIComponent(email)}`,
         });
-        // --- КОНЕЦ ИЗМЕНЕНИЯ ---
+        // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
       authError = error;
-      if (!error) setMessage('Проверьте вашу почту для сброса пароля!');
+      if (!error) setMessage('Проверьте вашу почту для сброса пароля! Ссылка там');
     }
       if (authError) {
         throw authError;

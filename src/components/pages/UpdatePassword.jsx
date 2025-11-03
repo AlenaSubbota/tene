@@ -16,27 +16,45 @@ export const UpdatePassword = () => {
   useEffect(() => {
     const token = searchParams.get('token');
     const type = searchParams.get('type');
-    // --- ВОТ ИЗМЕНЕНИЕ ---
-    const email = searchParams.get('email'); 
+    
+    // --- НОВОЕ ИСПРАВЛЕНИЕ: ПАРСИМ EMAIL ИЗ REDIRECT_TO ---
+    let email = null;
+    const redirectUrlString = searchParams.get('redirect_to');
+
+    if (redirectUrlString) {
+      try {
+        // Создаем URL-объект из строки redirect_to
+        const redirectUrl = new URL(redirectUrlString);
+        // Достаем email из параметров *этого* URL
+        email = redirectUrl.searchParams.get('email');
+      } catch (e) {
+        console.error("Не удалось распарсить redirect_to URL:", e);
+      }
+    }
+    // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
 
     console.log("Token из URL (?):", token); 
     console.log("Type из URL (?):", type);
-    console.log("Email из URL (?):", email); // <-- Новый лог
+    console.log("Email (распарсенный из redirect_to):", email); // <-- Новый лог
 
-    // --- ИЗМЕНЕНИЕ В УСЛОВИИ ---
+    // Условие теперь должно сработать
     if (token && type === 'recovery' && email) { 
       
-      // --- ИЗМЕНЕНИЕ В ВЫЗОВЕ ---
       supabase.auth
         .verifyOtp({
           token,
           type, // 'recovery'
-          email, // <-- ВОЗВРАЩАЕМ EMAIL
+          email, // <-- Теперь email должен быть здесь
         })
         .then(({ data, error }) => {
           if (error) {
             console.error("Ошибка verifyOtp:", error.message);
-            setError('Ссылка для восстановления пароля недействительна или срок ее действия истек.');
+            // Если снова 400 Bad Request, значит токен уже использован
+            if (error.message.includes("400")) {
+               setError('Эта ссылка уже была использована или срок ее действия истек. Пожалуйста, запросите сброс пароля еще раз.');
+            } else {
+               setError('Ссылка для восстановления пароля недействительна.');
+            }
           } else {
             console.log("verifyOtp success, data:", data);
             // Успех! Устанавливаем сессию и разрешаем ввод пароля
@@ -44,10 +62,10 @@ export const UpdatePassword = () => {
           }
         });
     } else {
-        setError('Неверная ссылка для восстановления пароля (отсутствует токен, тип или email).');
-        console.log("Token, type='recovery' или email не найдены в параметрах URL (?).");
+        setError('Неверная ссылка для восстановления пароля (не удалось найти токен, тип или email).');
+        console.log("Token, type='recovery' или email не найдены.");
     }
-  }, [searchParams]); // <-- Запускаем эффект, когда searchParams готовы
+  }, [searchParams]);
   
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -60,7 +78,6 @@ export const UpdatePassword = () => {
     setError('');
     setMessage('');
 
-    // Этот вызов updateUser сработает, т.к. сессия была установлена в useEffect
     const { error } = await supabase.auth.updateUser({
       password: password,
     });
@@ -71,7 +88,7 @@ export const UpdatePassword = () => {
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены на страницу входа.');
       setTimeout(() => {
-        navigate('/'); // Перенаправляем на главную (или на /auth)
+        navigate('/'); 
       }, 3000);
     }
     setIsSubmitting(false);
@@ -86,7 +103,6 @@ export const UpdatePassword = () => {
           {error ? (
             <p className="text-red-500 text-sm text-center">{error}</p>
           ) : !isReady ? (
-            // Показываем индикатор, пока идет проверка токена
             <p className="text-text-main/70">Проверка ссылки...</p>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">

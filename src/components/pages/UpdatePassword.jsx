@@ -1,35 +1,40 @@
 // src/components/pages/UpdatePassword.jsx
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom'; // Добавляем useSearchParams
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '../../supabase-config';
 
 export const UpdatePassword = () => {
+  // ... (стейты как у тебя)
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isReady, setIsReady] = useState(false); // Для показа формы
+  const [isReady, setIsReady] = useState(false); 
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams(); // Получаем параметры из URL
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     const token = searchParams.get('token');
     const type = searchParams.get('type');
-    const redirectTo = searchParams.get('redirect_to'); // Получаем redirect_to
+    const email = searchParams.get('email'); // <-- ДОБАВЛЯЕМ ЭТО
 
+    // (Твои логи для отладки)
     console.log("Token:", token); 
     console.log("Type:", type); 
-    console.log("Redirect To:", redirectTo); 
+    console.log("Email:", email); // <-- Добавь этот лог
 
-    if (token && type === 'recovery') {
+    // (Твой redirectTo больше не нужен для проверки, но email нужен)
+    // const redirectTo = searchParams.get('redirect_to'); 
+    
+    if (token && type === 'recovery' && email) { // <-- ПРОВЕРЯЕМ НАЛИЧИЕ EMAIL
       
       // ИСПРАВЛЕННЫЙ ВЫЗОВ:
       supabase.auth
         .verifyOtp({
           token,
           type, // 'recovery'
-          redirect_to: redirectTo, // <-- Просто передаем redirect_to
+          email, // <-- ВОТ КЛЮЧЕВОЕ ИЗМЕНЕНИЕ
         })
         .then(({ data, error }) => {
           if (error) {
@@ -41,14 +46,16 @@ export const UpdatePassword = () => {
           }
         });
     } else {
-      // Нет токена или неправильный тип
+      // Нет токена, типа или email
       setError('Недействительная или просроченная ссылка. Пожалуйста, запросите сброс пароля заново.');
     }
   }, [searchParams]); // Зависимость от searchParams
 
+  // ... (остальная часть компонента handleSubmit и рендер остаются без изменений)
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isReady) { // Дополнительная проверка
+    if (!isReady) { 
       setError('Сессия не подтверждена. Пожалуйста, проверьте ссылку.');
       return;
     }
@@ -56,8 +63,8 @@ export const UpdatePassword = () => {
     setMessage('');
     setIsSubmitting(true);
 
-    // Пытаемся обновить пароль. Если verifyOtp сработал,
-    // то сессия должна быть установлена, и updateUser сработает.
+    // Эта часть у тебя написана правильно, она сработает,
+    // если verifyOtp в useEffect установил сессию.
     const { error } = await supabase.auth.updateUser({ password });
 
     if (error) {
@@ -65,7 +72,6 @@ export const UpdatePassword = () => {
       setError(error.message);
     } else {
       setMessage('Пароль успешно обновлен! Вы будете перенаправлены...');
-      // Выходим из системы, чтобы пользователь вошёл с новым паролем
       await supabase.auth.signOut();
       setTimeout(() => {
         navigate('/auth');
@@ -74,12 +80,13 @@ export const UpdatePassword = () => {
     setIsSubmitting(false);
   };
 
+  // ... (твой JSX рендер)
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
-      <div className="w-full max-w-sm text-center">
+      {/* ... (весь твой JSX без изменений) ... */}
+       <div className="w-full max-w-sm text-center">
         <h1 className="text-3xl font-bold mb-8">Задайте новый пароль</h1>
         <div className="bg-component-bg p-6 rounded-2xl border border-border-color shadow-lg">
-
           {error ? (
             <p className="text-red-500 text-sm text-center">{error}</p>
           ) : !isReady ? (
@@ -95,9 +102,7 @@ export const UpdatePassword = () => {
                 required
                 disabled={isSubmitting || !!message}
               />
-
               {message && <p className="text-green-500 text-sm text-center">{message}</p>}
-
               <button
                 type="submit"
                 className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105 disabled:opacity-50 disabled:scale-100"
@@ -107,7 +112,6 @@ export const UpdatePassword = () => {
               </button>
             </form>
           )}
-
         </div>
       </div>
     </div>

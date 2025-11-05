@@ -18,9 +18,6 @@ export const AuthProvider = ({ children }) => {
       const currentUser = session?.user ?? null
       setUser(currentUser)
       
-      // Если сессия есть ИЛИ если мы уже пытались войти (есть ошибка),
-      // то загрузка завершена.
-      // Если сессии нет и ошибки нет, мы еще в процессе входа.
       if (currentUser || authError) {
         setLoading(false)
       }
@@ -40,14 +37,11 @@ export const AuthProvider = ({ children }) => {
         // Получаем initData из Telegram WebApp
         const tg = window.Telegram?.WebApp
         if (!tg || !tg.initData) {
-          // ВАЖНО: Убедись, что скрипт Telegram подключен в index.html
-          // <script src="https://telegram.org/js/telegram-web-app.js"></script>
           throw new Error('Не удалось получить данные Telegram. (tg.initData не найден)')
         }
 
         const initData = tg.initData
 
-        // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
         // 3. Вызываем наш собственный бэкенд-сервис /api/auth-tg
         const response = await fetch('/api/auth-tg', {
           method: 'POST',
@@ -58,42 +52,40 @@ export const AuthProvider = ({ children }) => {
         });
 
         if (!response.ok) {
-          // Попытаемся прочитать ошибку из ответа
           let errorBody = 'Неизвестная ошибка сервера';
           try {
             const err = await response.json();
             errorBody = err.error || `Статус: ${response.statusText}`;
           } catch (e) {
-            // Ошибка не в JSON, просто используем statusText
             errorBody = response.statusText;
           }
           throw new Error(`Ошибка функции (auth-tg): ${errorBody}`);
         }
         
-        const data = await response.json(); // Получаем { email, password }
+        // 4. Ожидаем, что бэкенд вернет { access_token, refresh_token }
+        const data = await response.json(); 
 
-        if (!data.email || !data.password) {
-          throw new Error('Функция не вернула email или пароль.');
+        if (!data.access_token || !data.refresh_token) {
+          throw new Error('Функция (auth-tg) не вернула access_token или refresh_token.');
         }
-        // --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
-        // 4. Используем "скрытые" данные для входа
-        const { error: signInError } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password: data.password,
+        // 5. Используем токены для установки сессии
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
         })
 
-        if (signInError) {
-          throw new Error(`Ошибка входа (signIn): ${signInError.message}`)
+        if (sessionError) {
+          throw new Error(`Ошибка установки сессии: ${sessionError.message}`)
         }
 
-        // После успешного signIn, onAuthStateChange сам установит
+        // После успешного setSession, onAuthStateChange сам установит
         // пользователя и setLoading(false)
         
       } catch (err) {
         console.error('Критическая ошибка авто-логина:', err)
-        setAuthError(err) // Сохраняем весь объект ошибки
-        setLoading(false) // Ошибка, прекращаем загрузку
+        setAuthError(err) 
+        setLoading(false) 
       }
     }
     
@@ -102,14 +94,10 @@ export const AuthProvider = ({ children }) => {
 
     // Отписываемся при размонтировании
     return () => subscription.unsubscribe()
-  }, [authError]) // Добавляем authError в зависимости, чтобы onAuthStateChange 
-                  // правильно обработал setLoading(false)
+  }, [authError]) 
 
-  // Передаем user, loading и authError (теперь это объект ошибки)
   const value = { user, setUser, loading, authError }
 
-  // Показываем children только после завершения загрузки
-  // (authError - это тоже "завершение")
   return (
     <AuthContext.Provider value={value}>
       {!loading && children}

@@ -2,11 +2,12 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from './supabase-config.js';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { UpdatePassword } from './components/pages/UpdatePassword.jsx';
+// --- ИЗМЕНЕНИЕ: Добавляем 'authError' из нашего нового Auth.jsx
 import { useAuth } from './Auth';
 import { v4 as uuidv4 } from 'uuid';
 
-
-import { AuthScreen } from './AuthScreen.jsx';
+// --- ИЗМЕНЕНИЕ: Убираем AuthScreen, он больше не нужен ---
+// import { AuthScreen } from './AuthScreen.jsx'; 
 import { HelpScreen } from './components/pages/HelpScreen.jsx';
 import LoadingSpinner from './components/LoadingSpinner.jsx';
 import { SubscriptionModal } from './components/SubscriptionModal.jsx';
@@ -24,10 +25,10 @@ import { SearchPage } from './components/pages/SearchPage.jsx';
 
 
 export default function App() {
-  // --- ИЗМЕНЕНИЕ 2: Получаем setUser ---
-  const { user, setUser, loading: authLoading } = useAuth();
+  // --- ИЗМЕНЕНИЕ: Получаем authError из useAuth ---
+  const { user, setUser, loading: authLoading, authError } = useAuth();
 
-  // Все состояния приложения
+  // Все состояния приложения (без изменений)
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [fontSize, setFontSize] = useState(16);
   const [fontClass, setFontClass] = useState(() => localStorage.getItem('fontClass') || 'font-sans');
@@ -43,7 +44,7 @@ export default function App() {
   const [isLoadingChapters, setIsLoadingChapters] = useState(true);
   const [lastReadData, setLastReadData] = useState({});
   const [bookmarks, setBookmarks] = useState([]);
-  const [userRatings, setUserRatings] = useState({}); // <-- Это состояние у вас уже есть
+  const [userRatings, setUserRatings] = useState({});
   const [isLoadingContent, setIsLoadingContent] = useState(true);
   const [isSubModalOpen, setIsSubModalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -51,31 +52,27 @@ export default function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [needsPolicyAcceptance, setNeedsPolicyAcceptance] = useState(false);
   
-  // --- ИЗМЕНЕНИЕ 3: Состояние refreshProfile больше не нужно для этой логики ---
-  // const [refreshProfile, setRefreshProfile] = useState(0);
-
   const BOT_USERNAME = "tenebrisverbot";
   const userId = user?.id;
 
-  // VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 1: Добавить callback для обновления состояния --- VVVV
+  // handleNovelStatsUpdate (без изменений)
   const handleNovelStatsUpdate = useCallback((novelId, newStats) => {
-    // newStats - это объект, например { views: 101 } или { average_rating: 4.5, rating_count: 20 }
     setNovels(currentNovels =>
       currentNovels.map(n =>
         n.id === novelId
-          ? { ...n, ...newStats } // Обновляем статистику
+          ? { ...n, ...newStats }
           : n
       )
     );
     setSelectedNovel(currentNovel =>
       currentNovel && currentNovel.id === novelId
-        ? { ...currentNovel, ...newStats } // Обновляем и выбранную новеллу
+        ? { ...currentNovel, ...newStats }
         : currentNovel
     );
   }, []);
-  // ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 1 --- ^^^^
 
-useEffect(() => {
+  // useEffect (theme) (без изменений)
+  useEffect(() => {
     const root = window.document.documentElement;
     root.classList.remove('dark', 'theme-amber');
     if (theme === 'dark') {
@@ -86,17 +83,13 @@ useEffect(() => {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
+  // useEffect (fontClass) (без изменений)
   useEffect(() => {
   localStorage.setItem('fontClass', fontClass);
 }, [fontClass]);
 
-  // src/App.jsx
-
-  // --- ИЗМЕНЕНИЕ 4: Полностью переписана логика проверки ---
-  // Этот useEffect отвечает ТОЛЬКО за профиль и политику
-  // Файл: src/App.jsx
-
-useEffect(() => {
+  // useEffect (loadProfileData & Realtime) (без изменений)
+  useEffect(() => {
     if (authLoading) return;
 
     if (!user) {
@@ -107,7 +100,7 @@ useEffect(() => {
       setSubscription(null);
       setBookmarks([]);
       setLastReadData({});
-      setUserRatings({}); // <-- Этот сброс у вас уже есть
+      setUserRatings({});
       return; 
     }
 
@@ -122,43 +115,31 @@ useEffect(() => {
       return; 
     }
     
-    // --- Политика принята, продолжаем ---
     setNeedsPolicyAcceptance(false);
       
-    // 2. Функция загрузки данных
     const loadProfileData = async () => {
-      
-      // [ИСПРАВЛЕНИЕ] Используем .limit(1), чтобы ГАРАНТИРОВАННО получить массив, как в логах
       const { data: profileDataArray, error } = await supabase
         .from('profiles')
         .select('subscription, last_read, bookmarks, is_admin')
         .eq('id', user.id)
-        .limit(1); // <-- Используем .limit(1) вместо .single()
+        .limit(1);
 
       if (error) {
         console.error("Ошибка загрузки профиля:", error);
       } else if (profileDataArray && profileDataArray.length > 0) {
         
-        // [ИСПРАВЛЕНИЕ] Извлекаем первый (и единственный) объект из массива
         const userProfile = profileDataArray[0]; 
         
-        
-        // [ИСПРАВЛЕНИЕ] Используем 'userProfile', а не 'profileDataArray'
         setIsUserAdmin(userProfile.is_admin || false);
         setSubscription(userProfile.subscription || null); 
         setLastReadData(userProfile.last_read || {});
         
-        // --- VVVV --- ИСПРАВЛЕНИЕ 1 (ЗАГРУЗКА) --- VVVV ---
-        // Конвертируем массив строк (text[]) в массив чисел (number[])
         setBookmarks((userProfile.bookmarks || []).map(Number));
-        // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ 1 --- ^^^^ ---
         
       } else {
         console.warn("Профиль не найден или пуст.");
       }
 
-      // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Добавление загрузки рейтингов) --- VVVV ---
-      // Сразу после загрузки профиля, загружаем оценки этого пользователя
       const { data: ratingsData, error: ratingsError } = await supabase
         .from('novel_ratings')
         .select('novel_id, rating')
@@ -167,21 +148,16 @@ useEffect(() => {
       if (ratingsError) {
         console.error("Ошибка загрузки оценок:", ratingsError);
       } else if (ratingsData) {
-        // Преобразуем массив в { novel_id: rating } для быстрого доступа
         const ratingsMap = ratingsData.reduce((acc, r) => {
             acc[r.novel_id] = r.rating;
             return acc;
         }, {});
         setUserRatings(ratingsMap);
       }
-      // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
     };
     
-
-    
-    // 3. Активируем Realtime-подписку
     const channel = supabase
-      .channel(`app-realtime:${user.id}`) // Даем каналу более общее имя
+      .channel(`app-realtime:${user.id}`)
       .on(
         'postgres_changes', 
         { 
@@ -191,26 +167,19 @@ useEffect(() => {
           filter: `id=eq.${user.id}`
         }, 
         (payload) => {
-          
-          // Обновляем состояние из Realtime (здесь 'payload.new' - это ОБЪЕКТ, и это_правильно)
           const newProfile = payload.new;
           setSubscription(newProfile.subscription || null);
           setIsUserAdmin(newProfile.is_admin || false);
           setLastReadData(newProfile.last_read || {});
           
-          // --- VVVV --- ИСПРАВЛЕНИЕ 2 (REALTIME) --- VVVV ---
-          // Конвертируем массив строк (text[]) в массив чисел (number[])
           const newBookmarksAsNumbers = (newProfile.bookmarks || []).map(Number);
           setBookmarks(newBookmarksAsNumbers);
-          // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ 2 --- ^^^^ ---
         }
       )
-      // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Realtime для рейтингов) --- VVVV ---
-      // Слушаем изменения в *своих* оценках
       .on(
         'postgres_changes',
         {
-          event: '*', // INSERT, UPDATE, DELETE
+          event: '*', 
           schema: 'public',
           table: 'novel_ratings',
           filter: `user_id=eq.${user.id}`
@@ -229,65 +198,49 @@ useEffect(() => {
           }
         }
       )
-      // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
-      
-      // --- VVVV --- НАЧАТЬ ИЗМЕНЕНИЕ 2: Заменить listener 'novels' на 'novel_stats' --- VVVV ---
-      // Слушаем ЛЮБЫЕ обновления в `novel_stats` (просмотры, рейтинги)
       .on(
         'postgres_changes',
         {
-          event: 'UPDATE', // Нас интересует только обновление
+          event: 'UPDATE', 
           schema: 'public',
-          table: 'novel_stats' // <-- СЛУШАЕМ ПРАВИЛЬНУЮ ТАБЛИЦУ
-          // Нет фильтра, слушаем все
+          table: 'novel_stats'
         },
         (payload) => {
-          // payload.new будет содержать { novel_id, views, average_rating, rating_count }
           const updatedStats = payload.new;
-          
-          // Вызываем наш callback, чтобы обновить состояние
-          // Это унифицирует обновление и от Realtime, и от прямого вызова
           if (updatedStats) {
             handleNovelStatsUpdate(updatedStats.novel_id, updatedStats);
           }
         }
       )
-      // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ 2 --- ^^^^ ---
       .subscribe(async (status, err) => {
          if (status === 'SUBSCRIBED') {
-           await loadProfileData(); // Загружаем данные после подписки
+           await loadProfileData();
          }
          if (status === 'CHANNEL_ERROR' || err) {
            console.error('Ошибка Realtime-подписки:', err);
          }
       });
 
-    // 4. Функция очистки (остается)
     return () => {
       supabase.removeChannel(channel);
     };
 
-}, [user, authLoading, handleNovelStatsUpdate]); // <-- Добавили handleNovelStatsUpdate в зависимости
+}, [user, authLoading, handleNovelStatsUpdate]);
 
-  // --- VVVV --- НАЧАЛО ИЗМЕНЕНИЙ (Загрузка новелл) --- VVVV ---
-  // Этот useEffect отвечает ТОЛЬКО за загрузку новелл
+  // useEffect (fetchNovels) (без изменений)
   useEffect(() => {
     const CACHE_KEY = 'novels_cache';
     const MAX_CACHE_AGE_MS = 1000 * 60 * 60; // 1 час
 
     if (user && !needsPolicyAcceptance) {
-
-      // Функция загрузки новелл
       const fetchNovels = async (isBackgroundFetch = false) => {
         if (!isBackgroundFetch) {
           setIsLoadingContent(true);
         }
 
-        // --- VVVV --- ИСПРАВЛЕНО: Загружаем `novel_stats` --- VVVV ---
         const { data: novelsData, error: novelsError } = await supabase
           .from('novels')
-          .select('*, novel_stats(*)') // <--- ПРАВИЛЬНЫЙ ЗАПРОС
-        // --- ^^^^ --- КОНЕЦ ИСПРАВЛЕНИЯ --- ^^^^ ---
+          .select('*, novel_stats(*)')
 
         if (novelsError) {
           console.error("Ошибка загрузки новелл:", novelsError);
@@ -295,17 +248,13 @@ useEffect(() => {
             setNovels([]);
           }
         } else {
-         // --- VVVV --- ИСПРАВЛЕНО: Маппинг данных из `novel_stats` --- VVVV ---
           const formattedNovels = novelsData.map(novel => ({
             ...novel,
-            // Данные теперь в `novel_stats` (или 0 по умолчанию)
             views: novel.novel_stats?.views || 0,
             average_rating: novel.novel_stats?.average_rating || 0.0,
             rating_count: novel.novel_stats?.rating_count || 0,
-            // Удаляем дублирующую структуру, чтобы избежать путаницы
             novel_stats: undefined 
           }));
-          // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЯ --- ^^^^ ---
 
           formattedNovels.sort((a, b) => b.views - a.views);
           
@@ -325,7 +274,6 @@ useEffect(() => {
         setIsLoadingContent(false);
       };
 
-      // --- (Логика кэширования остается без изменений) ---
       try {
         const cachedItem = localStorage.getItem(CACHE_KEY);
         if (cachedItem) {
@@ -335,16 +283,12 @@ useEffect(() => {
           if (isCacheValid) {
             setNovels(cache.data);
             setIsLoadingContent(false);
-            // Загружаем в фоне, только если кэш ОЧЕНЬ старый (например, >15 мин)
-            // Для 1 часа можно не грузить в фоне
           } else {
-            // Кэш невалиден
-            setNovels(cache.data); // Показываем старые данные...
-            setIsLoadingContent(false); // ...но не показываем спиннер
-            fetchNovels(true); // true = фоновая загрузка
+            setNovels(cache.data); 
+            setIsLoadingContent(false);
+            fetchNovels(true); 
           }
         } else {
-          // Кэша нет
           fetchNovels(false);
         }
       } catch (e) {
@@ -358,10 +302,8 @@ useEffect(() => {
       localStorage.removeItem(CACHE_KEY);
     }
   }, [user, needsPolicyAcceptance]);
-  // --- ^^^^ --- КОНЕЦ ИЗМЕНЕНИЙ --- ^^^^ ---
 
-
-  // Загрузка глав для выбранной новеллы
+  // useEffect (fetchChapters) (без изменений)
   useEffect(() => {
     if (!selectedNovel) { setChapters([]); return; }
     setIsLoadingChapters(true);
@@ -390,11 +332,13 @@ useEffect(() => {
     fetchChapters();
   }, [selectedNovel]);
 
+  // handleBack (без изменений)
   const handleBack = useCallback(() => {
     if (page === 'reader') { setSelectedChapter(null); setPage('details'); }
     else if (page === 'details') { setSelectedNovel(null); setGenreFilter(null); setPage('list'); }
   }, [page]);
 
+  // useEffect (Telegram BackButton) (без изменений)
   useEffect(() => {
     const tg = window.Telegram?.WebApp;
     if (!tg) return;
@@ -409,22 +353,21 @@ useEffect(() => {
     return () => tg.offEvent('backButtonClicked', handleBack);
   }, [page, handleBack, needsPolicyAcceptance]);
 
+  // updateUserData (без изменений)
   const updateUserData = useCallback(async (dataToUpdate) => {
     if (userId) {
-      // Мы передаем 'dataToUpdate' как один JSONB-аргумент 'data_to_update'
       const { error } = await supabase.rpc('update_my_profile', {
         data_to_update: dataToUpdate
       });
 
       if (error) {
-        // Эта ошибка теперь будет более значимой, если что-то пойдет не так
         console.error("Ошибка при вызове RPC update_my_profile:", error);
         alert(`Не удалось сохранить данные: ${error.message}`);
       }
     }
-    // 'userId' - единственная зависимость, все верно
   }, [userId]);
 
+  // handleTextSizeChange (без изменений)
   const handleTextSizeChange = useCallback((amount) => {
     setFontSize(prevSize => {
       const newSize = Math.max(12, Math.min(32, prevSize + amount));
@@ -433,11 +376,13 @@ useEffect(() => {
     });
   }, [fontClass, updateUserData]);
 
-const handleFontChange = (newFontClass) => {
-  setFontClass(newFontClass);
-  updateUserData({ settings: { fontSize: fontSize, fontClass: newFontClass } });
-};
+  // handleFontChange (без изменений)
+  const handleFontChange = (newFontClass) => {
+    setFontClass(newFontClass);
+    updateUserData({ settings: { fontSize: fontSize, fontClass: newFontClass } });
+  };
 
+  // handleSelectChapter (без изменений)
   const handleSelectChapter = useCallback(async (chapter) => {
     setSelectedChapter(chapter);
     setPage('reader');
@@ -448,22 +393,26 @@ const handleFontChange = (newFontClass) => {
     }
   }, [userId, selectedNovel, lastReadData, updateUserData]);
 
+  // handleSelectNovel, handleGenreSelect, handleClearGenreFilter (без изменений)
   const handleSelectNovel = (novel) => { setSelectedNovel(novel); setPage('details'); };
   const handleGenreSelect = (genre) => { setGenreFilter(genre); setPage('list'); setActiveTab('library'); };
   const handleClearGenreFilter = () => setGenreFilter(null);
 
+  // handleToggleBookmark (без изменений)
   const handleToggleBookmark = useCallback(async (novelId) => {
     const newBookmarks = bookmarks.includes(novelId) ? bookmarks.filter(id => id !== novelId) : [...bookmarks, novelId];
     setBookmarks(newBookmarks);
     await updateUserData({ bookmarks: newBookmarks });
   }, [bookmarks, updateUserData]);
 
+  // handlePlanSelect (без изменений)
   const handlePlanSelect = (plan) => {
     setSelectedPlan(plan);
     setIsSubModalOpen(false);
   };
 
- const handlePaymentMethodSelect = async (method) => {
+  // handlePaymentMethodSelect (без изменений)
+  const handlePaymentMethodSelect = async (method) => {
     const tg = window.Telegram?.WebApp;
     if (!tg) {
       console.error("Telegram WebApp не инициализирован.");
@@ -515,10 +464,9 @@ const handleFontChange = (newFontClass) => {
     });
   };
 
-  // --- ИЗМЕНЕНИЕ 5: Меняем логику обработчика ---
+  // handleAcceptPolicy (без изменений, т.к. 'setUser' мы все еще получаем из useAuth)
   const handleAcceptPolicy = async () => {
     if (userId) {
-      // 1. Обновляем данные в `auth.users` (это сохранится в сессии)
       const { data, error } = await supabase.auth.updateUser({
         data: { policy_accepted: true }
       });
@@ -526,38 +474,60 @@ const handleFontChange = (newFontClass) => {
       if (error) {
         console.error('Ошибка обновления user_metadata:', error);
       } else if (data.user) {
-        // 2. Обновляем локальное состояние 'user' в React
-        // Это вызовет повторный запуск useEffect, который скроет модальное окно
         setUser(data.user);
-        
-        // 3. (Опционально) Обновляем также и таблицу 'profiles'
-        // Это полезно для RLS или если другие части приложения читают из profiles
         await updateUserData({ policy_accepted: true });
       }
     }
   };
 
-  // Логика загрузки и политики остается
-  if (authLoading || (isLoadingContent && !needsPolicyAcceptance && user)) {
+  // --- ИЗМЕНЕНИЕ: Новая логика загрузки и обработки ошибок ---
+  
+  // 1. Пока провайдер Auth.jsx проверяет логин
+  if (authLoading) {
     return <LoadingSpinner />;
   }
+
+  // 2. Если Auth.jsx завершился с ошибкой
+  if (authError) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-text-main p-4">
+        <div className="w-full max-w-sm text-center p-6 rounded-2xl border border-border-color shadow-lg bg-component-bg">
+          <h1 className="text-2xl font-bold mb-4 text-red-500">Ошибка входа</h1>
+          <p className="text-text-main/80 mb-6">Не удалось выполнить автоматическую аутентификацию.</p>
+          <p className="text-xs text-text-main/50 bg-background p-2 rounded-md">
+            {authError.message || JSON.stringify(authError)}
+          </p>
+          <p className="text-sm text-text-main/70 mt-6">
+            Пожалуйста, попробуйте полностью закрыть и снова открыть приложение в Telegram.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Если мы залогинены, но грузим контент (новеллы, профиль)
+  // (Добавляем `user` в проверку, чтобы не показывать спиннер, если user null)
+  if (isLoadingContent && !needsPolicyAcceptance && user) {
+    return <LoadingSpinner />;
+  }
+  
+  // 4. Если нужно принять политику (пользователь уже есть)
   if (user && needsPolicyAcceptance) {
     return <HelpScreen onAccept={handleAcceptPolicy} />;
   }
+
+  // 5. Если смотрим экран помощи
   if (showHelp) {
     return <HelpScreen onBack={() => setShowHelp(false)} />;
   }
 
-  // А вот здесь начинается роутинг
+  // --- ИЗМЕНЕНИЕ: Полностью переработанный роутинг ---
   return (
     <Routes>
-      {/* ОБЩИЕ МАРШРУТЫ 
-        Эти маршруты доступны всегда, и мы управляем ими вручную.
+      {/* Маршрут /update-password остается. 
+        Он нужен, если пользователь (теоретически) 
+        когда-то регистрировался по email и получил ссылку на сброс.
       */}
-      <Route 
-        path="/auth" 
-        element={!user ? <AuthScreen /> : <Navigate to="/" replace />} 
-      />
       <Route 
         path="/update-password" 
         element={<UpdatePassword />} 
@@ -565,11 +535,11 @@ const handleFontChange = (newFontClass) => {
 
       {!user ? (
         // --- Маршруты для НЕ-авторизованного пользователя ---
+        // Сюда мы должны попадать, только если authError не сработал.
+        // Перенаправляем на /update-password, т.к. это единственный
+        // "внешний" роут, который у нас остался.
         <>
-          {/* Все, что не /auth и не /update-password, 
-            перенаправляем на /auth 
-          */}
-          <Route path="*" element={<Navigate to="/auth" replace />} />
+          <Route path="*" element={<Navigate to="/update-password" replace />} />
         </>
       ) : (
         // --- Маршруты для АВТОРИЗОВАННОГО пользователя ---
@@ -579,11 +549,11 @@ const handleFontChange = (newFontClass) => {
           */}
           <Route path="*" element={
             <main className={`bg-background min-h-screen font-sans text-text-main ${!isUserAdmin ? 'no-select' : ''}`}>
-              {/* ... (здесь весь твой <main> ... </main> с модалками и BottomNav) ... */}
+              
+              {/* === Начало: Вся твоя логика рендеринга (БЕЗ ИЗМЕНЕНИЙ) === */}
               <div className="pb-20">
                 {(() => {
                   if (page === 'details') {
-                    // ... (твой код для 'details')
                     const displayName = user?.user_metadata?.full_name || 
                                         user?.user_metadata?.user_name || 
                                         user?.user_metadata?.display_name || 
@@ -611,7 +581,6 @@ const handleFontChange = (newFontClass) => {
                            />;                    
                   }
                   if (page === 'reader') {
-                  // ... (твой код для 'reader')
                   const displayName = user?.user_metadata?.full_name || 
                                       user?.user_metadata?.user_name || 
                                       user?.user_metadata?.display_name || 
@@ -638,11 +607,13 @@ const handleFontChange = (newFontClass) => {
                 })()}
               </div>
               
-              {/* Все ваши модальные окна и BottomNav остаются здесь */}
+              {/* Все ваши модальные окна и BottomNav (БЕЗ ИЗМЕНЕНИЙ) */}
               {page === 'list' && <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />}
               {isSubModalOpen && <SubscriptionModal onClose={() => setIsSubModalOpen(false)} onSelectPlan={handlePlanSelect} />}
               {selectedPlan && <PaymentMethodModal onClose={() => setSelectedPlan(null)} onSelectMethod={handlePaymentMethodSelect} plan={selectedPlan} />}
               {selectedNews && <NewsModal newsItem={selectedNews} onClose={() => setSelectedNews(null)} />}
+              {/* === Конец: Вся твоя логика рендеринга === */}
+              
             </main>
           } />
         </>

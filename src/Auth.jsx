@@ -1,197 +1,122 @@
 // src/Auth.jsx
 
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { supabase } from './supabase-config.js';
+import React, { createContext, useState, useContext, useEffect } from 'react'
+import { supabase } from './supabase-config.js'
 
-const AuthContext = createContext();
+const AuthContext = createContext()
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); 
+  const [user, setUser] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState(null)
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false); 
-    });
+    // 1. Сначала подписываемся на изменения состояния
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      const currentUser = session?.user ?? null
+      setUser(currentUser)
+      
+      // Если сессия есть ИЛИ если мы уже пытались войти (есть ошибка),
+      // то загрузка завершена.
+      // Если сессии нет и ошибки нет, мы еще в процессе входа.
+      if (currentUser || authError) {
+        setLoading(false)
+      }
+    })
 
-    return () => subscription.unsubscribe();
-  }, []); 
+    // 2. Функция для автоматического входа через Telegram
+    const loginWithTelegram = async () => {
+      try {
+        // Проверяем, есть ли уже сессия в localStorage
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
+          setUser(session.user)
+          setLoading(false)
+          return // Уже залогинены, ничего не делаем
+        }
+        
+        // Получаем initData из Telegram WebApp
+        const tg = window.Telegram?.WebApp
+        if (!tg || !tg.initData) {
+          // ВАЖНО: Убедись, что скрипт Telegram подключен в index.html
+          // <script src="https://telegram.org/js/telegram-web-app.js"></script>
+          throw new Error('Не удалось получить данные Telegram. (tg.initData не найден)')
+        }
 
-  const value = { user, setUser, loading };
+        const initData = tg.initData
 
-  return <AuthContext.Provider value={value}>{!loading && children}</AuthContext.Provider>;
-};
+        // --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+        // 3. Вызываем наш собственный бэкенд-сервис /api/auth-tg
+        const response = await fetch('/api/auth-tg', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ initData: initData }),
+        });
+
+        if (!response.ok) {
+          // Попытаемся прочитать ошибку из ответа
+          let errorBody = 'Неизвестная ошибка сервера';
+          try {
+            const err = await response.json();
+            errorBody = err.error || `Статус: ${response.statusText}`;
+          } catch (e) {
+            // Ошибка не в JSON, просто используем statusText
+            errorBody = response.statusText;
+          }
+          throw new Error(`Ошибка функции (auth-tg): ${errorBody}`);
+        }
+        
+        const data = await response.json(); // Получаем { email, password }
+
+        if (!data.email || !data.password) {
+          throw new Error('Функция не вернула email или пароль.');
+        }
+        // --- КОНЕЦ ИЗМЕНЕНИЯ ---
+
+        // 4. Используем "скрытые" данные для входа
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: data.password,
+        })
+
+        if (signInError) {
+          throw new Error(`Ошибка входа (signIn): ${signInError.message}`)
+        }
+
+        // После успешного signIn, onAuthStateChange сам установит
+        // пользователя и setLoading(false)
+        
+      } catch (err) {
+        console.error('Критическая ошибка авто-логина:', err)
+        setAuthError(err) // Сохраняем весь объект ошибки
+        setLoading(false) // Ошибка, прекращаем загрузку
+      }
+    }
+    
+    // Запускаем процесс входа
+    loginWithTelegram()
+
+    // Отписываемся при размонтировании
+    return () => subscription.unsubscribe()
+  }, [authError]) // Добавляем authError в зависимости, чтобы onAuthStateChange 
+                  // правильно обработал setLoading(false)
+
+  // Передаем user, loading и authError (теперь это объект ошибки)
+  const value = { user, setUser, loading, authError }
+
+  // Показываем children только после завершения загрузки
+  // (authError - это тоже "завершение")
+  return (
+    <AuthContext.Provider value={value}>
+      {!loading && children}
+    </AuthContext.Provider>
+  )
+}
 
 export const useAuth = () => {
-  return useContext(AuthContext);
-};
-
-
-// --- Компонент с формой (ОБЪЕДИНЕННАЯ ВЕРСЯ) ---
-export const AuthForm = () => {
-  const [mode, setMode] = useState('login'); // 'login', 'register', 'reset'
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
-  const { setUser } = useAuth(); // Получаем setUser из контекста
-
-  const handleAuth = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setMessage('');
-
-    let authError = null;
-    
-    try {
-      if (mode === 'login') {
-        // 1. Логика входа
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: email,
-          password: password,
-        });
-        authError = error;
-        if (!error) setUser(data.user); // <-- Обновляем состояние немедленно
-
-      } else if (mode === 'register') {
-        // 2. Логика регистрации
-        const { error } = await supabase.auth.signUp({
-          email: email,
-          password: password,
-        });
-        authError = error;
-        if (!error) setMessage('Проверьте вашу почту для подтверждения регистрации!');
-        
-    } else if (mode === 'reset') {
-        
-        // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-        // Мы должны передать email в redirectTo, чтобы 
-        // UpdatePassword.jsx мог его прочитать.
-        const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `https://tene.fun/update-password`,
-        });
-        // --- КОНЕЦ ИСПРАВЛЕНИЯ ---
-
-      authError = error;
-      if (!error) setMessage('Проверьте вашу почту для сброса пароля! Ссылка там');
-    }
-      if (authError) {
-        throw authError;
-      }
-
-    } catch (error) {
-      console.error(`Ошибка в режиме ${mode}:`, error.message);
-      if (error.message.includes("Email not confirmed")) {
-        setError('Пожалуйста, подтвердите ваш e-mail. Проверьте почту.');
-      } else if (error.message.includes("Invalid login credentials")) {
-        setError('Неверный e-mail или пароль.');
-      } else if (error.message.includes("User already registered")) {
-        setError('Пользователь с таким e-mail уже зарегистрирован.');
-      } else {
-        setError(error.message || 'Произошла неизвестная ошибка.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Вспомогательная функция для текста кнопки
-  const getButtonText = () => {
-    if (loading) {
-      if (mode === 'login') return 'Входим...';
-      if (mode === 'register') return 'Регистрация...';
-      if (mode === 'reset') return 'Отправка...';
-    }
-    if (mode === 'login') return 'Войти';
-    if (mode === 'register') return 'Зарегистрироваться';
-    if (mode === 'reset') return 'Сбросить пароль';
-    return 'Отправить';
-  };
-
-  return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-3xl font-bold text-center">
-        {mode === 'login' && 'Вход v2'}
-        {mode === 'register' && 'Регистрация'}
-        {mode === 'reset' && 'Сброс пароля'}
-      </h1>
-
-      {error && <p className="text-red-500 text-sm text-center bg-red-500/10 p-2 rounded-lg">{error}</p>}
-      {message && <p className="text-green-500 text-sm text-center bg-green-500/10 p-2 rounded-lg">{message}</p>}
-
-      <form onSubmit={handleAuth} className="flex flex-col gap-4">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="E-mail"
-          className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
-          required
-        />
-        
-        {/* Показываем поле пароля только для входа и регистрации */}
-        {mode !== 'reset' && (
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Пароль"
-            className="w-full bg-background border-border-color border rounded-lg py-2 px-4 text-text-main placeholder-text-main/50 focus:outline-none focus:ring-2 focus:ring-accent"
-            required
-            minLength={6}
-          />
-        )}
-        
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full py-3 rounded-lg bg-accent text-white font-bold shadow-lg shadow-accent/30 transition-transform hover:scale-105 disabled:opacity-50"
-        >
-          {getButtonText()}
-        </button>
-      </form>
-
-      {/* Переключатели режимов */}
-      <div className="text-sm text-center">
-        {mode === 'login' && (
-          <>
-            <button 
-              onClick={() => { setMode('register'); setError(''); setMessage(''); }} 
-              className="text-accent hover:underline"
-            >
-              Нет аккаунта? Зарегистрироваться
-            </button>
-            <span className="mx-2 text-text-main/50">|</span>
-            <button 
-              onClick={() => { setMode('reset'); setError(''); setMessage(''); }} 
-              className="text-accent hover:underline"
-            >
-              Забыли пароль?
-            </button>
-          </>
-        )}
-        
-        {mode === 'register' && (
-          <button 
-            onClick={() => { setMode('login'); setError(''); setMessage(''); }} 
-            className="text-accent hover:underline"
-          >
-            Уже есть аккаунт? Войти
-          </button>
-        )}
-        
-        {mode === 'reset' && (
-          <button 
-            onClick={() => { setMode('login'); setError(''); setMessage(''); }} 
-            className="text-accent hover:underline"
-          >
-            Вернуться ко входу
-          </button>
-        )}
-      </div>
-    </div>
-  );
-};
+  return useContext(AuthContext)
+}

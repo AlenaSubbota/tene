@@ -1,17 +1,23 @@
 // src/components/pages/ProfilePage.jsx (Supabase версия)
 
 import React from 'react';
-import { supabase } from '../../supabase-config'; // Импортируем supabase
+import { useNavigate } from 'react-router-dom'; // <-- 1. ИМПОРТИРУЕМ НАВИГАЦИЮ
+import { supabase } from '../../supabase-config';
 import { Header } from "../Header.jsx";
 import { LogOutIcon } from "../icons.jsx";
 
 export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, onThemeChange, currentTheme, onShowHelp }) => {
     
+    const navigate = useNavigate(); // <-- 2. ПОЛУЧАЕМ ФУНКЦИЮ НАВИГАЦИИ
+
     // Новая функция выхода
     const handleLogout = async () => {
         const { error } = await supabase.auth.signOut();
         if (error) {
             console.error("Ошибка выхода:", error);
+        } else {
+            // 3. ЯВНО УХОДИМ НА ГЛАВНУЮ ПОСЛЕ ВЫХОДА
+            navigate('/'); 
         }
     };
 
@@ -23,10 +29,9 @@ export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId
         }
     };
     
-    // Эта логика остается прежней
+    // ... (getSubscriptionEndDate и остальная логика без изменений) ...
     const getSubscriptionEndDate = () => {
         if (subscription?.expires_at) {
-            // В Supabase даты приходят как строки, а не объекты Firebase
             return new Date(subscription.expires_at);
         }
         return null;
@@ -35,14 +40,15 @@ export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId
     const subscriptionEndDate = getSubscriptionEndDate();
     const hasActiveSubscription = subscriptionEndDate && subscriptionEndDate > new Date();
 
+
     return (
         <div>
             <Header title="Профиль" />
             <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4 mb-4">
                 <div className="flex items-center justify-between mb-4">
                     <div>
-                        {/* Имя пользователя в Supabase хранится в user_metadata */}
-                        <p className="font-bold text-lg">{user?.user_metadata?.display_name || 'Аноним'}</p>
+                        {/* 4. ИСПРАВЛЕНИЕ: display_name -> full_name */}
+                        <p className="font-bold text-lg">{user?.user_metadata?.full_name || 'Аноним'}</p>
                         <p className="text-sm text-text-main/70">{user?.email}</p>
                     </div>
                     <button onClick={handleLogout} className="p-2 rounded-full hover:bg-background transition-colors">
@@ -51,11 +57,11 @@ export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId
                 </div>
             </div>
           
-            {/* ... остальной JSX остается без изменений ... */}
-            <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4 mb-4">
+            {/* ... остальной JSX (темы, подписка, ID) ... */}
+            
+             <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4 mb-4">
                  <h3 className="font-bold mb-2">Тема оформления</h3>
                  <div className="flex flex-col space-y-2">
-                    {/* Опция 1: Светлая */}
                      <label className="flex items-center justify-between">
                          <span>Светлая</span>
                          <input
@@ -67,7 +73,6 @@ export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId
                              className="form-radio text-accent focus:ring-accent"
                          />
                      </label>
-                     {/* Опция 2: Темная (Бирюза) */}
                      <label className="flex items-center justify-between">
                          <span>Тёмная (Бирюза)</span>
                          <input
@@ -79,7 +84,6 @@ export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId
                              className="form-radio text-accent focus:ring-accent"
                          />
                      </label>
-                     {/* Опция 3: Темная (Золото) */}
                      <label className="flex items-center justify-between">
                          <span>Тёмная (Золото)</span>
                          <input

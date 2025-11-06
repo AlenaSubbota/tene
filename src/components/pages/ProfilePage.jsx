@@ -1,25 +1,12 @@
 // src/components/pages/ProfilePage.jsx (Supabase версия)
 
 import React from 'react';
-import { useNavigate } from 'react-router-dom'; // <-- 1. ИМПОРТИРУЕМ НАВИГАЦИЮ
+// import { useNavigate } from 'react-router-dom'; // <-- УДАЛЕНО
 import { supabase } from '../../supabase-config';
 import { Header } from "../Header.jsx";
-import { LogOutIcon } from "../icons.jsx";
+// import { LogOutIcon } from "../icons.jsx"; // <-- УДАЛЕНО
 
 export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId, onThemeChange, currentTheme, onShowHelp }) => {
-    
-    const navigate = useNavigate(); // <-- 2. ПОЛУЧАЕМ ФУНКЦИЮ НАВИГАЦИИ
-
-    // Новая функция выхода
-    const handleLogout = async () => {
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            console.error("Ошибка выхода:", error);
-        } else {
-            // 3. ЯВНО УХОДИМ НА ГЛАВНУЮ ПОСЛЕ ВЫХОДА
-            navigate('/'); 
-        }
-    };
 
     const handleCopyId = () => {
         if (userId) {
@@ -29,7 +16,6 @@ export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId
         }
     };
     
-    // ... (getSubscriptionEndDate и остальная логика без изменений) ...
     const getSubscriptionEndDate = () => {
         if (subscription?.expires_at) {
             return new Date(subscription.expires_at);
@@ -45,15 +31,15 @@ export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId
         <div>
             <Header title="Профиль" />
             <div className="p-4 rounded-lg bg-component-bg border border-border-color mx-4 mb-4">
-                <div className="flex items-center justify-between mb-4">
+                
+                {/* Класс 'justify-between' удален, кнопка тоже */}
+                <div className="flex items-center mb-4">
                     <div>
-                        {/* 4. ИСПРАВЛЕНИЕ: display_name -> full_name */}
+                        {/* Эта строка уже была правильной (full_name) */}
                         <p className="font-bold text-lg">{user?.user_metadata?.full_name || 'Аноним'}</p>
                         <p className="text-sm text-text-main/70">{user?.email}</p>
                     </div>
-                    <button onClick={handleLogout} className="p-2 rounded-full hover:bg-background transition-colors">
-                        <LogOutIcon />
-                    </button>
+                    {/* ‼️ КНОПКА ВЫХОДА УДАЛЕНА ‼️ */}
                 </div>
             </div>
           

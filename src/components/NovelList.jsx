@@ -46,7 +46,7 @@ export const NovelList = ({ novels, onSelectNovel, bookmarks, onToggleBookmark }
                   <div key={novel.id} onClick={() => onSelectNovel(novel)} className="relative group cursor-pointer animate-fade-in-down" style={{ animationDelay: `${index * 50}ms` }}>
                     <div className="relative aspect-[3/4] rounded-lg overflow-hidden shadow-lg transition-transform duration-300 group-hover:scale-105 border border-border-color">
                       <img src={`/${novel.cover_url}`} alt={novel.title} className="w-full h-full object-cover" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent"></div>
+                      <div className="absolute inset-0 bg-gradient-to-t"></div>
 
                       <button
                         onClick={(e) => handleBookmarkToggle(e, novel.id)}

@@ -1,7 +1,7 @@
 import React from 'react';
 import { Header } from "../Header.jsx";
 
-// Текст из вашего .docx файла
+// Текст из вашего .do    cx файла
 const termsOfService = `
 Условия использования (Пользовательское соглашение)
 Последнее обновление: 17 сентября 2025 г.

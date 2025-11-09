@@ -355,20 +355,18 @@ export const NovelDetails = ({
         {sortedChapters.map((chapter, index) => {
             const showLock = !hasActiveSubscription && chapter.isPaid;
             const isLastRead = lastReadChapterId === chapter.id;
-            
-            // --- УБРАЛИ НЕПРАВИЛЬНУЮ СТРОКУ 'const chapterNumber = ...' ---
+
+            {/* --- УБИРАЕМ СТРОКУ 'const chapterNumber = ...' --- */}
 
             return (
                 <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-3 rounded-lg cursor-pointer transition-all duration-300 border flex items-center justify-between hover:bg-background ${isLastRead ? 'bg-accent/10 border-accent/50' : 'border-transparent'}`}>
                     <div className="flex items-center gap-4">
                         
-                        {/* VVVV ИСПРАВЛЕННАЯ СТРОКА VVVV 
-                           (Используем 'chapter.chapter_number' из данных) */}
+                        {/* VVVV ИСПРАВЛЕННАЯ СТРОКА (используем chapter.chapter_number) VVVV */}
                         <span className={`font-mono text-sm ${isLastRead ? 'text-accent' : 'text-text-secondary'}`}>{String(chapter.chapter_number).padStart(2, '0')}</span>
                         
                         <div>
-                            {/* VVVV ИСПРАВЛЕННАЯ СТРОКА VVVV 
-                               (Добавлен 'fallback' на случай, если у главы нет 'title') */}
+                            {/* VVVV ИСПРАВЛЕННАЯ СТРОКА (добавлен 'fallback' для глав без 'title') VVVV */}
                             <p className={`font-semibold ${showLock ? 'text-text-secondary' : 'text-text-main'}`}>{chapter.title || `Глава ${chapter.chapter_number}`}</p>
                             <p className="text-text-secondary text-xs mt-1">{formatDate(chapter.published_at)}</p>
                         </div>

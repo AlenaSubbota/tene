@@ -222,7 +222,7 @@ export const ChapterReader = ({
 
     // Перезагрузка *первой* страницы (ИСПОЛЬЗУЕТСЯ ПОСЛЕ ОТПРАВКИ)
     const reloadFirstPageComments = useCallback(async () => {
-        if (!novel?.id || !chapter?.id) return;
+        if (!novel?.id || chapter?.id == null) return;
         
         setIsLoadingComments(true); 
         const COMMENTS_PER_PAGE = 20;

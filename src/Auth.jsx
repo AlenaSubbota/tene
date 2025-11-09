@@ -40,10 +40,7 @@ const SubscriptionGate = ({ message }) => {
   };
 
   // Пытаемся извлечь @username из сообщения об ошибке
-  const channelUsername = message.split(':').pop().trim() || "t.me/novelslab";
-  const channelLink = channelUsername.startsWith('t.me/') 
-    ? `https://${channelUsername}` 
-    : `https://t.me/${channelUsername.replace('@', '')}`;
+  const channelLink = "https://t.me/novelslab";
 
   return (
     <div style={styles.gate}>

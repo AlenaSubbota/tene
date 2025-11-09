@@ -67,7 +67,7 @@ export const ChapterReader = ({
 
     useEffect(() => {
     const fetchChapterData = async () => {
-        if (!novel?.id || chapter?.chapter_number === null || chapter?.chapter_number === undefined) return;
+        if (!novel?.id || !chapter?.id) return;
 
         // Сбрасываем состояния перед новой загрузкой
         setIsLoadingContent(true);
@@ -85,7 +85,7 @@ export const ChapterReader = ({
 
         try {
             console.log("--- Начало загрузки данных главы ---");
-            console.log("Параметры:", { novelId: novel.id, chapterNumber: chapter.chapter_number, content_path: chapter.content_path });
+            console.log("Параметры:", { novelId: novel.id, chapterId: chapter.id, content_path: chapter.content_path });
 
             // --- ШАГ 1: ЗАГРУЗКА ТЕКСТА ГЛАВЫ ---
             console.log("1. Запрос на получение signedUrl для:", chapter.content_path);
@@ -113,7 +113,7 @@ export const ChapterReader = ({
             console.log("2. Вызов RPC 'get_full_chapter_data'...");
             const { data: dynamicData, error: rpcError } = await supabase.rpc('get_full_chapter_data', {
                 p_novel_id: novel.id,
-                p_chapter_number: chapter.chapter_number
+                p_chapter_number: chapter.id
             });
 
             if (rpcError) {
@@ -160,7 +160,7 @@ export const ChapterReader = ({
     };
 
     fetchChapterData();
-}, [novel?.id, chapter?.chapter_number, userId, hasActiveSubscription, chapter.content_path]);
+}, [novel?.id, chapter?.id, userId, hasActiveSubscription, chapter.content_path]);
 
 
     // --- Применение стилей отступа параграфа (prose-override) ---
@@ -200,7 +200,7 @@ export const ChapterReader = ({
             .from('comments')
             .select(`*, comment_likes (user_id)`)
             .eq('novel_id', novel.id)
-            .eq('chapter_number', chapter.chapter_number)
+            .eq('chapter_number', chapter.id)
             .order('created_at', { ascending: false })
             .range(from, from + COMMENTS_PER_PAGE - 1);
 
@@ -231,7 +231,7 @@ export const ChapterReader = ({
             .from('comments')
             .select(`*, comment_likes (user_id)`)
             .eq('novel_id', novel.id)
-            .eq('chapter_number', chapter.chapter_number)
+            .eq('chapter_number', chapter.id)
             .order('created_at', { ascending: false })
             .range(0, COMMENTS_PER_PAGE - 1);
 
@@ -261,7 +261,7 @@ export const ChapterReader = ({
             .from('comments')
             .insert({
                 novel_id: novel.id,
-                chapter_number: chapter.chapter_number,
+                chapter_number: chapter.id,
                 user_id: userId,
                 user_name: userName || 'Аноним', 
                 text: textToSubmit,
@@ -321,7 +321,7 @@ export const ChapterReader = ({
 
         const { error } = await supabase.rpc('toggle_chapter_like', { 
             p_novel_id: novel.id, 
-            p_chapter_number: chapter.chapter_number
+            p_chapter_number: chapter.id
         });
 
         if (error) {

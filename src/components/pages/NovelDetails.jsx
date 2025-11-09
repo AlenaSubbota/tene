@@ -351,27 +351,34 @@ export const NovelDetails = ({
                                 </div>
 
                                 {isLoadingChapters ? <div className="flex justify-center items-center py-4"><LoadingSpinner /></div> : (
-                                    <div className="flex flex-col gap-2">
-                                        {sortedChapters.map((chapter, index) => {
-                                            const showLock = !hasActiveSubscription && chapter.isPaid;
-                                            const isLastRead = lastReadChapterId === chapter.id;
-                                            const chapterNumber = sortOrder === 'newest' ? chapters.length - index : index + 1;
+    <div className="flex flex-col gap-2">
+        {sortedChapters.map((chapter, index) => {
+            const showLock = !hasActiveSubscription && chapter.isPaid;
+            const isLastRead = lastReadChapterId === chapter.id;
+            
+            // --- УБРАЛИ НЕПРАВИЛЬНУЮ СТРОКУ 'const chapterNumber = ...' ---
 
-                                            return (
-                                                <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-3 rounded-lg cursor-pointer transition-all duration-300 border flex items-center justify-between hover:bg-background ${isLastRead ? 'bg-accent/10 border-accent/50' : 'border-transparent'}`}>
-                                                    <div className="flex items-center gap-4">
-                                                        <span className={`font-mono text-sm ${isLastRead ? 'text-accent' : 'text-text-secondary'}`}>{String(chapterNumber).padStart(2, '0')}</span>
-                                                        <div>
-                                                            <p className={`font-semibold ${showLock ? 'text-text-secondary' : 'text-text-main'}`}>{chapter.title}</p>
-                                                            <p className="text-text-secondary text-xs mt-1">{formatDate(chapter.published_at)}</p>
-                                                        </div>
-                                                    </div>
-                                                    {showLock && <LockIcon className="text-text-secondary" />}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
+            return (
+                <div key={chapter.id} onClick={() => handleChapterClick(chapter)} className={`p-3 rounded-lg cursor-pointer transition-all duration-300 border flex items-center justify-between hover:bg-background ${isLastRead ? 'bg-accent/10 border-accent/50' : 'border-transparent'}`}>
+                    <div className="flex items-center gap-4">
+                        
+                        {/* VVVV ИСПРАВЛЕННАЯ СТРОКА VVVV 
+                           (Используем 'chapter.chapter_number' из данных) */}
+                        <span className={`font-mono text-sm ${isLastRead ? 'text-accent' : 'text-text-secondary'}`}>{String(chapter.chapter_number).padStart(2, '0')}</span>
+                        
+                        <div>
+                            {/* VVVV ИСПРАВЛЕННАЯ СТРОКА VVVV 
+                               (Добавлен 'fallback' на случай, если у главы нет 'title') */}
+                            <p className={`font-semibold ${showLock ? 'text-text-secondary' : 'text-text-main'}`}>{chapter.title || `Глава ${chapter.chapter_number}`}</p>
+                            <p className="text-text-secondary text-xs mt-1">{formatDate(chapter.published_at)}</p>
+                        </div>
+                    </div>
+                    {showLock && <LockIcon className="text-text-secondary" />}
+                </div>
+            );
+        })}
+    </div>
+)}
                             </div>
                         </div>
                     )}

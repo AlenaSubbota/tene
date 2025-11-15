@@ -37,7 +37,6 @@ export const ProfilePage = ({ user, subscription, onGetSubscriptionClick, userId
                     <div>
                         {/* Эта строка уже была правильной (full_name) */}
                         <p className="font-bold text-lg">{user?.user_metadata?.full_name || 'Аноним'}</p>
-                        <p className="text-sm text-text-main/70">{user?.email}</p>
                     </div>
                     {/* ‼️ КНОПКА ВЫХОДА УДАЛЕНА ‼️ */}
                 </div>
